@@ -1,35 +1,39 @@
+# main.py
 from fastapi import FastAPI, Request
-from pydantic import BaseModel
 from claude_utils import run_claude
+from gpt_utils import run_gpt
+from utils import log_task
+import uvicorn
 
 app = FastAPI()
 
-@app.get("/")
-def read_root():
-    return {"status": "Operator dev server is live"}
-
-class RunPayload(BaseModel):
-    task: str
-    input: dict
-
 @app.post("/run")
-async def run_task(payload: RunPayload):
-    task_type = payload.task
-    input_data = payload.input
-
+async def run_task(req: Request):
+    data = await req.json()
+    task = data.get("task")
+    input_data = data.get("input")
+    
     try:
-        if task_type == "echo":
-            return {"result": input_data}
-
-        elif task_type == "claude":
-            prompt = input_data.get("prompt", "")
-            response = await run_claude(prompt)
-            return {"result": response}
-
+        if task == "claude":
+            prompt = input_data.get("prompt")
+            result = await run_claude(prompt)
+        elif task == "gpt":
+            prompt = input_data.get("prompt")
+            result = await run_gpt(prompt)
+        elif task == "summarize":
+            text = input_data.get("text")
+            result = await run_claude(f"Summarize the following: {text}")
+        elif task == "echo":
+            result = {"message": input_data.get("message")}
         else:
-            return {"error": f"Unknown task: {task_type}"}
+            return {"error": f"Unknown task type: {task}"}
+
+        await log_task(task, input_data, result)
+        return {"result": result}
 
     except Exception as e:
-        import traceback
-        traceback.print_exc()
+        await log_task(task, input_data, {"error": str(e)})
         return {"error": str(e)}
+
+if __name__ == "__main__":
+    uvicorn.run("main:app", host="0.0.0.0", port=7860, reload=True)
