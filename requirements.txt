@@ -2,3 +2,8 @@ fastapi
 uvicorn
 httpx
 python-dotenv
+openai
+anthropic
+google-api-python-client
+typer
+rich

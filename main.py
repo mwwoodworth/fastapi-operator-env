@@ -1,46 +1,46 @@
-# main.py
+import json
 import sys
-from fastapi import FastAPI, Request
-from claude_utils import run_claude
-from gpt_utils import run_gpt
-from utils import log_task
-from codex import brainops_operator
-import uvicorn
+import logging
+from typing import List
+import typer
+from codex.brainops_operator import run_task
 
-app = FastAPI()
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-@app.post("/run")
-async def run_task(req: Request):
-    data = await req.json()
-    task = data.get("task")
-    input_data = data.get("input")
+app = typer.Typer(add_completion=False, context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
+
+@app.callback(invoke_without_command=True)
+def main(ctx: typer.Context):
+    """Run BrainOps tasks from the command line."""
+    if not ctx.args:
+        typer.echo("Usage: python main.py <task_name> --key value ...")
+        raise typer.Exit(1)
+
+    task = ctx.args[0]
+    args = ctx.args[1:]
+    it = iter(args)
+    context = {}
+    for arg in it:
+        if not arg.startswith("--"):
+            typer.echo(f"Invalid argument {arg}")
+            raise typer.Exit(1)
+        key = arg.lstrip("-")
+        try:
+            value = next(it)
+        except StopIteration:
+            typer.echo(f"Missing value for {arg}")
+            raise typer.Exit(1)
+        context[key] = value
 
     try:
-        if task == "claude":
-            prompt = input_data.get("prompt")
-            result = await run_claude(prompt)
-        elif task == "gpt":
-            prompt = input_data.get("prompt")
-            result = await run_gpt(prompt)
-        elif task == "summarize":
-            text = input_data.get("text")
-            result = await run_claude(f"Summarize the following: {text}")
-        elif task == "echo":
-            result = {"message": input_data.get("message")}
-        else:
-            return {"error": f"Unknown task type: {task}"}
-
-        await log_task(task, input_data, result)
-        return {"result": result}
-
-    except Exception as e:
-        await log_task(task, input_data, {"error": str(e)})
-        return {"error": str(e)}
+        result = run_task(task, context)
+        typer.echo(json.dumps(result, indent=2))
+        raise typer.Exit(0)
+    except Exception as exc:
+        logger.error("Task failed: %s", exc)
+        typer.echo(json.dumps({"status": "error", "message": str(exc)}))
+        raise typer.Exit(1)
 
 if __name__ == "__main__":
-    if len(sys.argv) > 1:
-        task = sys.argv[1]
-        context = {}
-        brainops_operator.run_task(task, context)
-    else:
-        uvicorn.run("main:app", host="0.0.0.0", port=7860, reload=True)
+    app()

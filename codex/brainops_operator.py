@@ -1,33 +1,51 @@
 # codex/brainops_operator.py
+"""BrainOps task dispatcher."""
+
+import logging
+from typing import Callable, Dict
+
 from codex.tasks import (
-    vercel_deploy,
+    backup_site,
     fastapi_sync,
+    generate_roadmap,
+    refresh_content,
+    run_tests,
     seo_optimize,
     site_audit,
-    generate_roadmap,
-    run_tests,
-    backup_site,
-    refresh_content,
+    vercel_deploy,
 )
 
 
-def run_task(task: str, context: dict):
-    match task:
-        case "deploy_vercel":
-            vercel_deploy.run(context)
-        case "sync_fastapi":
-            fastapi_sync.run(context)
-        case "optimize_seo":
-            seo_optimize.run(context)
-        case "site_audit":
-            site_audit.run(context)
-        case "generate_roadmap":
-            generate_roadmap.run(context)
-        case "run_tests":
-            run_tests.run(context)
-        case "backup_site":
-            backup_site.run(context)
-        case "refresh_content":
-            refresh_content.run(context)
-        case _:
-            print(f"[❌] Unknown task: {task}")
+logger = logging.getLogger(__name__)
+
+TASK_MAP: Dict[str, Callable[[dict], dict]] = {
+    "deploy_vercel": vercel_deploy.run,
+    "sync_fastapi": fastapi_sync.run,
+    "optimize_seo": seo_optimize.run,
+    "site_audit": site_audit.run,
+    "generate_roadmap": generate_roadmap.run,
+    "run_tests": run_tests.run,
+    "backup_site": backup_site.run,
+    "refresh_content": refresh_content.run,
+}
+
+
+def run_task(task: str, context: dict) -> dict:
+    """Dispatch a task to the correct handler.
+
+    Parameters
+    ----------
+    task : str
+        Name of the task.
+    context : dict
+        Parameters for the task.
+    """
+
+    func = TASK_MAP.get(task)
+    if not func:
+        error = f"Unknown task: {task}"
+        logger.error(error)
+        raise ValueError(error)
+
+    logger.info("Running task %s with context %s", task, context)
+    return func(context)
