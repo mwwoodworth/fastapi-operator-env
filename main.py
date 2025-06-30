@@ -1,8 +1,10 @@
 # main.py
+import sys
 from fastapi import FastAPI, Request
 from claude_utils import run_claude
 from gpt_utils import run_gpt
 from utils import log_task
+from codex import brainops_operator
 import uvicorn
 
 app = FastAPI()
@@ -12,7 +14,7 @@ async def run_task(req: Request):
     data = await req.json()
     task = data.get("task")
     input_data = data.get("input")
-    
+
     try:
         if task == "claude":
             prompt = input_data.get("prompt")
@@ -36,4 +38,9 @@ async def run_task(req: Request):
         return {"error": str(e)}
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=7860, reload=True)
+    if len(sys.argv) > 1:
+        task = sys.argv[1]
+        context = {}
+        brainops_operator.run_task(task, context)
+    else:
+        uvicorn.run("main:app", host="0.0.0.0", port=7860, reload=True)
