@@ -11,6 +11,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from codex.tasks import secrets as secrets_task
+from codex.tasks import claude_summarize, claude_agent
 
 from codex import get_registry, run_task
 from codex.memory import memory_store
@@ -64,12 +65,39 @@ async def task_run(req: TaskRunRequest) -> JSONResponse:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
+@app.post("/task/generate")
+async def generate_task(req: dict) -> Dict[str, Any]:
+    return claude_agent.run(req)
+
+
+@app.post("/task/webhook")
+async def webhook_trigger(req: dict) -> Dict[str, Any]:
+    task = req.get("task")
+    context = req.get("context", {})
+    result = run_task(task, context)
+    return {"status": "success", "result": result}
+
+
 @app.get("/task/inspect/{task_id}")
 async def inspect_task(task_id: str) -> Dict[str, Any]:
     entry = memory_store.fetch_one(task_id)
-    if not entry:
+    log_entry = None
+    try:
+        from pathlib import Path
+        import json
+
+        log_file = Path("logs/task_log.json")
+        if log_file.exists():
+            history = json.loads(log_file.read_text())
+            for item in history:
+                if item.get("id") == task_id:
+                    log_entry = item
+                    break
+    except Exception:  # noqa: BLE001
+        log_entry = None
+    if not entry and not log_entry:
         raise HTTPException(status_code=404, detail="task not found")
-    return entry
+    return {"memory": entry, "log": log_entry}
 
 
 @app.get("/docs/registry")
@@ -107,6 +135,11 @@ async def list_secrets_api():
     return {"secrets": secrets_task.list_secrets()}
 
 
+@app.get("/memory/summary")
+async def memory_summary() -> Dict[str, Any]:
+    return claude_summarize.run({})
+
+
 @app.get("/health")
 async def health() -> Dict[str, str]:
     return {"status": "ok"}
@@ -120,6 +153,18 @@ def _parse_cli() -> tuple[str, Dict[str, Any]]:
     task = sys.argv[1]
     if task == "memory" and len(sys.argv) > 2 and sys.argv[2] == "view":
         return "memory_view", {}
+    if task == "secrets" and len(sys.argv) > 2:
+        action = sys.argv[2]
+        if action == "store" and len(sys.argv) >= 5:
+            return "secrets", {
+                "action": "store",
+                "name": sys.argv[3],
+                "value": sys.argv[4],
+            }
+        if action in {"retrieve", "delete"} and len(sys.argv) >= 4:
+            return "secrets", {"action": action, "name": sys.argv[3]}
+        if action == "list":
+            return "secrets", {"action": "list"}
     context: Dict[str, Any] = {}
     args = sys.argv[2:]
     key = None
