@@ -38,6 +38,11 @@ class TaskRunRequest(BaseModel):
     context: Dict[str, Any] | None = {}
 
 
+class NLDesignRequest(BaseModel):
+    goal: str
+    model: str | None = None
+
+
 @app.on_event("startup")
 async def startup_event() -> None:
     required = [
@@ -73,6 +78,14 @@ async def task_run(req: TaskRunRequest) -> JSONResponse:
 @app.post("/task/generate")
 async def generate_task(req: dict) -> Dict[str, Any]:
     return claude_agent.run(req)
+
+
+@app.post("/task/nl-design")
+async def nl_design(req: NLDesignRequest) -> Dict[str, Any]:
+    context = {"goal": req.goal}
+    if req.model:
+        context["model"] = req.model
+    return run_task("nl_task_designer", context)
 
 
 @app.post("/task/webhook")
@@ -153,6 +166,13 @@ async def list_secrets_api():
 @app.get("/memory/summary")
 async def memory_summary() -> Dict[str, Any]:
     return claude_summarize.run({})
+
+
+@app.get("/memory/query")
+async def memory_query(tags: str = "", limit: int = 10) -> Dict[str, Any]:
+    tag_list = [t.strip() for t in tags.split(",") if t.strip()]
+    entries = memory_store.query(tag_list, limit=limit)
+    return {"entries": entries}
 
 
 @app.get("/dashboard/status")
