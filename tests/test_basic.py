@@ -24,3 +24,10 @@ def test_diagnostics_state():
     resp = client.get('/diagnostics/state')
     assert resp.status_code == 200
     assert 'active_tasks' in resp.json()
+
+
+def test_voice_endpoints():
+    resp = client.get('/voice/history')
+    assert resp.status_code == 200
+    resp = client.get('/voice/status')
+    assert resp.status_code == 200

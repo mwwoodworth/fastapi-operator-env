@@ -40,3 +40,5 @@ Additional helpful endpoints:
 
 - `/webhook/make` - trigger tasks from Make.com.
 - `/diagnostics/state` - view operator status snapshot.
+- `/voice/status` - latest voice transcript processing info.
+- `/voice/history` - recent transcription records.

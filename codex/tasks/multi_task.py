@@ -74,10 +74,11 @@ def run(context: Dict[str, Any]) -> Dict[str, Any]:
     if not isinstance(tasks, list) or not tasks:
         return {"error": "tasks must be a non-empty list"}
 
+    extra = {k: v for k, v in context.items() if k not in {"tasks"}}
     results: List[Any] = []
     for task_def in tasks:
         task_id = task_def.get("task")
-        task_ctx = task_def.get("context", {})
+        task_ctx = {**extra, **task_def.get("context", {})}
         task_ctx = _resolve_context(task_ctx, results)
         result = run_task(task_id, task_ctx)
         results.append(result)

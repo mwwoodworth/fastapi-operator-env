@@ -8,6 +8,7 @@ import json
 from datetime import datetime
 from pathlib import Path
 import uuid
+import httpx
 from typing import Any, Dict
 
 from fastapi import FastAPI, HTTPException, Request, Header, UploadFile, File
@@ -303,25 +304,96 @@ async def voice_upload(file: UploadFile = File(...)) -> Dict[str, Any]:
 
     transcribed = run_task("whisper_transcribe", {"audio_path": str(dest)})
     text = transcribed.get("text", "")
-    tasks = run_task(
+
+    prompt_tasks = run_task(
         "chat_to_prompt",
-        {"message": text, "model": "claude", "memory_scope": 5, "auto_run": True},
+        {"message": text, "model": "claude", "memory_scope": 5},
     )
+    tasks_list = prompt_tasks.get("tasks", [])
+    run_result = None
+    if tasks_list:
+        run_result = run_task(
+            "multi_task",
+            {
+                "tasks": tasks_list,
+                "linked_audio": str(dest),
+                "input_origin": "transcription",
+            },
+        )
+
+    entry_id = str(uuid.uuid4())
+    transcript_id = dest.stem
     memory_store.save_memory(
         {
+            "id": entry_id,
             "task": "voice_upload",
             "input": str(dest),
-            "output": {"transcription": text, "tasks": tasks},
+            "output": {"transcription": text, "tasks": tasks_list, "run_result": run_result},
             "tags": ["voice", "transcription", "mobile"],
+            "metadata": {"transcript_id": transcript_id, "processed_by": "Claude"},
         }
     )
-    return {"transcription": text, "tasks": tasks}
+
+    try:
+        run_task(
+            "create_tana_node",
+            {
+                "content": text,
+                "metadata": {
+                    "source": "brainops-voice",
+                    "transcript_id": transcript_id,
+                    "linked_memory_id": entry_id,
+                },
+            },
+        )
+    except Exception:  # noqa: BLE001
+        logger.exception("Failed to sync to Tana")
+
+    return {"transcription": text, "tasks": tasks_list, "id": entry_id}
 
 
 @app.get("/voice/history")
 async def voice_history(limit: int = 20) -> Dict[str, Any]:
     records = memory_store.query(["voice"], limit=limit)
-    return {"entries": records}
+    history = []
+    for r in records:
+        history.append(
+            {
+                "id": r.get("metadata", {}).get("transcript_id") or r.get("id"),
+                "filename": Path(r.get("input", "")).name,
+                "transcript": r.get("output", {}).get("transcription", ""),
+                "timestamp": r.get("timestamp"),
+            }
+        )
+    return {"entries": history}
+
+
+@app.get("/voice/status")
+async def voice_status() -> Dict[str, Any]:
+    records = memory_store.query(["voice"], limit=1)
+    if not records:
+        return {
+            "latest_transcript": "",
+            "task_executed": False,
+            "memory_link": None,
+            "execution_status": "none",
+            "processed_by": None,
+        }
+    r = records[-1]
+    transcript = r.get("output", {}).get("transcription", "")
+    executed = bool(r.get("output", {}).get("run_result"))
+    status = "success"
+    result = r.get("output", {}).get("run_result")
+    if isinstance(result, dict) and result.get("error"):
+        status = "error"
+    processed = r.get("metadata", {}).get("processed_by", "Claude")
+    return {
+        "latest_transcript": transcript,
+        "task_executed": executed,
+        "memory_link": r.get("id"),
+        "execution_status": status,
+        "processed_by": processed,
+    }
 
 
 class StatusUpdate(BaseModel):
@@ -336,6 +408,32 @@ async def status_update(req: StatusUpdate) -> Dict[str, Any]:
     entry = req.dict()
     entry["tags"] = ["status_update"]
     memory_store.save_memory(entry)
+
+    try:
+        orig = memory_store.fetch_one(req.task_id)
+        node_id = orig.get("metadata", {}).get("node_id") if orig else None
+        if node_id and os.getenv("TANA_NODE_CALLBACK"):
+            headers = {}
+            if os.getenv("TANA_API_KEY"):
+                headers["Authorization"] = f"Bearer {os.getenv('TANA_API_KEY')}"
+            httpx.post(
+                "https://europe-west1.api.tana.inc/update/node",
+                json={"id": node_id, "content": req.message},
+                headers=headers,
+                timeout=10,
+            )
+            memory_store.save_memory(
+                {
+                    "task": "tana_callback",
+                    "input": entry,
+                    "output": {"node_id": node_id},
+                    "tags": ["feedback-returned"],
+                    "metadata": {"source": "tana-exec-sync", "node_id": node_id},
+                }
+            )
+    except Exception:  # noqa: BLE001
+        logger.exception("Tana callback failed")
+
     return {"status": "logged"}
 
 
