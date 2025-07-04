@@ -141,3 +141,9 @@ def query(tags: List[str] | None = None, limit: int = 10) -> List[Dict[str, Any]
     if tags:
         records = [r for r in records if set(tags).issubset(set(r.get("tags") or []))]
     return records[-limit:]
+
+
+def load_recent(limit: int = 5) -> str:
+    """Return recent memory entries concatenated as text."""
+    records = fetch_all(limit=limit)
+    return "\n\n".join(str(r.get("output") or r) for r in records)
