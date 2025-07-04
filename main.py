@@ -189,6 +189,40 @@ async def dashboard_status() -> Dict[str, Any]:
     }
 
 
+@app.get("/diagnostics/state")
+async def diagnostics_state() -> Dict[str, Any]:
+    active_tasks = 0
+    retry_queue = 0
+    last_summary = None
+    last_tana_push = None
+    try:
+        from supabase_client import supabase
+
+        res = supabase.table("task_queue").select("id").eq("status", "pending").execute()
+        active_tasks = len(res.data or [])
+        rq = supabase.table("retry_queue").select("id").eq("status", "pending").execute()
+        retry_queue = len(rq.data or [])
+    except Exception:  # noqa: BLE001
+        active_tasks = 0
+        retry_queue = 0
+    for item in reversed(memory_store.fetch_all(limit=20)):
+        if item.get("task") == "claude_memory_agent" or item.get("task") == "gemini_memory_agent":
+            last_summary = item.get("timestamp")
+            break
+    for item in reversed(memory_store.fetch_all(limit=50)):
+        if item.get("task") == "create_tana_node":
+            last_tana_push = item.get("timestamp")
+            break
+    secrets_loaded = [s for s in ["CLAUDE_API_KEY", "TANA_API_KEY"] if os.getenv(s)]
+    return {
+        "active_tasks": active_tasks,
+        "last_memory_summary": last_summary,
+        "retry_queue": retry_queue,
+        "secrets_loaded": secrets_loaded,
+        "last_successful_tana_push": last_tana_push,
+    }
+
+
 @app.get("/tana/scan")
 async def tana_scan() -> Dict[str, Any]:
     return tana_node_executor.run({})
@@ -205,6 +239,14 @@ def _parse_cli() -> tuple[str, Dict[str, Any]]:
     if len(sys.argv) < 2:
         return "", {}
     task = sys.argv[1]
+    if task == "task" and len(sys.argv) >= 4 and sys.argv[2] == "run":
+        import json as _json
+
+        try:
+            payload = _json.loads(sys.argv[3])
+        except Exception:  # noqa: BLE001
+            return "", {}
+        return payload.get("task", ""), payload.get("context", {})
     if task == "memory" and len(sys.argv) > 2:
         sub = sys.argv[2]
         if sub == "view":
