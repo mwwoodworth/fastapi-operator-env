@@ -6,6 +6,7 @@ import logging
 from datetime import datetime
 from pathlib import Path
 from utils.text_helpers import clean_ai_response
+from utils.template_loader import render_template
 
 TASK_ID = "claude_prompt"
 TASK_DESCRIPTION = "Send a prompt to Claude and return response"
@@ -28,7 +29,10 @@ def _append_log(prompt: str, completion: str) -> None:
 
 def run(context: dict) -> dict:
     """Execute a Claude API call."""
-    prompt = context.get("prompt", "")
+    if "template" in context:
+        prompt = render_template(context.get("template"), context.get("fields", {}))
+    else:
+        prompt = context.get("prompt", "")
     model = context.get("model", "claude-3-opus")
     temperature = context.get("temperature", 0.7)
 

@@ -25,11 +25,14 @@ def run(context: dict):
         "Content-Type": "application/json"
     }
 
-    payload = {
-        "nodes": [
-            {"name": content}
-        ]
-    }
+    metadata = context.get("metadata")
+    node = {"name": content}
+    if isinstance(metadata, dict):
+        tags = metadata.get("tags")
+        if tags:
+            node["supertags"] = tags
+        node["description"] = metadata.get("source", "")
+    payload = {"nodes": [node]}
 
     try:
         response = httpx.post(
