@@ -13,5 +13,7 @@ from . import (
     multi_task,
     rag_query,
     claude_summarize,
+    claude_agent,
+    claude_blog_from_memory,
     secrets,
 )
