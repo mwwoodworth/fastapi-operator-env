@@ -145,6 +145,28 @@ def mark_as_resolved(task_id: str, status: str, notes: str) -> None:
         _update_file(task_id, status, notes)
 
 
+def update_task(task_id: str, fields: Dict[str, Any]) -> None:
+    """Update fields on an inbox task."""
+    if _client:
+        try:  # pragma: no cover - network
+            _client.table(_TABLE).update(fields).eq("task_id", task_id).execute()
+            return
+        except Exception:  # noqa: BLE001
+            pass
+    if not _LOG_FILE.exists():
+        return
+    try:
+        data = json.loads(_LOG_FILE.read_text())
+    except Exception:  # noqa: BLE001
+        return
+    for item in data:
+        if item.get("task_id") == task_id:
+            item.update(fields)
+            item["updated"] = datetime.utcnow().isoformat()
+            break
+    _LOG_FILE.write_text(json.dumps(data, indent=2))
+
+
 def get_task(task_id: str) -> Optional[Dict[str, Any]]:
     """Retrieve a single inbox item."""
     if _client:
