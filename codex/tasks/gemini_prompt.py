@@ -7,6 +7,7 @@ from datetime import datetime
 from pathlib import Path
 from utils.text_helpers import clean_ai_response
 from utils.template_loader import render_template
+from utils.ai_logging import log_prompt
 
 TASK_ID = "gemini_prompt"
 TASK_DESCRIPTION = "Send a prompt to Gemini and return response"
@@ -51,6 +52,7 @@ def run(context: dict) -> dict:
         )
         completion = clean_ai_response(completion_raw)
         _append_log(prompt, completion)
+        log_prompt("gemini", TASK_ID, prompt, completion)
         logger.info("Gemini completion length %s", len(completion))
         return {"completion": completion}
     except Exception as exc:  # noqa: BLE001

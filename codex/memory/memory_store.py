@@ -118,3 +118,26 @@ def count_entries() -> int:
         except Exception:  # noqa: BLE001
             return 0
     return 0
+
+
+def query(tags: List[str] | None = None, limit: int = 10) -> List[Dict[str, Any]]:
+    """Query memory entries by tags."""
+    tags = tags or []
+    if _client:
+        try:
+            qry = (
+                _client.table("memory")
+                .select("*")
+                .order("timestamp", desc=True)
+                .limit(limit)
+            )
+            if tags:
+                qry = qry.contains("tags", tags)
+            res = qry.execute()
+            return list(res.data or [])
+        except Exception:  # noqa: BLE001
+            pass
+    records = fetch_all(limit=1000)
+    if tags:
+        records = [r for r in records if set(tags).issubset(set(r.get("tags") or []))]
+    return records[-limit:]
