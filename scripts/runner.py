@@ -7,6 +7,7 @@ import logging
 
 from codex import run_task
 from codex.memory import memory_store
+from codex.tasks import secrets
 
 logger = logging.getLogger(__name__)
 INTERVAL = 900  # 15 minutes
@@ -22,6 +23,10 @@ async def poll_and_run() -> None:
                     run_task(entry["task"], ctx)
                 except Exception as exc:  # noqa: BLE001
                     logger.error("Auto task failed: %s", exc)
+        try:
+            secrets.expire_old()
+        except Exception as exc:  # noqa: BLE001
+            logger.error("Secret expiration failed: %s", exc)
         await asyncio.sleep(INTERVAL)
 
 

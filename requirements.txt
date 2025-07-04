@@ -7,6 +7,7 @@ anthropic
 google-api-python-client
 typer
 rich
+cryptography
 supabase
 langchain
 langchain-community
