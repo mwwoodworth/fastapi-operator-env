@@ -8,4 +8,7 @@ from . import (
     backup_site,
     refresh_content,
     tana_create,
+    claude_prompt,
+    gemini_prompt,
+    multi_task,
 )
