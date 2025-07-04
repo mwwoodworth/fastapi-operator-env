@@ -40,11 +40,21 @@ def _append_file(entry: Dict[str, Any]) -> None:
     _LOG_FILE.write_text(json.dumps(history[-100:], indent=2))
 
 
-def save_memory(memory: Dict[str, Any]) -> None:
-    """Persist a memory entry."""
+def save_memory(memory: Dict[str, Any], origin: Dict[str, Any] | None = None) -> None:
+    """Persist a memory entry with optional origin metadata."""
     entry = memory.copy()
     entry.setdefault("id", str(uuid.uuid4()))
     entry.setdefault("timestamp", datetime.utcnow().isoformat())
+    if origin:
+        meta = entry.setdefault("metadata", {})
+        if isinstance(meta, dict):
+            meta.update(origin)
+        else:
+            entry["metadata"] = origin
+        if origin.get("tags"):
+            entry.setdefault("tags", [])
+            if isinstance(entry["tags"], list):
+                entry["tags"] = list(set(entry["tags"] + origin["tags"]))
     if _client:
         try:
             _client.table("memory").insert(entry).execute()

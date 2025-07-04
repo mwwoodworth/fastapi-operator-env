@@ -31,4 +31,5 @@ def run(context: Dict[str, Any]) -> Dict[str, Any]:
     return {
         "claude": claude.get("completion"),
         "gemini": gemini.get("completion"),
+        "executed_by": [claude.get("executed_by", "claude"), gemini.get("executed_by", "gemini")],
     }

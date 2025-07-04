@@ -25,6 +25,7 @@ def run(context: Dict[str, Any]) -> Dict[str, Any]:
     prompt = render_template("ai_blog_summary", {"title": title, "input": text})
     result = claude_prompt.run({"prompt": prompt})
     blog = result.get("completion", "")
+    executed_by = result.get("executed_by", "claude")
     memory_store.save_memory(
         {
             "task": TASK_ID,
@@ -32,11 +33,12 @@ def run(context: Dict[str, Any]) -> Dict[str, Any]:
             "output": blog,
             "user": context.get("user", "default"),
             "tags": ["blog"],
-        }
+        },
+        origin={"model": executed_by},
     )
     if context.get("tana"):
         try:
             tana_create.run({"content": blog, "metadata": {"tags": ["blog"]}})
         except Exception:  # noqa: BLE001
             logger.exception("Failed to send blog to Tana")
-    return {"blog": blog}
+    return {"blog": blog, "executed_by": executed_by}

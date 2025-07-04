@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Any, Dict, List
 
-from .memory import memory_store
+from .memory import memory_store, link_task_to_origin
 
 logger = logging.getLogger(__name__)
 
@@ -145,6 +145,19 @@ def run_task(task_id: str, context: Dict[str, Any]) -> Any:
         )
         _ERROR_LOG_FILE.write_text(json.dumps(history[-100:], indent=2))
     try:
+        origin_meta = {}
+        for key in [
+            "linked_transcript_id",
+            "model",
+            "source",
+            "node_id",
+            "task_generated_by",
+        ]:
+            if key in context:
+                origin_meta[key] = context[key]
+        if context.get("input_origin") == "transcription":
+            origin_meta.setdefault("source", "voice")
+            origin_meta.setdefault("tags", ["auto-generated", "from-transcript"])
         memory_store.save_memory(
             {
                 "id": log_entry_id,
@@ -154,10 +167,20 @@ def run_task(task_id: str, context: Dict[str, Any]) -> Any:
                 "user": context.get("user", "default"),
                 "tags": context.get("tags", []),
                 "status": status,
-            }
+            },
+            origin=origin_meta or None,
         )
     except Exception:  # noqa: BLE001
         pass
+    if status == "success":
+        try:
+            link_task_to_origin(
+                log_entry_id,
+                context.get("input_origin") or context.get("source") or "manual",
+                origin_meta,
+            )
+        except Exception:  # noqa: BLE001
+            pass
     return result
 
 

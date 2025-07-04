@@ -54,7 +54,7 @@ def run(context: dict) -> dict:
         _append_log(prompt, completion)
         log_prompt("gemini", TASK_ID, prompt, completion)
         logger.info("Gemini completion length %s", len(completion))
-        return {"completion": completion}
+        return {"completion": completion, "executed_by": "gemini"}
     except Exception as exc:  # noqa: BLE001
         logger.error("Gemini API call failed: %s", exc)
         return {"error": str(exc)}

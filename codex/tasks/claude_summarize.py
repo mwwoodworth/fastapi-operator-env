@@ -23,6 +23,7 @@ def run(context: Dict[str, Any]) -> Dict[str, Any]:
     prompt = f"Summarize the following information:\n{text}"
     result = claude_prompt.run({"prompt": prompt})
     summary = result.get("completion", "")
+    executed_by = result.get("executed_by", "claude")
     memory_store.save_memory(
         {
             "task": TASK_ID,
@@ -30,6 +31,7 @@ def run(context: Dict[str, Any]) -> Dict[str, Any]:
             "output": summary,
             "user": context.get("user", "default"),
             "tags": ["summary"],
-        }
+        },
+        origin={"model": executed_by},
     )
-    return {"summary": summary}
+    return {"summary": summary, "executed_by": executed_by}

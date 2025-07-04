@@ -37,6 +37,7 @@ def run(context: Dict[str, Any]) -> Dict[str, Any]:
     )
     result = claude_prompt.run({"prompt": prompt})
     summary = result.get("completion", "")
+    executed_by = result.get("executed_by", "claude")
     memory_store.save_memory(
         {
             "task": TASK_ID,
@@ -44,10 +45,11 @@ def run(context: Dict[str, Any]) -> Dict[str, Any]:
             "output": summary,
             "tags": ["summary"],
             "metadata": {"summary_of": SUMMARY_TAG},
-        }
+        },
+        origin={"model": executed_by},
     )
     try:
         tana_create.run({"content": summary, "metadata": {"tags": ["summary"]}})
     except Exception:  # noqa: BLE001
         logger.exception("Failed to send summary to Tana")
-    return {"summary": summary}
+    return {"summary": summary, "executed_by": executed_by}

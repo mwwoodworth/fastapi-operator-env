@@ -52,12 +52,14 @@ def run(context: Dict[str, Any]) -> Dict[str, Any]:
         result = claude_prompt.run({"prompt": prompt})
 
     final_prompt = result.get("completion", "")
+    executed_by = result.get("executed_by", model)
     memory_store.save_memory(
         {
             "task": TASK_ID,
             "input": context,
             "output": final_prompt,
             "tags": ["prompt"],
-        }
+        },
+        origin={"model": executed_by},
     )
-    return {"prompt": final_prompt}
+    return {"prompt": final_prompt, "executed_by": executed_by}

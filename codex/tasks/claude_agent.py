@@ -46,6 +46,7 @@ def run(context: Dict[str, Any]) -> Dict[str, Any]:
     )
     result = claude_prompt.run({"prompt": prompt})
     raw = result.get("completion", "")
+    executed_by = result.get("executed_by", "claude")
     try:
         task_data = json.loads(raw)
     except Exception as exc:  # noqa: BLE001
@@ -55,5 +56,5 @@ def run(context: Dict[str, Any]) -> Dict[str, Any]:
     tasks = task_data.get("tasks") or []
     multi_result = {}
     if tasks:
-        multi_result = multi_task.run({"tasks": tasks})
-    return {"generated": tasks, "result": multi_result}
+        multi_result = multi_task.run({"tasks": tasks, "task_generated_by": TASK_ID})
+    return {"generated": tasks, "result": multi_result, "executed_by": executed_by}

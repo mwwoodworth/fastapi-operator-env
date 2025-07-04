@@ -31,11 +31,13 @@ def run(context: Dict[str, Any]) -> Dict[str, Any]:
     )
     result = claude_prompt.run({"prompt": prompt, "model": "claude-3-opus"})
     completion = result.get("completion", "")
+    executed_by = result.get("executed_by", "claude")
     log_prompt("claude", TASK_ID, prompt, completion)
 
     try:
         data = json.loads(completion)
     except Exception:
-        return {"raw": completion}
+        return {"raw": completion, "executed_by": executed_by}
 
+    data["executed_by"] = executed_by
     return data
