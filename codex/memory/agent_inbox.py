@@ -28,6 +28,34 @@ if SUPABASE_AVAILABLE and _SUPABASE_URL and _SUPABASE_KEY:
 _LOG_FILE = Path("logs/inbox.json")
 
 from codex.tasks import ai_inbox_summarizer
+from codex.integrations import push_notify
+from codex.tasks import claude_prompt
+
+_ALERT_THRESHOLD = int(os.getenv("INBOX_ALERT_THRESHOLD", "3"))
+_LAST_ALERT_FILE = Path("logs/last_inbox_alert.txt")
+
+
+def _maybe_send_alert() -> None:
+    if _ALERT_THRESHOLD <= 0:
+        return
+    pending = len(get_pending_tasks(_ALERT_THRESHOLD + 1))
+    if pending < _ALERT_THRESHOLD:
+        return
+    last_ts = None
+    if _LAST_ALERT_FILE.exists():
+        try:
+            last_ts = datetime.fromisoformat(_LAST_ALERT_FILE.read_text().strip())
+        except Exception:
+            last_ts = None
+    if last_ts and (datetime.utcnow() - last_ts).total_seconds() < 3600:
+        return
+    items = get_pending_tasks(5)
+    summaries = [i.get("summary", {}).get("summary") for i in items]
+    prompt = "Summarize inbox: " + " ".join(summaries)
+    res = claude_prompt.run({"prompt": prompt})
+    msg = res.get("completion", "") or f"{pending} tasks pending"
+    push_notify.send_push("Inbox Pending", msg.strip(), url="/agent/inbox")
+    _LAST_ALERT_FILE.write_text(datetime.utcnow().isoformat())
 
 
 def _append_file(entry: Dict[str, Any]) -> None:
@@ -62,6 +90,7 @@ def add_to_inbox(task_id: str, context: Dict[str, Any], origin: str, model: str 
             _append_file(entry)
     else:
         _append_file(entry)
+    _maybe_send_alert()
     return entry
 
 

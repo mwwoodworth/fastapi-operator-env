@@ -4,6 +4,7 @@ os.environ.setdefault("FERNET_SECRET", "YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXoxMjM0
 os.environ.setdefault("SUPABASE_URL", "http://example.com")
 os.environ.setdefault("SUPABASE_SERVICE_KEY", "dummy")
 os.environ.setdefault("INBOX_SUMMARIZER_MODEL", "none")
+os.environ.setdefault("PUSH_WEBHOOK_URL", "")
 
 from fastapi.testclient import TestClient
 from main import app
@@ -46,4 +47,12 @@ def test_inbox_routes():
     resp = client.post('/agent/inbox/approve', json={"task_id": item["task_id"], "decision": "reject"})
     assert resp.status_code == 200
     resp = client.get('/agent/inbox/summary')
+    assert resp.status_code == 200
+
+def test_new_agent_routes():
+    resp = client.post('/agent/plan/daily')
+    assert resp.status_code == 200
+    resp = client.post('/agent/inbox/prioritize')
+    assert resp.status_code == 200
+    resp = client.get('/agent/inbox/mobile')
     assert resp.status_code == 200

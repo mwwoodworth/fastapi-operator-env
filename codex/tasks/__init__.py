@@ -20,5 +20,8 @@ from . import (
     github_push_trigger,
     tana_node_executor,
     ai_inbox_summarizer,
+    claude_calendar_planner,
+    inbox_prioritizer,
+    reminder_generator,
     secrets,
 )
