@@ -6,12 +6,17 @@ import logging
 import os
 from typing import Any, Dict
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request, Header
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from codex.tasks import secrets as secrets_task
-from codex.tasks import claude_summarize, claude_agent
+from codex.tasks import (
+    secrets as secrets_task,
+    claude_summarize,
+    claude_agent,
+    github_push_trigger,
+    tana_node_executor,
+)
 
 from codex import get_registry, run_task
 from codex.memory import memory_store
@@ -78,6 +83,16 @@ async def webhook_trigger(req: dict) -> Dict[str, Any]:
     return {"status": "success", "result": result}
 
 
+@app.post("/webhook/github")
+async def github_webhook(request: Request, x_hub_signature_256: str | None = Header(default=None)) -> Dict[str, Any]:
+    payload = await request.json()
+    raw = await request.body()
+    result = github_push_trigger.run({"payload": payload, "signature": x_hub_signature_256, "raw_body": raw})
+    if result.get("error"):
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
+
+
 @app.get("/task/inspect/{task_id}")
 async def inspect_task(task_id: str) -> Dict[str, Any]:
     entry = memory_store.fetch_one(task_id)
@@ -140,6 +155,45 @@ async def memory_summary() -> Dict[str, Any]:
     return claude_summarize.run({})
 
 
+@app.get("/dashboard/status")
+async def dashboard_status() -> Dict[str, Any]:
+    tasks_count = len(get_registry())
+    memory_count = memory_store.count_entries()
+    pending = 0
+    last_success = None
+    try:
+        from supabase_client import supabase
+
+        res = supabase.table("retry_queue").select("id").eq("status", "pending").execute()
+        pending = len(res.data or [])
+    except Exception:  # noqa: BLE001
+        pending = 0
+    try:
+        from pathlib import Path
+        import json
+
+        log_file = Path("logs/task_log.json")
+        if log_file.exists():
+            history = json.loads(log_file.read_text())
+            for item in reversed(history):
+                if not isinstance(item.get("result"), dict) or not item["result"].get("error"):
+                    last_success = item.get("timestamp")
+                    break
+    except Exception:  # noqa: BLE001
+        last_success = None
+    return {
+        "tasks_registered": tasks_count,
+        "memory_entries": memory_count,
+        "pending_retries": pending,
+        "last_successful_task": last_success,
+    }
+
+
+@app.get("/tana/scan")
+async def tana_scan() -> Dict[str, Any]:
+    return tana_node_executor.run({})
+
+
 @app.get("/health")
 async def health() -> Dict[str, str]:
     return {"status": "ok"}
@@ -151,8 +205,14 @@ def _parse_cli() -> tuple[str, Dict[str, Any]]:
     if len(sys.argv) < 2:
         return "", {}
     task = sys.argv[1]
-    if task == "memory" and len(sys.argv) > 2 and sys.argv[2] == "view":
-        return "memory_view", {}
+    if task == "memory" and len(sys.argv) > 2:
+        sub = sys.argv[2]
+        if sub == "view":
+            return "memory_view", {}
+        if sub == "summarize":
+            return "claude_memory_agent", {}
+    if task == "retry" and len(sys.argv) > 2 and sys.argv[2] == "queue":
+        return "retry_queue", {}
     if task == "secrets" and len(sys.argv) > 2:
         action = sys.argv[2]
         if action == "store" and len(sys.argv) >= 5:
@@ -186,7 +246,13 @@ if __name__ == "__main__":
         entries = memory_store.fetch_all()
         print(json.dumps(entries, indent=2))
     elif cmd:
-        result = run_task(cmd, ctx)
-        import json
+        if cmd == "retry_queue":
+            from scripts.runner import check_retry_queue
 
-        print(json.dumps(result, indent=2))
+            check_retry_queue()
+            print("retry queue processed")
+        else:
+            result = run_task(cmd, ctx)
+            import json
+
+            print(json.dumps(result, indent=2))

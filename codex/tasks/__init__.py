@@ -15,5 +15,9 @@ from . import (
     claude_summarize,
     claude_agent,
     claude_blog_from_memory,
+    claude_memory_agent,
+    gemini_memory_agent,
+    github_push_trigger,
+    tana_node_executor,
     secrets,
 )
