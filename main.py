@@ -283,6 +283,22 @@ async def memory_query(tags: str = "", limit: int = 10) -> Dict[str, Any]:
     return {"entries": entries}
 
 
+@app.get("/memory/trace/{task_id}")
+async def memory_trace(task_id: str) -> Dict[str, Any]:
+    entry = memory_store.fetch_one(task_id)
+    if not entry:
+        return {"error": "not_found"}
+    meta = entry.get("metadata") or {}
+    return {
+        "task": entry.get("task"),
+        "triggered_by": meta.get("source"),
+        "linked_transcript": meta.get("linked_transcript_id"),
+        "linked_node": meta.get("node_id"),
+        "executed_by": meta.get("model") or entry.get("output", {}).get("executed_by"),
+        "output": entry.get("output"),
+    }
+
+
 @app.get("/chat/history")
 async def chat_history(limit: int = 20, model: str | None = None, tags: str = "") -> Dict[str, Any]:
     tag_list = [t.strip() for t in tags.split(",") if t.strip()]
@@ -317,6 +333,9 @@ async def voice_upload(file: UploadFile = File(...)) -> Dict[str, Any]:
             {
                 "tasks": tasks_list,
                 "linked_audio": str(dest),
+                "linked_transcript_id": dest.stem,
+                "model": "claude",
+                "source": "voice",
                 "input_origin": "transcription",
             },
         )
@@ -331,7 +350,8 @@ async def voice_upload(file: UploadFile = File(...)) -> Dict[str, Any]:
             "output": {"transcription": text, "tasks": tasks_list, "run_result": run_result},
             "tags": ["voice", "transcription", "mobile"],
             "metadata": {"transcript_id": transcript_id, "processed_by": "Claude"},
-        }
+        },
+        origin={"model": "claude", "source": "voice"},
     )
 
     try:
@@ -366,6 +386,31 @@ async def voice_history(limit: int = 20) -> Dict[str, Any]:
             }
         )
     return {"entries": history}
+
+
+@app.get("/voice/trace/{transcript_id}")
+async def voice_trace(transcript_id: str) -> Dict[str, Any]:
+    limit = int(os.getenv("TRACE_VIEW_LIMIT", 50))
+    records = memory_store.fetch_all(limit=1000)
+    transcript = ""
+    tasks = []
+    outputs = []
+    executed_by = None
+    for r in records:
+        meta = r.get("metadata") or {}
+        if meta.get("transcript_id") == transcript_id and r.get("task") == "voice_upload":
+            transcript = r.get("output", {}).get("transcription", "")
+            executed_by = meta.get("processed_by")
+        if meta.get("linked_transcript_id") == transcript_id:
+            tasks.append(r.get("task"))
+            outputs.append(r)
+    outputs = outputs[:limit]
+    return {
+        "transcript": transcript,
+        "tasks_triggered": tasks,
+        "memory_outputs": outputs,
+        "executed_by": executed_by,
+    }
 
 
 @app.get("/voice/status")

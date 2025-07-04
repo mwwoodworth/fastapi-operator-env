@@ -31,9 +31,10 @@ def run(context: Dict[str, Any]) -> Dict[str, Any]:
     )
     result = gemini_prompt.run({"prompt": prompt})
     raw = result.get("completion", "")
+    executed_by = result.get("executed_by", "gemini")
     try:
         optimized = json.loads(raw)
     except Exception:
         logger.error("Failed to parse optimization output")
         optimized = None
-    return {"optimized": optimized, "raw": raw}
+    return {"optimized": optimized, "raw": raw, "executed_by": executed_by}

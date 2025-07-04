@@ -51,6 +51,7 @@ def run(context: Dict[str, Any]) -> Dict[str, Any]:
             else gemini_prompt.run({"prompt": prompt})
         )
     raw = ai_result.get("completion", "")
+    executed_by = ai_result.get("executed_by", model if model != "chain" else "claude")
     log_prompt(model, TASK_ID, prompt, raw)
 
     try:
@@ -62,6 +63,6 @@ def run(context: Dict[str, Any]) -> Dict[str, Any]:
     tasks = data.get("tasks") or []
     results = {}
     if tasks:
-        results = multi_task.run({"tasks": tasks})
+        results = multi_task.run({"tasks": tasks, "task_generated_by": TASK_ID})
 
-    return {"generated": tasks, "result": results}
+    return {"generated": tasks, "result": results, "executed_by": executed_by}

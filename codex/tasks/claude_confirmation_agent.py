@@ -31,9 +31,11 @@ def run(context: Dict[str, Any]) -> Dict[str, Any]:
     )
     result = claude_prompt.run({"prompt": prompt})
     raw = result.get("completion", "")
+    executed_by = result.get("executed_by", "claude")
     try:
         data = json.loads(raw)
     except Exception:  # noqa: BLE001
         decision = "adjust" if "adjust" in raw.lower() else ("no" if "no" in raw.lower() else "yes")
         data = {"decision": decision, "reason": raw}
+    data["executed_by"] = executed_by
     return data

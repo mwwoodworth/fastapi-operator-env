@@ -61,7 +61,7 @@ def run(context: dict) -> dict:
         _append_log(prompt, completion)
         log_prompt("claude", TASK_ID, prompt, completion)
         logger.info("Claude completion length %s", len(completion))
-        return {"completion": completion}
+        return {"completion": completion, "executed_by": "claude"}
     except Exception as exc:  # noqa: BLE001
         logger.error("Claude API call failed: %s", exc)
         return {"error": str(exc)}
