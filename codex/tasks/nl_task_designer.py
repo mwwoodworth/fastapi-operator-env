@@ -38,9 +38,18 @@ def run(context: Dict[str, Any]) -> Dict[str, Any]:
         "Respond only with a JSON object containing a 'tasks' list."
     )
 
-    ai_result = (
-        claude_prompt.run({"prompt": prompt}) if model == "claude" else gemini_prompt.run({"prompt": prompt})
-    )
+    if model == "chain":
+        first = claude_prompt.run({"prompt": prompt})
+        first_out = first.get("completion", "")
+        critique = gemini_prompt.run({"prompt": f"Critique and refine the following plan:\n{first_out}"})
+        critique_out = critique.get("completion", "")
+        ai_result = claude_prompt.run({"prompt": f"Summarize this refined plan in JSON:\n{critique_out}"})
+    else:
+        ai_result = (
+            claude_prompt.run({"prompt": prompt})
+            if model == "claude"
+            else gemini_prompt.run({"prompt": prompt})
+        )
     raw = ai_result.get("completion", "")
     log_prompt(model, TASK_ID, prompt, raw)
 

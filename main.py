@@ -4,6 +4,10 @@ from __future__ import annotations
 
 import logging
 import os
+import json
+from datetime import datetime
+from pathlib import Path
+import uuid
 from typing import Any, Dict
 
 from fastapi import FastAPI, HTTPException, Request, Header
@@ -16,11 +20,14 @@ from codex.tasks import (
     claude_agent,
     github_push_trigger,
     tana_node_executor,
+    claude_prompt,
+    gemini_prompt,
 )
 
 from codex import get_registry, run_task
 from codex.memory import memory_store
 from codex.integrations.make_webhook import router as make_webhook_router
+from utils.ai_router import get_ai_model
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("brainops.api")
@@ -41,6 +48,36 @@ class TaskRunRequest(BaseModel):
 class NLDesignRequest(BaseModel):
     goal: str
     model: str | None = None
+
+
+class ChatRequest(BaseModel):
+    message: str
+    model: str | None = None
+    memory_scope: str | int | None = 5
+    stream: bool | None = False
+
+
+class ChatToTaskRequest(BaseModel):
+    message: str
+    model: str | None = None
+    memory_scope: str | int | None = 5
+
+
+def _resolve_scope(scope: str | int | None) -> int:
+    """Parse memory scope value like 'last_5' into an integer."""
+    if scope is None:
+        return 5
+    if isinstance(scope, int):
+        return scope
+    if isinstance(scope, str) and scope.startswith("last_"):
+        try:
+            return int(scope.split("_", 1)[1])
+        except Exception:  # noqa: BLE001
+            return 5
+    try:
+        return int(scope)
+    except Exception:  # noqa: BLE001
+        return 5
 
 
 @app.on_event("startup")
@@ -86,6 +123,76 @@ async def nl_design(req: NLDesignRequest) -> Dict[str, Any]:
     if req.model:
         context["model"] = req.model
     return run_task("nl_task_designer", context)
+
+
+@app.post("/chat")
+async def chat_endpoint(req: ChatRequest) -> Dict[str, Any]:
+    model = req.model or get_ai_model(task="chat")
+    scope = _resolve_scope(req.memory_scope)
+    mem_text = memory_store.load_recent(scope)
+    system_prompt = os.getenv(
+        "CHAT_SYSTEM_PROMPT",
+        "You are BrainOps Operator, a fast, reliable assistant for project execution.",
+    )
+    prompt = f"{system_prompt}\n\nRecent memory:\n{mem_text}\nUser: {req.message}\nAssistant:"
+    ai_result = (
+        claude_prompt.run({"prompt": prompt}) if model == "claude" else gemini_prompt.run({"prompt": prompt})
+    )
+    completion = ai_result.get("completion", "")
+
+    task_suggestions = run_task(
+        "chat_to_prompt",
+        {"message": req.message, "model": "claude", "memory_scope": scope},
+    )
+    suggested = task_suggestions.get("tasks") or task_suggestions.get("generated")
+
+    entry_id = str(uuid.uuid4())
+    memory_entry = {
+        "id": entry_id,
+        "type": "chat",
+        "source": "chat",
+        "model": model,
+        "input": req.message,
+        "output": completion,
+        "tags": ["chat", "interactive"],
+        "timestamp": datetime.utcnow().isoformat(),
+    }
+    memory_store.save_memory(memory_entry)
+
+    log_path = Path(f"logs/chat_{model}.json")
+    history: list[dict[str, Any]] = []
+    if log_path.exists():
+        try:
+            history = json.loads(log_path.read_text())
+        except Exception:  # noqa: BLE001
+            history = []
+    history.append(
+        {
+            "prompt": prompt,
+            "memory": mem_text,
+            "result": completion,
+            "timestamp": memory_entry["timestamp"],
+            "suggested": suggested,
+        }
+    )
+    log_path.write_text(json.dumps(history[-200:], indent=2))
+
+    return {
+        "response": completion,
+        "model": model,
+        "suggested_tasks": suggested,
+        "memory_id": entry_id,
+    }
+
+
+@app.post("/chat/to-task")
+async def chat_to_task(req: ChatToTaskRequest) -> Dict[str, Any]:
+    context = {
+        "message": req.message,
+        "model": req.model,
+        "memory_scope": req.memory_scope,
+    }
+    return run_task("chat_to_prompt", context)
 
 
 @app.post("/task/webhook")
@@ -173,6 +280,16 @@ async def memory_query(tags: str = "", limit: int = 10) -> Dict[str, Any]:
     tag_list = [t.strip() for t in tags.split(",") if t.strip()]
     entries = memory_store.query(tag_list, limit=limit)
     return {"entries": entries}
+
+
+@app.get("/chat/history")
+async def chat_history(limit: int = 20, model: str | None = None, tags: str = "") -> Dict[str, Any]:
+    tag_list = [t.strip() for t in tags.split(",") if t.strip()]
+    tag_list.append("chat")
+    records = memory_store.query(tag_list, limit=limit)
+    if model:
+        records = [r for r in records if r.get("model") == model]
+    return {"entries": records}
 
 
 @app.get("/dashboard/status")

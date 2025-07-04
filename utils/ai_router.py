@@ -6,9 +6,9 @@ import os
 
 
 def get_ai_model(task: str | None = None) -> str:
-    """Return 'claude' or 'gemini' based on the task name and env var."""
+    """Return 'claude', 'gemini', or 'chain' based on task name and env var."""
     mode = os.getenv("AI_ROUTER_MODE", "auto")
-    if mode in {"claude", "gemini"}:
+    if mode in {"claude", "gemini", "chain"}:
         return mode
 
     if not task:
