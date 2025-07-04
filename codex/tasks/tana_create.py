@@ -1,6 +1,12 @@
+"""Create a simple node in Tana."""
+
 import httpx
 import os
 import logging
+
+TASK_ID = "create_tana_node"
+TASK_DESCRIPTION = "Create a node in Tana with provided content"
+REQUIRED_FIELDS = ["content"]
 
 TANA_API_KEY = os.getenv("TANA_API_KEY")
 

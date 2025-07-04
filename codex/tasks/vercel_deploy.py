@@ -1,5 +1,8 @@
 """Vercel deployment task."""
 
+TASK_ID = "deploy_vercel"
+TASK_DESCRIPTION = "Deploy a project using the Vercel CLI"
+
 import logging
 import os
 import subprocess

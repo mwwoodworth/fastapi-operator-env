@@ -3,7 +3,7 @@ import datetime
 import json
 from pathlib import Path
 
-LOG_FILE = Path("ai_task_log.json")
+LOG_FILE = Path("logs/task_log.json")
 
 async def log_task(task_type, input_data, result_data):
     entry = {
@@ -18,5 +18,7 @@ async def log_task(task_type, input_data, result_data):
             history = json.loads(LOG_FILE.read_text())
         except Exception:
             pass
+    else:
+        LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
     history.append(entry)
     LOG_FILE.write_text(json.dumps(history[-50:], indent=2))  # Keep only last 50 logs
