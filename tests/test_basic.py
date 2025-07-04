@@ -5,6 +5,9 @@ os.environ.setdefault("SUPABASE_URL", "http://example.com")
 os.environ.setdefault("SUPABASE_SERVICE_KEY", "dummy")
 os.environ.setdefault("INBOX_SUMMARIZER_MODEL", "none")
 os.environ.setdefault("PUSH_WEBHOOK_URL", "")
+os.environ.setdefault("MEMORY_SYNC_AGENT", "true")
+os.environ.setdefault("AI_COAUTHOR_MODE", "enabled")
+os.environ.setdefault("AI_FEEDBACK_CHAIN", "true")
 
 from fastapi.testclient import TestClient
 from main import app
@@ -77,4 +80,21 @@ def test_recurring_and_delay_routes():
     resp = client.post('/agent/inbox/delay', json={"task_id": item["task_id"], "delay_until": "2100-01-01T00:00"})
     assert resp.status_code == 200
     resp = client.get('/dashboard/tasks')
+    assert resp.status_code == 200
+
+
+def test_new_phase16_routes():
+    resp = client.post('/memory/sync/agents')
+    assert resp.status_code == 200
+
+    resp = client.post('/task/ai-coauthor', json={"intent": "test"})
+    assert resp.status_code == 200
+
+    resp = client.post('/agent/workflows/audit')
+    assert resp.status_code == 200
+
+    resp = client.post('/memory/audit/diff', json={"task_id": "claude_prompt"})
+    assert resp.status_code == 200
+
+    resp = client.get('/dashboard/sync')
     assert resp.status_code == 200

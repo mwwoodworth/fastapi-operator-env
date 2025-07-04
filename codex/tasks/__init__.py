@@ -24,4 +24,9 @@ from . import (
     inbox_prioritizer,
     reminder_generator,
     secrets,
+    memory_sync_agent,
+    ai_coauthored_composer,
+    workflow_audit_agent,
+    template_optimizer,
+    memory_diff_checker,
 )

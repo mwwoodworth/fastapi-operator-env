@@ -570,6 +570,34 @@ async def optimize_flow(req: dict) -> Dict[str, Any]:
     return result
 
 
+@app.post("/memory/sync/agents")
+async def memory_sync_agents() -> Dict[str, Any]:
+    return run_task("memory_sync_agent", {})
+
+
+class MemoryDiffRequest(BaseModel):
+    task_id: str
+
+
+@app.post("/memory/audit/diff")
+async def memory_audit_diff(req: MemoryDiffRequest) -> Dict[str, Any]:
+    return run_task("memory_diff_checker", req.dict())
+
+
+class CoAuthorRequest(BaseModel):
+    intent: str
+
+
+@app.post("/task/ai-coauthor")
+async def task_ai_coauthor(req: CoAuthorRequest) -> Dict[str, Any]:
+    return run_task("ai_coauthored_composer", req.dict())
+
+
+@app.post("/agent/workflows/audit")
+async def workflows_audit() -> Dict[str, Any]:
+    return run_task("workflow_audit_agent", {})
+
+
 class MobileTask(BaseModel):
     voice_message: str
 
@@ -675,6 +703,25 @@ async def dashboard_full() -> Dict[str, Any]:
         "supabase": supabase_status,
     })
     return base
+
+
+@app.get("/dashboard/sync")
+async def dashboard_sync() -> Dict[str, Any]:
+    records = memory_store.fetch_all(limit=200)
+    syncs = len([r for r in records if r.get("task") == "memory_sync_agent"]) 
+    coauthored = len([r for r in records if r.get("task") == "ai_coauthored_composer"]) 
+    discrepancy_time = None
+    for r in reversed(records):
+        if r.get("task") == "memory_diff_checker" and r.get("output") and isinstance(r.get("output"), dict) and r["output"].get("discrepancy"):
+            discrepancy_time = r.get("timestamp")
+            break
+    repairs = len([r for r in records if r.get("task") == "workflow_audit_agent"]) 
+    return {
+        "claude_gemini_syncs": syncs,
+        "coauthored_tasks": coauthored,
+        "last_discrepancy": discrepancy_time,
+        "repair_suggestions": repairs,
+    }
 
 
 @app.get("/diagnostics/state")
