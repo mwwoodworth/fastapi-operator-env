@@ -12,9 +12,9 @@ python main.py <task_name> --key value
 ### API
 Start the server:
 ```bash
-uvicorn main_api:app --host 0.0.0.0 --port 8000
+uvicorn main:app --host 0.0.0.0 --port 10000
 ```
-Then POST to `/run-task` with JSON body:
+Then POST to `/task/run` with JSON body:
 ```json
 {"task": "deploy_vercel", "context": {"project_path": "."}}
 ```
@@ -24,3 +24,5 @@ Copy `.env.example` to `.env` and fill in the required keys.
 
 ## Tasks
 Tasks live in `codex/tasks/` and each implements a `run(context)` function returning structured results.
+
+You can view available tasks by calling the `/docs/registry` endpoint once the server is running.
