@@ -5,10 +5,11 @@ import os
 from pathlib import Path
 from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel
+from typing import Optional, List, Dict
 from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
 
-from codex.brainops_operator import run_task
+from codex import brainops_operator
 from codex.integrations.make_webhook import router as make_webhook_router
 
 load_dotenv()
@@ -22,14 +23,30 @@ app = FastAPI()
 app.include_router(make_webhook_router)
 
 
-class TanaRequest(BaseModel):
+class TanaCreateRequest(BaseModel):
     content: str
+    tags: Optional[List[str]] = []
+    fields: Optional[Dict[str, str]] = {}
+    children: Optional[List[str]] = []
 
 
 @app.post("/tana/create-node")
-async def create_tana_node(request: TanaRequest):
-    run_task("create_tana_node", {"content": request.content})
-    return {"status": "submitted", "content": request.content}
+async def create_tana_node(req: TanaCreateRequest):
+    context = {
+        "content": req.content,
+        "tags": req.tags,
+        "fields": req.fields,
+        "children": req.children,
+    }
+    brainops_operator.run_task("create_tana_node", context)
+    return {"status": "submitted", "payload": context}
+
+
+@app.post("/tana/from-assistant")
+async def tana_from_assistant(req: Request):
+    payload = await req.json()
+    brainops_operator.run_task("create_tana_node", payload)
+    return {"status": "assistant_note_received"}
 
 @app.post("/run-task")
 async def run_task_endpoint(payload: dict):
@@ -40,7 +57,7 @@ async def run_task_endpoint(payload: dict):
 
     logger.info("Received task %s", task)
     try:
-        result = run_task(task, context)
+        result = brainops_operator.run_task(task, context)
         record = {"status": "success", "result": result}
         _log_history(task, context, record)
         return JSONResponse(record)
