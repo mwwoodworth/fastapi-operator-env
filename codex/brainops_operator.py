@@ -82,6 +82,7 @@ def _log_task(task: str, context: dict, result: Any) -> None:
         "task": task,
         "context": context,
         "result": result,
+        "retry": context.get("retry", 0),
     }
     history: List[dict] = []
     if _LOG_FILE.exists():
@@ -101,7 +102,26 @@ def run_task(task_id: str, context: Dict[str, Any]) -> Any:
     task_def = registry.get(task_id)
     if not task_def:
         raise ValueError(f"Unknown task: {task_id}")
-    result = task_def.func(context)
+    retry = int(context.get("retry", 0))
+    try:
+        result = task_def.func(context)
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("Task %s failed", task_id)
+        result = {"error": str(exc)}
+        if retry < 3:
+            try:
+                from supabase_client import supabase
+
+                supabase.table("retry_queue").insert(
+                    {
+                        "task": task_id,
+                        "context": context,
+                        "retry": retry + 1,
+                        "status": "pending",
+                    }
+                ).execute()
+            except Exception as e:  # noqa: BLE001
+                logger.error("Failed to queue retry: %s", e)
     log_entry_id = _log_task(task_id, context, result)
     try:
         memory_store.save_memory(

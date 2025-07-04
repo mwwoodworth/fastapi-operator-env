@@ -102,3 +102,19 @@ def fetch_one(entry_id: str) -> Optional[Dict[str, Any]]:
         except Exception:  # noqa: BLE001
             return None
     return None
+
+
+def count_entries() -> int:
+    """Return total number of memory records."""
+    if _client:
+        try:
+            res = _client.table("memory").select("id", count="exact").execute()
+            return int(res.count or 0)
+        except Exception:  # noqa: BLE001
+            pass
+    if _LOG_FILE.exists():
+        try:
+            return len(json.loads(_LOG_FILE.read_text()))
+        except Exception:  # noqa: BLE001
+            return 0
+    return 0
