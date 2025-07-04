@@ -67,6 +67,12 @@ class ChatToTaskRequest(BaseModel):
     memory_scope: str | int | None = 5
 
 
+class KnowledgeQueryRequest(BaseModel):
+    query: str
+    sources: list[str] | None = None
+    model: str | None = None
+
+
 def _resolve_scope(scope: str | int | None) -> int:
     """Parse memory scope value like 'last_5' into an integer."""
     if scope is None:
@@ -284,6 +290,35 @@ async def memory_query(tags: str = "", limit: int = 10) -> Dict[str, Any]:
     tag_list = [t.strip() for t in tags.split(",") if t.strip()]
     entries = memory_store.query(tag_list, limit=limit)
     return {"entries": entries}
+
+
+@app.post("/knowledge/index")
+async def knowledge_index() -> Dict[str, Any]:
+    from codex.memory import doc_indexer
+    docs = doc_indexer.index_documents()
+    return {"indexed": len(docs)}
+
+
+@app.post("/knowledge/query")
+async def knowledge_query(req: KnowledgeQueryRequest) -> Dict[str, Any]:
+    context = {
+        "query": req.query,
+        "sources": req.sources,
+        "model": req.model,
+    }
+    return run_task("unified_rag_agent", context)
+
+
+@app.get("/knowledge/sources")
+async def knowledge_sources() -> Dict[str, Any]:
+    from codex.memory import doc_indexer
+    return {"docs": doc_indexer.list_sources()}
+
+
+@app.get("/logs/rag")
+async def rag_logs(limit: int = 20) -> Dict[str, Any]:
+    from utils import rag_logger
+    return {"entries": rag_logger.load_logs(limit)}
 
 
 @app.get("/memory/trace/{task_id}")

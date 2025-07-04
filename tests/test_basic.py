@@ -119,3 +119,21 @@ def test_new_phase17_routes():
         json={"tasks": [{"task": "A"}, {"task": "B", "depends_on": "A"}]},
     )
     assert resp.status_code == 200
+
+
+def test_phase18_knowledge_routes():
+    resp = client.post('/knowledge/index')
+    assert resp.status_code == 200
+
+    resp = client.post(
+        '/knowledge/query',
+        json={"query": "Claude recommended", "sources": ["local_docs"]},
+    )
+    assert resp.status_code == 200
+    assert 'summary' in resp.json()
+
+    resp = client.get('/knowledge/sources')
+    assert resp.status_code == 200
+
+    resp = client.get('/logs/rag')
+    assert resp.status_code == 200
