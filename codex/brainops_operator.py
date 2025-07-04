@@ -13,6 +13,7 @@ from codex.tasks import (
     seo_optimize,
     site_audit,
     vercel_deploy,
+    tana_create,
 )
 
 
@@ -41,11 +42,16 @@ def run_task(task: str, context: dict) -> dict:
         Parameters for the task.
     """
 
-    func = TASK_MAP.get(task)
-    if not func:
-        error = f"Unknown task: {task}"
-        logger.error(error)
-        raise ValueError(error)
+    match task:
+        case "create_tana_node":
+            tana_create.run(context)
+            return {"status": "submitted"}
+        case _:
+            func = TASK_MAP.get(task)
+            if not func:
+                error = f"Unknown task: {task}"
+                logger.error(error)
+                raise ValueError(error)
 
-    logger.info("Running task %s with context %s", task, context)
-    return func(context)
+            logger.info("Running task %s with context %s", task, context)
+            return func(context)

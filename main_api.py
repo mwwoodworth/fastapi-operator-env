@@ -4,6 +4,7 @@ import json
 import os
 from pathlib import Path
 from fastapi import FastAPI, HTTPException, Request
+from pydantic import BaseModel
 from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
 
@@ -19,6 +20,16 @@ logger = logging.getLogger("brainops.api")
 
 app = FastAPI()
 app.include_router(make_webhook_router)
+
+
+class TanaRequest(BaseModel):
+    content: str
+
+
+@app.post("/tana/create-node")
+async def create_tana_node(request: TanaRequest):
+    run_task("create_tana_node", {"content": request.content})
+    return {"status": "submitted", "content": request.content}
 
 @app.post("/run-task")
 async def run_task_endpoint(payload: dict):
