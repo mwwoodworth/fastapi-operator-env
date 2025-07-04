@@ -7,9 +7,12 @@ import importlib
 import json
 import logging
 import pkgutil
+import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Any, Dict, List
+
+from .memory import memory_store
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +75,9 @@ def get_registry() -> Dict[str, TaskDefinition]:
 
 def _log_task(task: str, context: dict, result: Any) -> None:
     _LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
+    entry_id = str(uuid.uuid4())
     entry = {
+        "id": entry_id,
         "timestamp": datetime.datetime.utcnow().isoformat(),
         "task": task,
         "context": context,
@@ -86,6 +91,7 @@ def _log_task(task: str, context: dict, result: Any) -> None:
             history = []
     history.append(entry)
     _LOG_FILE.write_text(json.dumps(history[-100:], indent=2))
+    return entry_id
 
 
 def run_task(task_id: str, context: Dict[str, Any]) -> Any:
@@ -96,7 +102,20 @@ def run_task(task_id: str, context: Dict[str, Any]) -> Any:
     if not task_def:
         raise ValueError(f"Unknown task: {task_id}")
     result = task_def.func(context)
-    _log_task(task_id, context, result)
+    log_entry_id = _log_task(task_id, context, result)
+    try:
+        memory_store.save_memory(
+            {
+                "id": log_entry_id,
+                "task": task_id,
+                "input": context,
+                "output": result,
+                "user": context.get("user", "default"),
+                "tags": context.get("tags", []),
+            }
+        )
+    except Exception:  # noqa: BLE001
+        pass
     return result
 
 
