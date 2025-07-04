@@ -1,0 +1,10 @@
+{
+  "roof_blog_intro": {
+    "template": "Write a compelling introduction for a blog post titled: {{title}}",
+    "fields": ["title"]
+  },
+  "ai_exec_summary": {
+    "template": "Summarize these tasks: {{tasks}} for executive review",
+    "fields": ["tasks"]
+  }
+}

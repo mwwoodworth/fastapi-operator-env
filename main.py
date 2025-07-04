@@ -11,6 +11,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from codex import get_registry, run_task
+from codex.memory import memory_store
 from codex.integrations.make_webhook import router as make_webhook_router
 
 logging.basicConfig(level=logging.INFO)
@@ -61,6 +62,14 @@ async def task_run(req: TaskRunRequest) -> JSONResponse:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
+@app.get("/task/inspect/{task_id}")
+async def inspect_task(task_id: str) -> Dict[str, Any]:
+    entry = memory_store.fetch_one(task_id)
+    if not entry:
+        raise HTTPException(status_code=404, detail="task not found")
+    return entry
+
+
 @app.get("/docs/registry")
 async def docs_registry() -> Dict[str, Any]:
     registry = {
@@ -76,3 +85,38 @@ async def docs_registry() -> Dict[str, Any]:
 @app.get("/health")
 async def health() -> Dict[str, str]:
     return {"status": "ok"}
+
+
+def _parse_cli() -> tuple[str, Dict[str, Any]]:
+    import sys
+
+    if len(sys.argv) < 2:
+        return "", {}
+    task = sys.argv[1]
+    if task == "memory" and len(sys.argv) > 2 and sys.argv[2] == "view":
+        return "memory_view", {}
+    context: Dict[str, Any] = {}
+    args = sys.argv[2:]
+    key = None
+    for arg in args:
+        if arg.startswith("--"):
+            key = arg[2:]
+            context[key] = ""
+        elif key:
+            context[key] = arg
+            key = None
+    return task, context
+
+
+if __name__ == "__main__":
+    cmd, ctx = _parse_cli()
+    if cmd == "memory_view":
+        import json
+
+        entries = memory_store.fetch_all()
+        print(json.dumps(entries, indent=2))
+    elif cmd:
+        result = run_task(cmd, ctx)
+        import json
+
+        print(json.dumps(result, indent=2))
