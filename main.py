@@ -513,6 +513,35 @@ async def agent_inbox_summary() -> Dict[str, Any]:
     return agent_inbox.get_summary()
 
 
+@app.post("/agent/plan/daily")
+async def agent_daily_plan() -> Dict[str, Any]:
+    return run_task("claude_calendar_planner", {})
+
+
+@app.post("/agent/inbox/prioritize")
+async def agent_inbox_prioritize() -> Dict[str, Any]:
+    return run_task("inbox_prioritizer", {})
+
+
+@app.get("/agent/inbox/mobile")
+async def agent_inbox_mobile() -> Dict[str, Any]:
+    tasks = agent_inbox.get_pending_tasks(10)
+    counts: Dict[str, int] = {}
+    for t in tasks:
+        origin = t.get("origin", "other")
+        counts[origin] = counts.get(origin, 0) + 1
+    summary_parts = [f"{v} {k}" for k, v in counts.items()]
+    summary = f"{len(tasks)} items pending. " + ", ".join(summary_parts)
+    top = tasks[0] if tasks else {}
+    return {
+        "summary": summary,
+        "top_task": {
+            "task_id": top.get("task_id"),
+            "summary": (top.get("summary") or {}).get("summary"),
+        },
+    }
+
+
 @app.post("/optimize/flow")
 async def optimize_flow(req: dict) -> Dict[str, Any]:
     history = req.get("history")
