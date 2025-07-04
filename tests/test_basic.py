@@ -56,3 +56,25 @@ def test_new_agent_routes():
     assert resp.status_code == 200
     resp = client.get('/agent/inbox/mobile')
     assert resp.status_code == 200
+
+
+def test_recurring_and_delay_routes():
+    # add recurring task
+    payload = {
+        "task": "claude_prompt",
+        "context": {"prompt": "test"},
+        "frequency": "weekly",
+        "day": "Monday",
+        "time": "08:00"
+    }
+    resp = client.post('/agent/recurring/add', json=payload)
+    assert resp.status_code == 200
+    resp = client.get('/agent/recurring')
+    assert resp.status_code == 200
+    # delay inbox task
+    from codex.memory import agent_inbox
+    item = agent_inbox.add_to_inbox("sample_task", {"foo": "bar"}, "test")
+    resp = client.post('/agent/inbox/delay', json={"task_id": item["task_id"], "delay_until": "2100-01-01T00:00"})
+    assert resp.status_code == 200
+    resp = client.get('/dashboard/tasks')
+    assert resp.status_code == 200

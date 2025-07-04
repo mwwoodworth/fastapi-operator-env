@@ -23,6 +23,9 @@ from codex.tasks import (
     tana_node_executor,
     claude_prompt,
     gemini_prompt,
+    recurring_task_engine,
+    task_rescheduler,
+    weekly_priority_review,
 )
 
 from codex import get_registry, run_task
@@ -482,6 +485,13 @@ class InboxDecision(BaseModel):
     edit_context: Dict[str, Any] | None = None
 
 
+class DelayRequest(BaseModel):
+    task_id: str
+    delay_until: str
+    note: str | None = ""
+    fallback: str | None = "notify"
+
+
 @app.get("/agent/inbox")
 async def agent_inbox_view(limit: int = 10) -> List[Dict[str, Any]]:
     return agent_inbox.get_pending_tasks(limit)
@@ -506,6 +516,17 @@ async def agent_inbox_approve(req: InboxDecision) -> Dict[str, Any]:
         agent_inbox.mark_as_resolved(req.task_id, "edited", req.notes or "")
         return {"status": "edited", "result": result}
     raise HTTPException(status_code=400, detail="invalid_decision")
+
+
+@app.post("/agent/inbox/delay")
+async def agent_inbox_delay(req: DelayRequest) -> Dict[str, Any]:
+    item = agent_inbox.get_task(req.task_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="not_found")
+    task_rescheduler.record_delay(
+        req.task_id, req.delay_until, req.note, req.fallback
+    )
+    return {"status": "delayed"}
 
 
 @app.get("/agent/inbox/summary")
@@ -553,6 +574,15 @@ class MobileTask(BaseModel):
     voice_message: str
 
 
+class RecurringTask(BaseModel):
+    task: str
+    context: Dict[str, Any] | None = {}
+    frequency: str
+    day: str | None = None
+    time: str
+    enabled: bool | None = True
+
+
 @app.post("/mobile/task")
 async def mobile_task(req: MobileTask) -> Dict[str, Any]:
     message = req.voice_message
@@ -565,6 +595,17 @@ async def mobile_task(req: MobileTask) -> Dict[str, Any]:
     for t in tasks:
         queued.append(agent_inbox.add_to_inbox(t.get("task"), t.get("context", {}), "mobile"))
     return {"task_id": [q.get("task_id") for q in queued], "summary": [q.get("summary") for q in queued]}
+
+
+@app.get("/agent/recurring")
+async def get_recurring() -> List[Dict[str, Any]]:
+    return recurring_task_engine.get_recurring_tasks()
+
+
+@app.post("/agent/recurring/add")
+async def add_recurring(req: RecurringTask) -> Dict[str, Any]:
+    entry = recurring_task_engine.add_recurring_task(req.dict())
+    return {"added": entry}
 
 
 @app.get("/dashboard/status")
@@ -598,6 +639,24 @@ async def dashboard_status() -> Dict[str, Any]:
         "memory_entries": memory_count,
         "pending_retries": pending,
         "last_successful_task": last_success,
+    }
+
+
+@app.get("/dashboard/tasks")
+async def dashboard_tasks() -> Dict[str, Any]:
+    pending = len(agent_inbox.get_pending_tasks(100))
+    recurring_enabled = len([
+        t for t in recurring_task_engine.get_recurring_tasks() if t.get("enabled", True)
+    ])
+    delayed = len([
+        t for t in agent_inbox.get_pending_tasks(100) if t.get("delay_until")
+    ])
+    last_review = weekly_priority_review.get_last_review_time()
+    return {
+        "pending": pending,
+        "recurring_enabled": recurring_enabled,
+        "delayed_tasks": delayed,
+        "last_priority_review": last_review,
     }
 
 
