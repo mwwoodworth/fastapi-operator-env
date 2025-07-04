@@ -10,6 +10,8 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
+from codex.tasks import secrets as secrets_task
+
 from codex import get_registry, run_task
 from codex.memory import memory_store
 from codex.integrations.make_webhook import router as make_webhook_router
@@ -80,6 +82,29 @@ async def docs_registry() -> Dict[str, Any]:
         for key, value in get_registry().items()
     }
     return registry
+
+
+@app.post("/secrets/store")
+async def store_secret_api(req: dict):
+    secrets_task.store_secret(req["name"], req["value"])
+    return {"status": "stored"}
+
+
+@app.get("/secrets/retrieve/{name}")
+async def retrieve_secret_api(name: str):
+    val = secrets_task.retrieve_secret(name)
+    return {"value": val}
+
+
+@app.delete("/secrets/delete/{name}")
+async def delete_secret_api(name: str):
+    secrets_task.delete_secret(name)
+    return {"status": "deleted"}
+
+
+@app.get("/secrets/list")
+async def list_secrets_api():
+    return {"secrets": secrets_task.list_secrets()}
 
 
 @app.get("/health")

@@ -13,4 +13,5 @@ from . import (
     multi_task,
     rag_query,
     claude_summarize,
+    secrets,
 )

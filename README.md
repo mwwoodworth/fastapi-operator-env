@@ -25,4 +25,12 @@ Copy `.env.example` to `.env` and fill in the required keys.
 ## Tasks
 Tasks live in `codex/tasks/` and each implements a `run(context)` function returning structured results.
 
+### Secrets Vault
+
+The API exposes endpoints under `/secrets` for storing and retrieving encrypted credentials. Example:
+
+```bash
+curl -X POST http://localhost:10000/secrets/store -H "Content-Type: application/json" -d '{"name":"CLAUDE_API_KEY","value":"sk-xyz"}'
+```
+
 You can view available tasks by calling the `/docs/registry` endpoint once the server is running.
