@@ -10,7 +10,7 @@ from pathlib import Path
 import uuid
 from typing import Any, Dict
 
-from fastapi import FastAPI, HTTPException, Request, Header
+from fastapi import FastAPI, HTTPException, Request, Header, UploadFile, File
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
@@ -290,6 +290,60 @@ async def chat_history(limit: int = 20, model: str | None = None, tags: str = ""
     if model:
         records = [r for r in records if r.get("model") == model]
     return {"entries": records}
+
+
+@app.post("/voice/upload")
+async def voice_upload(file: UploadFile = File(...)) -> Dict[str, Any]:
+    """Upload an audio file and process it into tasks."""
+    upload_dir = Path(os.getenv("VOICE_UPLOAD_DIR", "uploads"))
+    upload_dir.mkdir(parents=True, exist_ok=True)
+    dest = upload_dir / file.filename
+    with dest.open("wb") as f:
+        f.write(await file.read())
+
+    transcribed = run_task("whisper_transcribe", {"audio_path": str(dest)})
+    text = transcribed.get("text", "")
+    tasks = run_task(
+        "chat_to_prompt",
+        {"message": text, "model": "claude", "memory_scope": 5, "auto_run": True},
+    )
+    memory_store.save_memory(
+        {
+            "task": "voice_upload",
+            "input": str(dest),
+            "output": {"transcription": text, "tasks": tasks},
+            "tags": ["voice", "transcription", "mobile"],
+        }
+    )
+    return {"transcription": text, "tasks": tasks}
+
+
+@app.get("/voice/history")
+async def voice_history(limit: int = 20) -> Dict[str, Any]:
+    records = memory_store.query(["voice"], limit=limit)
+    return {"entries": records}
+
+
+class StatusUpdate(BaseModel):
+    task_id: str
+    status: str
+    message: str
+    timestamp: str | None = None
+
+
+@app.post("/webhook/status-update")
+async def status_update(req: StatusUpdate) -> Dict[str, Any]:
+    entry = req.dict()
+    entry["tags"] = ["status_update"]
+    memory_store.save_memory(entry)
+    return {"status": "logged"}
+
+
+@app.post("/optimize/flow")
+async def optimize_flow(req: dict) -> Dict[str, Any]:
+    history = req.get("history")
+    result = run_task("gemini_optimize_taskflow", {"history": history})
+    return result
 
 
 @app.get("/dashboard/status")
