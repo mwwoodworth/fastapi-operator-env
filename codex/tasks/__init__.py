@@ -7,4 +7,5 @@ from . import (
     run_tests,
     backup_site,
     refresh_content,
+    tana_create,
 )
