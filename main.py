@@ -9,7 +9,7 @@ from datetime import datetime
 from pathlib import Path
 import uuid
 import httpx
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 from fastapi import FastAPI, HTTPException, Request, Header, UploadFile, File
 from fastapi.responses import JSONResponse
@@ -26,7 +26,7 @@ from codex.tasks import (
 )
 
 from codex import get_registry, run_task
-from codex.memory import memory_store
+from codex.memory import memory_store, agent_inbox
 from codex.integrations.make_webhook import router as make_webhook_router
 from utils.ai_router import get_ai_model
 
@@ -328,17 +328,10 @@ async def voice_upload(file: UploadFile = File(...)) -> Dict[str, Any]:
     tasks_list = prompt_tasks.get("tasks", [])
     run_result = None
     if tasks_list:
-        run_result = run_task(
-            "multi_task",
-            {
-                "tasks": tasks_list,
-                "linked_audio": str(dest),
-                "linked_transcript_id": dest.stem,
-                "model": "claude",
-                "source": "voice",
-                "input_origin": "transcription",
-            },
-        )
+        from codex.memory import agent_inbox
+
+        for task in tasks_list:
+            agent_inbox.add_to_inbox(task.get("task"), task.get("context", {}), "voice")
 
     entry_id = str(uuid.uuid4())
     transcript_id = dest.stem
@@ -482,11 +475,67 @@ async def status_update(req: StatusUpdate) -> Dict[str, Any]:
     return {"status": "logged"}
 
 
+class InboxDecision(BaseModel):
+    task_id: str
+    decision: str
+    notes: str | None = ""
+    edit_context: Dict[str, Any] | None = None
+
+
+@app.get("/agent/inbox")
+async def agent_inbox_view(limit: int = 10) -> List[Dict[str, Any]]:
+    return agent_inbox.get_pending_tasks(limit)
+
+
+@app.post("/agent/inbox/approve")
+async def agent_inbox_approve(req: InboxDecision) -> Dict[str, Any]:
+    item = agent_inbox.get_task(req.task_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="not_found")
+    if req.decision == "approve":
+        context = req.edit_context or item.get("context", {})
+        result = run_task(item["task_id"], context)
+        agent_inbox.mark_as_resolved(req.task_id, "approved", req.notes or "")
+        return {"status": "approved", "result": result}
+    if req.decision == "reject":
+        agent_inbox.mark_as_resolved(req.task_id, "rejected", req.notes or "")
+        return {"status": "rejected"}
+    if req.decision == "edit":
+        context = req.edit_context or item.get("context", {})
+        result = run_task(item["task_id"], context)
+        agent_inbox.mark_as_resolved(req.task_id, "edited", req.notes or "")
+        return {"status": "edited", "result": result}
+    raise HTTPException(status_code=400, detail="invalid_decision")
+
+
+@app.get("/agent/inbox/summary")
+async def agent_inbox_summary() -> Dict[str, Any]:
+    return agent_inbox.get_summary()
+
+
 @app.post("/optimize/flow")
 async def optimize_flow(req: dict) -> Dict[str, Any]:
     history = req.get("history")
     result = run_task("gemini_optimize_taskflow", {"history": history})
     return result
+
+
+class MobileTask(BaseModel):
+    voice_message: str
+
+
+@app.post("/mobile/task")
+async def mobile_task(req: MobileTask) -> Dict[str, Any]:
+    message = req.voice_message
+    prompt_result = run_task(
+        "chat_to_prompt",
+        {"message": message, "model": "claude", "memory_scope": 5},
+    )
+    tasks = prompt_result.get("tasks") or []
+    queued: List[Dict[str, Any]] = []
+    for t in tasks:
+        queued.append(agent_inbox.add_to_inbox(t.get("task"), t.get("context", {}), "mobile"))
+    return {"task_id": [q.get("task_id") for q in queued], "summary": [q.get("summary") for q in queued]}
 
 
 @app.get("/dashboard/status")
@@ -521,6 +570,23 @@ async def dashboard_status() -> Dict[str, Any]:
         "pending_retries": pending,
         "last_successful_task": last_success,
     }
+
+
+@app.get("/dashboard/full")
+async def dashboard_full() -> Dict[str, Any]:
+    base = dashboard_status()
+    inbox = agent_inbox.get_summary()
+    supabase_status = bool(os.getenv("SUPABASE_URL"))
+    last_entry = memory_store.fetch_all(limit=1)
+    last_model = None
+    if last_entry:
+        last_model = last_entry[0].get("metadata", {}).get("model")
+    base.update({
+        "inbox": inbox,
+        "last_model": last_model,
+        "supabase": supabase_status,
+    })
+    return base
 
 
 @app.get("/diagnostics/state")
