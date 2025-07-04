@@ -19,5 +19,6 @@ from . import (
     gemini_memory_agent,
     github_push_trigger,
     tana_node_executor,
+    ai_inbox_summarizer,
     secrets,
 )

@@ -42,3 +42,8 @@ Additional helpful endpoints:
 - `/diagnostics/state` - view operator status snapshot.
 - `/voice/status` - latest voice transcript processing info.
 - `/voice/history` - recent transcription records.
+- `/agent/inbox` - pending task queue.
+- `/agent/inbox/approve` - approve or reject tasks.
+- `/agent/inbox/summary` - inbox counts overview.
+- `/dashboard/full` - extended operator metrics.
+- `/mobile/task` - quick mobile task capture.
