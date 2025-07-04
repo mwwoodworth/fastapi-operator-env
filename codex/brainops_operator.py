@@ -17,6 +17,7 @@ from .memory import memory_store
 logger = logging.getLogger(__name__)
 
 _LOG_FILE = Path("logs/task_log.json")
+_ERROR_LOG_FILE = Path("logs/error_log.json")
 
 
 @dataclass
@@ -123,6 +124,26 @@ def run_task(task_id: str, context: Dict[str, Any]) -> Any:
             except Exception as e:  # noqa: BLE001
                 logger.error("Failed to queue retry: %s", e)
     log_entry_id = _log_task(task_id, context, result)
+    status = "success"
+    if isinstance(result, dict) and result.get("error"):
+        status = "failed"
+        _ERROR_LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
+        history = []
+        if _ERROR_LOG_FILE.exists():
+            try:
+                history = json.loads(_ERROR_LOG_FILE.read_text())
+            except Exception:  # noqa: BLE001
+                history = []
+        history.append(
+            {
+                "id": log_entry_id,
+                "timestamp": datetime.datetime.utcnow().isoformat(),
+                "task": task_id,
+                "context": context,
+                "error": result.get("error"),
+            }
+        )
+        _ERROR_LOG_FILE.write_text(json.dumps(history[-100:], indent=2))
     try:
         memory_store.save_memory(
             {
@@ -132,6 +153,7 @@ def run_task(task_id: str, context: Dict[str, Any]) -> Any:
                 "output": result,
                 "user": context.get("user", "default"),
                 "tags": context.get("tags", []),
+                "status": status,
             }
         )
     except Exception:  # noqa: BLE001

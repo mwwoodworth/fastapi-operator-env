@@ -12,6 +12,8 @@ async def handle_webhook(payload: dict, x_make_secret: str | None = Header(defau
 
     task = payload.get("task")
     context = payload.get("context", {})
+    if isinstance(context, dict):
+        context.setdefault("source", "make-webhook")
     if not task:
         raise HTTPException(status_code=400, detail="'task' is required")
 

@@ -9,6 +9,7 @@ from typing import Any, Dict
 import httpx
 
 from codex.brainops_operator import run_task
+from codex.memory import memory_store
 from . import tana_create
 
 TASK_ID = "tana_node_executor"
@@ -52,12 +53,27 @@ def run(context: Dict[str, Any]) -> Dict[str, Any]:
                     payload = _json.loads(payload)
                 except Exception:
                     continue
+            if payload.get("feedback"):
+                try:
+                    memory_store.save_memory(
+                        {
+                            "task": TASK_ID,
+                            "input": payload,
+                            "output": payload.get("content"),
+                            "tags": ["feedback"],
+                            "metadata": {
+                                "source": "tana-feedback",
+                                "node_id": node.get("id"),
+                            },
+                        }
+                    )
+                except Exception:  # noqa: BLE001
+                    logger.exception("Failed to record feedback")
             task_id = payload.get("task")
             task_ctx = payload.get("context", {})
-            if not task_id:
-                continue
-            result = run_task(task_id, task_ctx)
-            results.append(result)
+            if task_id:
+                result = run_task(task_id, task_ctx)
+                results.append(result)
             if node.get("id"):
                 try:
                     tana_create.run(

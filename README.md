@@ -5,8 +5,9 @@ This repository contains a lightweight task runner and API server used by the Br
 ## Usage
 
 ### CLI
+Run tasks locally using either key/value flags or the JSON wrapper:
 ```bash
-python main.py <task_name> --key value
+python main.py task run '{"task": "create_tana_node", "context": {"content": "CLI test"}}'
 ```
 
 ### API
@@ -34,3 +35,8 @@ curl -X POST http://localhost:10000/secrets/store -H "Content-Type: application/
 ```
 
 You can view available tasks by calling the `/docs/registry` endpoint once the server is running.
+
+Additional helpful endpoints:
+
+- `/webhook/make` - trigger tasks from Make.com.
+- `/diagnostics/state` - view operator status snapshot.
