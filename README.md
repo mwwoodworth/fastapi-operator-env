@@ -47,3 +47,7 @@ Additional helpful endpoints:
 - `/agent/inbox/summary` - inbox counts overview.
 - `/dashboard/full` - extended operator metrics.
 - `/mobile/task` - quick mobile task capture.
+- `/agent/forecast/weekly` - generate a 7-day forecast plan.
+- `/dashboard/forecast` - view the rolling task timeline.
+- `/agent/strategy/weekly` - run the weekly strategy agent.
+- `/task/dependency-map` - create a dependency map for tasks.

@@ -598,6 +598,31 @@ async def workflows_audit() -> Dict[str, Any]:
     return run_task("workflow_audit_agent", {})
 
 
+@app.post("/agent/forecast/weekly")
+async def agent_forecast_weekly(req: dict | None = None) -> Dict[str, Any]:
+    context = req or {"goal": "Optimize AI pipeline delivery over the next 7 days"}
+    return run_task("strategy_forecaster", context)
+
+
+@app.get("/dashboard/forecast")
+async def dashboard_forecast() -> Dict[str, Any]:
+    return run_task("timeline_builder", {})
+
+
+@app.post("/agent/strategy/weekly")
+async def agent_strategy_weekly() -> Dict[str, Any]:
+    return run_task("claude_strategy_agent", {})
+
+
+class DependencyMapRequest(BaseModel):
+    tasks: List[Dict[str, Any]]
+
+
+@app.post("/task/dependency-map")
+async def task_dependency_map(req: DependencyMapRequest) -> Dict[str, Any]:
+    return run_task("gemini_dependency_map", {"tasks": req.tasks})
+
+
 class MobileTask(BaseModel):
     voice_message: str
 

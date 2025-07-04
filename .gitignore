@@ -206,3 +206,6 @@ marimo/_static/
 marimo/_lsp/
 __marimo__/
 rag_cache/
+logs/
+recurring_tasks.json
+delayed_tasks.json

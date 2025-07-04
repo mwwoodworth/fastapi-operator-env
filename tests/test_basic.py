@@ -8,6 +8,10 @@ os.environ.setdefault("PUSH_WEBHOOK_URL", "")
 os.environ.setdefault("MEMORY_SYNC_AGENT", "true")
 os.environ.setdefault("AI_COAUTHOR_MODE", "enabled")
 os.environ.setdefault("AI_FEEDBACK_CHAIN", "true")
+os.environ.setdefault("FORECAST_PLANNER_ENABLED", "true")
+os.environ.setdefault("WEEKLY_STRATEGY_DAY", "Sunday")
+os.environ.setdefault("DAILY_PLANNER_MODEL", "claude")
+os.environ.setdefault("ESCALATION_CHECK_INTERVAL", "1800")
 
 from fastapi.testclient import TestClient
 from main import app
@@ -97,4 +101,21 @@ def test_new_phase16_routes():
     assert resp.status_code == 200
 
     resp = client.get('/dashboard/sync')
+    assert resp.status_code == 200
+
+
+def test_new_phase17_routes():
+    resp = client.post('/agent/forecast/weekly')
+    assert resp.status_code == 200
+
+    resp = client.get('/dashboard/forecast')
+    assert resp.status_code == 200
+
+    resp = client.post('/agent/strategy/weekly')
+    assert resp.status_code == 200
+
+    resp = client.post(
+        '/task/dependency-map',
+        json={"tasks": [{"task": "A"}, {"task": "B", "depends_on": "A"}]},
+    )
     assert resp.status_code == 200
