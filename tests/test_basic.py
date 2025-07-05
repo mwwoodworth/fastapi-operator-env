@@ -155,3 +155,16 @@ def test_search_and_error_logs():
     resp = client.get('/logs/errors')
     assert resp.status_code == 200
     assert 'entries' in resp.json()
+
+
+def test_basic_auth_enforced():
+    os.environ['BASIC_AUTH_USERS'] = '{"user":"pass"}'
+    os.environ['ADMIN_USERS'] = 'user'
+    import importlib
+    import main as main_module
+    importlib.reload(main_module)
+    auth_client = TestClient(main_module.app)
+    resp = auth_client.get('/health')
+    assert resp.status_code == 401
+    resp = auth_client.get('/health', auth=("user", "pass"))
+    assert resp.status_code == 200
