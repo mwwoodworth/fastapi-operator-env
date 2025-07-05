@@ -50,6 +50,9 @@ Additional helpful endpoints:
 - `/agent/inbox/summary` - inbox counts overview.
 - `/dashboard/full` - extended operator metrics.
 - `/dashboard/metrics` - summary counts of tasks and memory logs.
+- `/dashboard/ui` - live dashboard interface.
+- `/memory/search` - search memories with filters.
+- `/logs/errors` - recent error entries.
 - `/mobile/task` - quick mobile task capture.
 - `/agent/forecast/weekly` - generate a 7-day forecast plan.
 - `/dashboard/forecast` - view the rolling task timeline.

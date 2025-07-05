@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>BrainOps Metrics Dashboard</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bulma/0.9.4/css/bulma.min.css">
+<style>
+  body { padding: 1rem; }
+  .dark-mode { background:#121212;color:#eee; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script src="https://unpkg.com/react/umd/react.development.js"></script>
+<script src="https://unpkg.com/react-dom/umd/react-dom.development.js"></script>
+<script src="https://unpkg.com/recharts/umd/Recharts.min.js"></script>
+<script src="https://unpkg.com/framer-motion/dist/framer-motion.umd.js"></script>
+<script>
+const { useState, useEffect } = React;
+
+function Dashboard() {
+  const [data, setData] = useState({});
+  const [dark, setDark] = useState(false);
+
+  const load = () => {
+    fetch('/dashboard/metrics').then(r => r.json()).then(setData);
+  };
+  useEffect(() => {
+    load();
+    const id = setInterval(load, 5000);
+    return () => clearInterval(id);
+  }, []);
+
+  const areaData = [
+    { name: 'Tasks', value: data.tasks_logged || 0 },
+    { name: 'Errors', value: data.errors_logged || 0 },
+    { name: 'Memory', value: data.memory_entries || 0 }
+  ];
+
+  const toggleDark = () => setDark(!dark);
+
+  return React.createElement('div', { className: dark ? 'dark-mode' : '' },
+    React.createElement('button', { className: 'button is-small', onClick: toggleDark }, dark ? 'Light' : 'Dark'),
+    React.createElement('h2', { className: 'title' }, 'Metrics'),
+    React.createElement(Recharts.PieChart, { width: 300, height: 300 },
+      React.createElement(Recharts.Pie, {
+        dataKey: 'value', data: areaData, cx: 150, cy: 150, outerRadius: 100, fill: '#00d1b2',
+        label: entry => entry.name
+      })
+    ),
+    React.createElement('p', null, 'Last Task: ' + (data.last_task_time || 'n/a')),
+    React.createElement('p', null, 'Last Memory: ' + (data.last_memory_time || 'n/a'))
+  );
+}
+
+ReactDOM.render(React.createElement(Dashboard), document.getElementById('root'));
+</script>
+</body>
+</html>
