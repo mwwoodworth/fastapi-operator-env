@@ -772,6 +772,44 @@ async def dashboard_full() -> Dict[str, Any]:
     return base
 
 
+@app.get("/dashboard/metrics")
+async def dashboard_metrics() -> Dict[str, Any]:
+    """Return basic counts from log files."""
+    log_file = Path("logs/task_log.json")
+    tasks_logged = 0
+    unique_tasks = 0
+    last_task = None
+    if log_file.exists():
+        try:
+            data = json.loads(log_file.read_text())
+            tasks_logged = len(data)
+            unique_tasks = len({d.get("task") for d in data})
+            if data:
+                last_task = data[-1].get("timestamp")
+        except Exception:  # noqa: BLE001
+            pass
+    error_file = Path("logs/error_log.json")
+    errors = 0
+    if error_file.exists():
+        try:
+            errors = len(json.loads(error_file.read_text()))
+        except Exception:  # noqa: BLE001
+            errors = 0
+    mem_count = memory_store.count_entries()
+    last_mem_time = None
+    records = memory_store.fetch_all(limit=1)
+    if records:
+        last_mem_time = records[0].get("timestamp")
+    return {
+        "tasks_logged": tasks_logged,
+        "unique_tasks": unique_tasks,
+        "errors_logged": errors,
+        "memory_entries": mem_count,
+        "last_task_time": last_task,
+        "last_memory_time": last_mem_time,
+    }
+
+
 @app.get("/dashboard/sync")
 async def dashboard_sync() -> Dict[str, Any]:
     records = memory_store.fetch_all(limit=200)

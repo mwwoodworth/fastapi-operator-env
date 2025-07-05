@@ -137,3 +137,10 @@ def test_phase18_knowledge_routes():
 
     resp = client.get('/logs/rag')
     assert resp.status_code == 200
+
+
+def test_dashboard_metrics():
+    resp = client.get('/dashboard/metrics')
+    assert resp.status_code == 200
+    data = resp.json()
+    assert 'tasks_logged' in data
