@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import os
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -44,7 +44,7 @@ def save_memory(memory: Dict[str, Any], origin: Dict[str, Any] | None = None) ->
     """Persist a memory entry with optional origin metadata."""
     entry = memory.copy()
     entry.setdefault("id", str(uuid.uuid4()))
-    entry.setdefault("timestamp", datetime.utcnow().isoformat())
+    entry.setdefault("timestamp", datetime.now(timezone.utc).isoformat())
     if origin:
         meta = entry.setdefault("metadata", {})
         if isinstance(meta, dict):

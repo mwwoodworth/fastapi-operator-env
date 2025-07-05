@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 def run(context: dict) -> dict:
     """Create a simple ROADMAP.md stub.
 
-    TODO: Integrate Gemini or GPT for automatic content generation.
+    Placeholder for future AI-assisted roadmap generation.
     """
 
     project = context.get("project_name", "MyProject")

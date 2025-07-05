@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List
 
@@ -47,7 +47,7 @@ def add_recurring_task(entry: Dict[str, Any]) -> Dict[str, Any]:
 def run(context: Dict[str, Any] | None = None) -> Dict[str, Any]:
     """Check for due recurring tasks and add them to inbox."""
     tasks = _load()
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     triggered: List[str] = []
     for t in tasks:
         if not t.get("enabled", True):

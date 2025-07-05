@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -47,7 +47,7 @@ def _maybe_send_alert() -> None:
             last_ts = datetime.fromisoformat(_LAST_ALERT_FILE.read_text().strip())
         except Exception:
             last_ts = None
-    if last_ts and (datetime.utcnow() - last_ts).total_seconds() < 3600:
+    if last_ts and (datetime.now(timezone.utc) - last_ts).total_seconds() < 3600:
         return
     items = get_pending_tasks(5)
     summaries = [i.get("summary", {}).get("summary") for i in items]
@@ -55,7 +55,7 @@ def _maybe_send_alert() -> None:
     res = claude_prompt.run({"prompt": prompt})
     msg = res.get("completion", "") or f"{pending} tasks pending"
     push_notify.send_push("Inbox Pending", msg.strip(), url="/agent/inbox")
-    _LAST_ALERT_FILE.write_text(datetime.utcnow().isoformat())
+    _LAST_ALERT_FILE.write_text(datetime.now(timezone.utc).isoformat())
 
 
 def _append_file(entry: Dict[str, Any]) -> None:
@@ -80,7 +80,7 @@ def add_to_inbox(task_id: str, context: Dict[str, Any], origin: str, model: str 
         "model": model,
         "context": context,
         "status": "pending",
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "summary": summary,
     }
     if _client:
@@ -129,7 +129,7 @@ def _update_file(task_id: str, status: str, notes: str) -> None:
         if item.get("task_id") == task_id:
             item["status"] = status
             item["notes"] = notes
-            item["updated"] = datetime.utcnow().isoformat()
+            item["updated"] = datetime.now(timezone.utc).isoformat()
             break
     _LOG_FILE.write_text(json.dumps(data, indent=2))
 
@@ -162,7 +162,7 @@ def update_task(task_id: str, fields: Dict[str, Any]) -> None:
     for item in data:
         if item.get("task_id") == task_id:
             item.update(fields)
-            item["updated"] = datetime.utcnow().isoformat()
+            item["updated"] = datetime.now(timezone.utc).isoformat()
             break
     _LOG_FILE.write_text(json.dumps(data, indent=2))
 

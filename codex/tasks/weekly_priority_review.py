@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List
 
@@ -34,7 +34,7 @@ def run(context: Dict[str, Any] | None = None) -> Dict[str, Any]:
     )
     ai = claude_prompt.run({"prompt": prompt})
     _LAST_FILE.parent.mkdir(exist_ok=True)
-    _LAST_FILE.write_text(datetime.utcnow().isoformat())
+    _LAST_FILE.write_text(datetime.now(timezone.utc).isoformat())
     memory_store.save_memory(
         {
             "task": TASK_ID,

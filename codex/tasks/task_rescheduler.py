@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List
 
@@ -47,7 +47,7 @@ def record_delay(task_id: str, delay_until: str, note: str | None = None, fallba
 def run(context: Dict[str, Any] | None = None) -> Dict[str, Any]:
     """Check for expired delays and determine next action."""
     tasks = _load()
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     remaining: List[Dict[str, Any]] = []
     actions: List[Dict[str, Any]] = []
     for t in tasks:

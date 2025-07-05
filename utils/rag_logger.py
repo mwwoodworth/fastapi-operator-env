@@ -3,7 +3,7 @@ from __future__ import annotations
 """Logging utilities for knowledge retrieval queries."""
 
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List
 
@@ -37,6 +37,6 @@ def create_entry(query: str, sources: List[str], summary: str, model: str) -> Di
         "query": query,
         "sources_used": sources,
         "results_summary": summary,
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "model": model,
     }

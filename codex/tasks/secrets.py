@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import json
 from pathlib import Path
 
@@ -20,7 +20,7 @@ _AUDIT_FILE = Path("logs/secrets_audit.json")
 def _log_audit(name: str, action: str) -> None:
     _AUDIT_FILE.parent.mkdir(exist_ok=True)
     entry = {
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "name": name,
         "action": action,
     }
@@ -68,7 +68,7 @@ def list_secrets() -> list[str]:
 
 
 def expire_old(days: int = 90) -> None:
-    cutoff = datetime.utcnow() - timedelta(days=days)
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
     res = (
         supabase.table("secrets")
         .select("id", "created_at")

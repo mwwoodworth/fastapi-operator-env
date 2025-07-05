@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import logging
 
 from codex import run_task
@@ -25,7 +25,7 @@ async def scheduled_loop() -> None:
                 if ts:
                     try:
                         dt = datetime.fromisoformat(ts)
-                        if datetime.utcnow() - dt > timedelta(hours=2):
+                        if datetime.now(timezone.utc) - dt > timedelta(hours=2):
                             push_notify.send_push(
                                 "Tasks awaiting approval",
                                 f"{len(pending)} items need attention",

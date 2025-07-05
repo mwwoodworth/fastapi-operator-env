@@ -21,7 +21,10 @@ Then POST to `/task/run` with JSON body:
 ```
 
 ## Environment
-Copy `.env.example` to `.env` and fill in the required keys.
+Copy `.env.example` to `.env` and fill in the required keys. Set `ENVIRONMENT=production`
+when deploying to Render or Vercel so the server fails fast if mandatory secrets
+are missing. Supabase credentials are required in production for persistent
+memory storage.
 
 ## Tasks
 Tasks live in `codex/tasks/` and each implements a `run(context)` function returning structured results.
@@ -51,3 +54,6 @@ Additional helpful endpoints:
 - `/dashboard/forecast` - view the rolling task timeline.
 - `/agent/strategy/weekly` - run the weekly strategy agent.
 - `/task/dependency-map` - create a dependency map for tasks.
+
+## Deployment
+Use `uvicorn main:app` locally. For cloud deploy, create a Render or Vercel service using the provided `render.yaml` and ensure all environment variables from `.env` are set.
