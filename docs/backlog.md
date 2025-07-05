@@ -1,16 +1,16 @@
 # Feature Backlog
 
 ## Advanced dashboard widgets
-- Implement calendar, timeline, and Kanban views for scheduled tasks.
-- Add analytics charts for task throughput and error rates.
+- [x] Add analytics charts for task throughput and error rates.
+- [ ] Implement calendar, timeline, and Kanban views for scheduled tasks.
 
 ## Smart search and filtering
-- Allow query of Tana data with tags, time ranges, and free text.
-- Integrate fuzzy search for memory entries.
+- [x] Allow query of Tana data with tags, time ranges, and free text.
+- [x] Integrate fuzzy search for memory entries.
 
 ## Multi-user support
-- Add optional user field on tasks and memories.
-- Implement simple role-based access for admin vs. viewer.
+- [x] Add optional user field on tasks and memories.
+- [x] Implement simple role-based access for admin vs. viewer.
 
 ## Additional integrations
 - Notion import/export of tasks.

@@ -144,3 +144,13 @@ def test_dashboard_metrics():
     assert resp.status_code == 200
     data = resp.json()
     assert 'tasks_logged' in data
+
+
+def test_search_and_error_logs():
+    resp = client.get('/memory/search?q=test')
+    assert resp.status_code == 200
+    assert 'entries' in resp.json()
+
+    resp = client.get('/logs/errors')
+    assert resp.status_code == 200
+    assert 'entries' in resp.json()

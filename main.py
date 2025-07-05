@@ -12,8 +12,11 @@ import uuid
 import httpx
 from typing import Any, Dict, List
 
-from fastapi import FastAPI, HTTPException, Request, Header, UploadFile, File
+from fastapi import FastAPI, HTTPException, Request, Header, UploadFile, File, Depends
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
+import secrets as pysecrets
 from pydantic import BaseModel
 
 from codex.tasks import (
@@ -37,6 +40,42 @@ from utils.ai_router import get_ai_model
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("brainops.api")
 
+security = HTTPBasic(auto_error=False)
+USERS = {}
+ADMIN_USERS: set[str] = set()
+
+if os.getenv("BASIC_AUTH_USERS"):
+    try:
+        USERS = json.loads(os.getenv("BASIC_AUTH_USERS", "{}"))
+    except Exception:  # noqa: BLE001
+        USERS = {}
+ADMIN_USERS = set((os.getenv("ADMIN_USERS") or "").split(","))
+
+
+def get_current_user(credentials: HTTPBasicCredentials = Depends(security)) -> str:
+    if not USERS:
+        return "anonymous"
+    if credentials is None:
+        raise HTTPException(
+            status_code=401,
+            detail="Unauthorized",
+            headers={"WWW-Authenticate": "Basic"},
+        )
+    correct_password = USERS.get(credentials.username)
+    if not correct_password or not pysecrets.compare_digest(credentials.password, correct_password):
+        raise HTTPException(
+            status_code=401,
+            detail="Unauthorized",
+            headers={"WWW-Authenticate": "Basic"},
+        )
+    return credentials.username
+
+
+def require_admin(user: str = Depends(get_current_user)) -> str:
+    if USERS and user not in ADMIN_USERS:
+        raise HTTPException(status_code=403, detail="not authorized")
+    return user
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -58,8 +97,9 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(lifespan=lifespan)
+app = FastAPI(lifespan=lifespan, dependencies=[Depends(get_current_user)])
 app.include_router(make_webhook_router)
+app.mount("/dashboard/ui", StaticFiles(directory="static/dashboard", html=True), name="dashboard-ui")
 
 
 class TanaRequest(BaseModel):
@@ -299,6 +339,20 @@ async def memory_query(tags: str = "", limit: int = 10) -> Dict[str, Any]:
     return {"entries": entries}
 
 
+@app.get("/memory/search")
+async def memory_search(
+    q: str = "",
+    tags: str = "",
+    start: str | None = None,
+    end: str | None = None,
+    user: str | None = None,
+    limit: int = 20,
+) -> Dict[str, Any]:
+    tag_list = [t.strip() for t in tags.split(",") if t.strip()]
+    results = memory_store.search(q, tag_list, start, end, user, limit)
+    return {"entries": results}
+
+
 @app.post("/knowledge/index")
 async def knowledge_index() -> Dict[str, Any]:
     from codex.memory import doc_indexer
@@ -326,6 +380,19 @@ async def knowledge_sources() -> Dict[str, Any]:
 async def rag_logs(limit: int = 20) -> Dict[str, Any]:
     from utils import rag_logger
     return {"entries": rag_logger.load_logs(limit)}
+
+
+@app.get("/logs/errors")
+async def error_logs(limit: int = 50) -> Dict[str, Any]:
+    """Return recent error log entries."""
+    error_file = Path("logs/error_log.json")
+    entries: List[Dict[str, Any]] = []
+    if error_file.exists():
+        try:
+            entries = json.loads(error_file.read_text())[-limit:]
+        except Exception:  # noqa: BLE001
+            entries = []
+    return {"entries": entries}
 
 
 @app.get("/memory/trace/{task_id}")

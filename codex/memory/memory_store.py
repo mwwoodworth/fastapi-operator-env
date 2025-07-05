@@ -157,3 +157,52 @@ def load_recent(limit: int = 5) -> str:
     """Return recent memory entries concatenated as text."""
     records = fetch_all(limit=limit)
     return "\n\n".join(str(r.get("output") or r) for r in records)
+
+
+def search(
+    query: str = "",
+    tags: List[str] | None = None,
+    start_time: str | None = None,
+    end_time: str | None = None,
+    user: str | None = None,
+    limit: int = 20,
+) -> List[Dict[str, Any]]:
+    """Search memory entries with optional fuzzy query and filters."""
+    tags = tags or []
+    records = fetch_all(limit=1000)
+    if tags:
+        records = [r for r in records if set(tags).issubset(set(r.get("tags") or []))]
+    if start_time:
+        try:
+            start_dt = datetime.fromisoformat(start_time)
+            records = [
+                r
+                for r in records
+                if r.get("timestamp")
+                and datetime.fromisoformat(r["timestamp"]) >= start_dt
+            ]
+        except Exception:  # noqa: BLE001
+            pass
+    if end_time:
+        try:
+            end_dt = datetime.fromisoformat(end_time)
+            records = [
+                r
+                for r in records
+                if r.get("timestamp")
+                and datetime.fromisoformat(r["timestamp"]) <= end_dt
+            ]
+        except Exception:  # noqa: BLE001
+            pass
+    if user:
+        records = [r for r in records if r.get("user") == user]
+    if query:
+        q_lower = query.lower()
+        records = [
+            r
+            for r in records
+            if q_lower in str(r.get("input", "")).lower()
+            or q_lower in str(r.get("output", "")).lower()
+            or q_lower in str(r.get("task", "")).lower()
+        ]
+    return records[-limit:]
