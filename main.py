@@ -18,6 +18,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 import secrets as pysecrets
 from pydantic import BaseModel
+from utils.slack import send_slack_message
 
 from codex.tasks import (
     secrets as secrets_task,
@@ -99,7 +100,14 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan, dependencies=[Depends(get_current_user)])
 app.include_router(make_webhook_router)
-app.mount("/dashboard/ui", StaticFiles(directory="static/dashboard", html=True), name="dashboard-ui")
+
+# Serve dashboard with authentication
+dashboard_app = FastAPI(dependencies=[Depends(get_current_user)])
+dashboard_app.mount("/", StaticFiles(directory="static/dashboard", html=True), name="dashboard")
+app.mount("/dashboard/ui", dashboard_app)
+
+# Expose static assets like manifest and icons
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
 class TanaRequest(BaseModel):
@@ -305,25 +313,25 @@ async def docs_registry() -> Dict[str, Any]:
 
 
 @app.post("/secrets/store")
-async def store_secret_api(req: dict):
+async def store_secret_api(req: dict, _: str = Depends(require_admin)):
     secrets_task.store_secret(req["name"], req["value"])
     return {"status": "stored"}
 
 
 @app.get("/secrets/retrieve/{name}")
-async def retrieve_secret_api(name: str):
+async def retrieve_secret_api(name: str, _: str = Depends(require_admin)):
     val = secrets_task.retrieve_secret(name)
     return {"value": val}
 
 
 @app.delete("/secrets/delete/{name}")
-async def delete_secret_api(name: str):
+async def delete_secret_api(name: str, _: str = Depends(require_admin)):
     secrets_task.delete_secret(name)
     return {"status": "deleted"}
 
 
 @app.get("/secrets/list")
-async def list_secrets_api():
+async def list_secrets_api(_: str = Depends(require_admin)):
     return {"secrets": secrets_task.list_secrets()}
 
 
@@ -393,6 +401,24 @@ async def error_logs(limit: int = 50) -> Dict[str, Any]:
         except Exception:  # noqa: BLE001
             entries = []
     return {"entries": entries}
+
+
+class FeedbackReport(BaseModel):
+    message: str
+    page: str | None = None
+
+
+@app.post("/feedback/report")
+async def feedback_report(req: FeedbackReport, user: str = Depends(get_current_user)) -> Dict[str, Any]:
+    entry = {
+        "task": "user_feedback",
+        "input": {"message": req.message, "page": req.page},
+        "user": user,
+        "tags": ["feedback"],
+    }
+    memory_store.save_memory(entry)
+    send_slack_message(f"Feedback from {user}: {req.message}")
+    return {"status": "received"}
 
 
 @app.get("/memory/trace/{task_id}")

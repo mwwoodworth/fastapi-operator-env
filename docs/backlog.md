@@ -19,3 +19,4 @@
 ## Mobile PWA polish
 - [x] Add manifest for installability.
 - Cache recent dashboard data for offline access.
+- [ ] Feedback form in dashboard for user bug reports.

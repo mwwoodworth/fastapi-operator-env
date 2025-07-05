@@ -2,6 +2,27 @@
 
 This repository contains a lightweight task runner and API server used by the BrainOps automation system. Tasks can be executed via CLI, HTTP API or Make.com webhooks.
 
+## Getting Started
+
+1. Install dependencies and create a local environment file:
+   ```bash
+   pip install -r requirements.txt
+   cp .env.example .env
+   ```
+   Fill in the required API keys inside `.env`.
+
+2. (Optional) Enable HTTP Basic Auth by defining users:
+   ```bash
+   export BASIC_AUTH_USERS='{"admin": "secret"}'
+   export ADMIN_USERS=admin
+   ```
+   All routes will then require authentication.
+
+3. Launch the server:
+   ```bash
+   uvicorn main:app --host 0.0.0.0 --port 10000
+   ```
+
 ## Usage
 
 ### CLI
@@ -29,6 +50,14 @@ Set `SLACK_WEBHOOK_URL` to a Slack incoming webhook to get notified when tasks s
 
 ## Tasks
 Tasks live in `codex/tasks/` and each implements a `run(context)` function returning structured results.
+
+### Demo Data
+
+Sample helpers in the `mock/` folder can be used to generate example events or tasks during onboarding:
+
+```bash
+python main.py task run '{"task": "claude_prompt", "context": {"prompt": "demo"}}'
+```
 
 ### Secrets Vault
 
@@ -59,7 +88,8 @@ Additional helpful endpoints:
 - `/dashboard/forecast` - view the rolling task timeline.
 - `/agent/strategy/weekly` - run the weekly strategy agent.
 - `/task/dependency-map` - create a dependency map for tasks.
+- `/feedback/report` - submit bug reports or suggestions.
 
 ## Deployment
 Use `uvicorn main:app` locally. For cloud deploy, create a Render or Vercel service using the provided `render.yaml` and ensure all environment variables from `.env` are set.
-The dashboard at `/dashboard/ui` includes a PWA manifest so it can be installed on mobile devices.
+The dashboard at `/dashboard/ui` includes a PWA manifest. Open the page in a modern mobile browser and choose **Add to Home Screen** to install it like a native app.

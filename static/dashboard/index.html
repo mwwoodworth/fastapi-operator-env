@@ -43,6 +43,15 @@ function Dashboard() {
 
   const toggleDark = () => setDark(!dark);
 
+  const [feedback, setFeedback] = useState('');
+  const sendFeedback = () => {
+    fetch('/feedback/report', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: feedback })
+    }).then(() => setFeedback(''));
+  };
+
   return React.createElement('div', { className: dark ? 'dark-mode' : '' },
     React.createElement('button', { className: 'button is-small', onClick: toggleDark }, dark ? 'Light' : 'Dark'),
     React.createElement('h2', { className: 'title' }, 'Metrics'),
@@ -77,7 +86,15 @@ function Dashboard() {
     React.createElement('h3', { className: 'title is-5' }, 'Recent Errors'),
     React.createElement('ul', null, errors.map((e, i) =>
       React.createElement('li', { key: i }, e.error)
-    ))
+    )),
+    React.createElement('h3', { className: 'title is-5 mt-5' }, 'Send Feedback'),
+    React.createElement('textarea', {
+      className: 'textarea', value: feedback,
+      onChange: e => setFeedback(e.target.value)
+    }),
+    React.createElement('button', {
+      className: 'button is-link mt-2', onClick: sendFeedback
+    }, 'Submit')
   );
 }
 
