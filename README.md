@@ -93,3 +93,36 @@ Additional helpful endpoints:
 ## Deployment
 Use `uvicorn main:app` locally. For cloud deploy, create a Render or Vercel service using the provided `render.yaml` and ensure all environment variables from `.env` are set.
 The dashboard at `/dashboard/ui` includes a PWA manifest. Open the page in a modern mobile browser and choose **Add to Home Screen** to install it like a native app.
+
+## Dashboard UI
+
+A production-ready dashboard is located in `dashboard_ui/` built with Next.js, Tailwind CSS and shadcn/ui components. It can be deployed statically or embedded via `<iframe>`.
+
+### Build & Export
+
+```bash
+cd dashboard_ui
+npm install
+npm run build && npm run export
+```
+
+The export step outputs static files to `static/dashboard/` which FastAPI serves at `/dashboard/ui`.
+
+### Deploy
+
+- **Vercel/Netlify:** deploy `dashboard_ui` as a static site.
+- **FastAPI static:** copy the exported files to `static/dashboard/` on your server.
+
+### Embed
+
+Include the dashboard in another site using:
+
+```html
+<iframe src="/dashboard/ui" width="100%" height="600" style="border:0;"></iframe>
+```
+
+### Customization
+
+- API endpoint base URL and auth can be set via `NEXT_PUBLIC_API_BASE` and TODO auth headers in `dashboard_ui` components.
+- Branding and styling can be tweaked in `dashboard_ui/styles` and React components.
+
