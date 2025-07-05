@@ -25,6 +25,7 @@ Copy `.env.example` to `.env` and fill in the required keys. Set `ENVIRONMENT=pr
 when deploying to Render or Vercel so the server fails fast if mandatory secrets
 are missing. Supabase credentials are required in production for persistent
 memory storage.
+Set `SLACK_WEBHOOK_URL` to a Slack incoming webhook to get notified when tasks succeed or fail.
 
 ## Tasks
 Tasks live in `codex/tasks/` and each implements a `run(context)` function returning structured results.
@@ -61,3 +62,4 @@ Additional helpful endpoints:
 
 ## Deployment
 Use `uvicorn main:app` locally. For cloud deploy, create a Render or Vercel service using the provided `render.yaml` and ensure all environment variables from `.env` are set.
+The dashboard at `/dashboard/ui` includes a PWA manifest so it can be installed on mobile devices.

@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>BrainOps Metrics Dashboard</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bulma/0.9.4/css/bulma.min.css">
+<link rel="manifest" href="/static/manifest.json">
 <style>
   body { padding: 1rem; }
   .dark-mode { background:#121212;color:#eee; }
@@ -21,10 +22,12 @@ const { useState, useEffect } = React;
 
 function Dashboard() {
   const [data, setData] = useState({});
+  const [errors, setErrors] = useState([]);
   const [dark, setDark] = useState(false);
 
   const load = () => {
     fetch('/dashboard/metrics').then(r => r.json()).then(setData);
+    fetch('/logs/errors?limit=5').then(r => r.json()).then(d => setErrors(d.entries || []));
   };
   useEffect(() => {
     load();
@@ -43,6 +46,26 @@ function Dashboard() {
   return React.createElement('div', { className: dark ? 'dark-mode' : '' },
     React.createElement('button', { className: 'button is-small', onClick: toggleDark }, dark ? 'Light' : 'Dark'),
     React.createElement('h2', { className: 'title' }, 'Metrics'),
+    React.createElement('div', { className: 'columns' },
+      React.createElement('div', { className: 'column' },
+        React.createElement('div', { className: 'box has-text-centered' },
+          React.createElement('p', { className: 'heading' }, 'Tasks Logged'),
+          React.createElement('p', { className: 'title' }, data.tasks_logged || 0)
+        )
+      ),
+      React.createElement('div', { className: 'column' },
+        React.createElement('div', { className: 'box has-text-centered' },
+          React.createElement('p', { className: 'heading' }, 'Errors'),
+          React.createElement('p', { className: 'title' }, data.errors_logged || 0)
+        )
+      ),
+      React.createElement('div', { className: 'column' },
+        React.createElement('div', { className: 'box has-text-centered' },
+          React.createElement('p', { className: 'heading' }, 'Memory Entries'),
+          React.createElement('p', { className: 'title' }, data.memory_entries || 0)
+        )
+      )
+    ),
     React.createElement(Recharts.PieChart, { width: 300, height: 300 },
       React.createElement(Recharts.Pie, {
         dataKey: 'value', data: areaData, cx: 150, cy: 150, outerRadius: 100, fill: '#00d1b2',
@@ -50,7 +73,11 @@ function Dashboard() {
       })
     ),
     React.createElement('p', null, 'Last Task: ' + (data.last_task_time || 'n/a')),
-    React.createElement('p', null, 'Last Memory: ' + (data.last_memory_time || 'n/a'))
+    React.createElement('p', null, 'Last Memory: ' + (data.last_memory_time || 'n/a')),
+    React.createElement('h3', { className: 'title is-5' }, 'Recent Errors'),
+    React.createElement('ul', null, errors.map((e, i) =>
+      React.createElement('li', { key: i }, e.error)
+    ))
   );
 }
 

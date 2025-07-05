@@ -7,6 +7,7 @@ from datetime import timezone
 import importlib
 import json
 import logging
+import traceback
 import pkgutil
 import uuid
 from dataclasses import dataclass, field
@@ -14,6 +15,7 @@ from pathlib import Path
 from typing import Callable, Any, Dict, List
 
 from .memory import memory_store, link_task_to_origin
+from utils.slack import send_slack_message
 
 logger = logging.getLogger(__name__)
 
@@ -109,7 +111,8 @@ def run_task(task_id: str, context: Dict[str, Any]) -> Any:
         result = task_def.func(context)
     except Exception as exc:  # noqa: BLE001
         logger.exception("Task %s failed", task_id)
-        result = {"error": str(exc)}
+        tb = traceback.format_exc()
+        result = {"error": str(exc), "stack": tb}
         if retry < 3:
             try:
                 from supabase_client import supabase
@@ -142,9 +145,11 @@ def run_task(task_id: str, context: Dict[str, Any]) -> Any:
                 "task": task_id,
                 "context": context,
                 "error": result.get("error"),
+                "stack": result.get("stack"),
             }
         )
         _ERROR_LOG_FILE.write_text(json.dumps(history[-100:], indent=2))
+        send_slack_message(f"Task {task_id} failed: {result.get('error')}")
     try:
         origin_meta = {}
         for key in [
@@ -182,6 +187,7 @@ def run_task(task_id: str, context: Dict[str, Any]) -> Any:
             )
         except Exception:  # noqa: BLE001
             pass
+        send_slack_message(f"Task {task_id} completed")
     return result
 
 

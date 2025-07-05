@@ -14,8 +14,8 @@
 
 ## Additional integrations
 - Notion import/export of tasks.
-- Slack notifications for completed tasks and errors.
+- [x] Slack notifications for completed tasks and errors.
 
 ## Mobile PWA polish
-- Add manifest for installability.
+- [x] Add manifest for installability.
 - Cache recent dashboard data for offline access.
