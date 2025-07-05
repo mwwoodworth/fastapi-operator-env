@@ -12,6 +12,7 @@ os.environ.setdefault("FORECAST_PLANNER_ENABLED", "true")
 os.environ.setdefault("WEEKLY_STRATEGY_DAY", "Sunday")
 os.environ.setdefault("DAILY_PLANNER_MODEL", "claude")
 os.environ.setdefault("ESCALATION_CHECK_INTERVAL", "1800")
+os.environ.setdefault("SLACK_WEBHOOK_URL", "http://example.com/webhook")
 
 from fastapi.testclient import TestClient
 from main import app
