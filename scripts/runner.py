@@ -46,10 +46,10 @@ def auto_memory_summarizer() -> None:
             last = datetime.datetime.fromisoformat(LAST_SUMMARY_FILE.read_text().strip())
         except Exception:  # noqa: BLE001
             last = None
-    if not last or (datetime.datetime.utcnow() - last).total_seconds() > 86400:
+    if not last or (datetime.datetime.now(datetime.timezone.utc) - last).total_seconds() > 86400:
         try:
             run_task("claude_memory_agent", {})
-            LAST_SUMMARY_FILE.write_text(datetime.datetime.utcnow().isoformat())
+            LAST_SUMMARY_FILE.write_text(datetime.datetime.now(datetime.timezone.utc).isoformat())
         except Exception as exc:  # noqa: BLE001
             logger.error("Auto memory summarizer failed: %s", exc)
 

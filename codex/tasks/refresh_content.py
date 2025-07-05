@@ -20,7 +20,7 @@ def run(context: dict) -> dict:
     logger.info("Pulling latest content in %s", content_dir)
     try:
         subprocess.run(["git", "pull"], cwd=str(content_dir), check=True, capture_output=True)
-        # TODO: integrate Claude/GPT for automatic content refresh
+        # Placeholder for future AI-based content refresh
         message = "Content refreshed"
         logger.info(message)
         return {"status": "success", "message": message}

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List
 
 from codex.memory import memory_store
@@ -13,7 +13,7 @@ REQUIRED_FIELDS: List[str] = []
 
 
 def run(context: Dict[str, Any] | None = None) -> Dict[str, Any]:
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     records = memory_store.fetch_all(limit=50)
     recent = []
     for r in records:

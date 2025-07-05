@@ -5,7 +5,8 @@ from __future__ import annotations
 import logging
 import os
 import json
-from datetime import datetime
+from datetime import datetime, timezone
+from contextlib import asynccontextmanager
 from pathlib import Path
 import uuid
 import httpx
@@ -36,7 +37,28 @@ from utils.ai_router import get_ai_model
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("brainops.api")
 
-app = FastAPI()
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    required = [
+        "TANA_API_KEY",
+        "SUPABASE_SERVICE_KEY",
+        "VERCEL_TOKEN",
+        "OPENAI_API_KEY",
+        "STRIPE_SECRET_KEY",
+    ]
+    missing = [var for var in required if not os.getenv(var)]
+    env = os.getenv("ENVIRONMENT", "development").lower()
+    if env == "production" and missing:
+        raise RuntimeError(f"Missing required env vars: {', '.join(missing)}")
+    if missing:
+        logger.warning("Missing env vars: %s", ", ".join(missing))
+    tasks = ", ".join(get_registry().keys())
+    logger.info("Available tasks: %s", tasks)
+    yield
+
+
+app = FastAPI(lifespan=lifespan)
 app.include_router(make_webhook_router)
 
 
@@ -90,24 +112,9 @@ def _resolve_scope(scope: str | int | None) -> int:
         return 5
 
 
-@app.on_event("startup")
-async def startup_event() -> None:
-    required = [
-        "TANA_API_KEY",
-        "SUPABASE_SERVICE_KEY",
-        "VERCEL_TOKEN",
-        "OPENAI_API_KEY",
-        "STRIPE_SECRET_KEY",
-    ]
-    missing = [var for var in required if not os.getenv(var)]
-    if missing:
-        logger.warning("Missing env vars: %s", ", ".join(missing))
-    tasks = ", ".join(get_registry().keys())
-    logger.info("Available tasks: %s", tasks)
-
-
 @app.post("/tana/create-node")
 async def create_tana_node(req: TanaRequest) -> Dict[str, Any]:
+    """Create a note in Tana from the provided content."""
     run_task("create_tana_node", {"content": req.content})
     return {"status": "submitted", "content": req.content}
 
@@ -165,7 +172,7 @@ async def chat_endpoint(req: ChatRequest) -> Dict[str, Any]:
         "input": req.message,
         "output": completion,
         "tags": ["chat", "interactive"],
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
     }
     memory_store.save_memory(memory_entry)
 
@@ -825,6 +832,7 @@ async def tana_scan() -> Dict[str, Any]:
 
 @app.get("/health")
 async def health() -> Dict[str, str]:
+    """Basic health check endpoint used by monitoring services."""
     return {"status": "ok"}
 
 

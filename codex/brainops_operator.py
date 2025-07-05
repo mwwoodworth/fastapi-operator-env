@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime
+from datetime import timezone
 import importlib
 import json
 import logging
@@ -79,7 +80,7 @@ def _log_task(task: str, context: dict, result: Any) -> None:
     entry_id = str(uuid.uuid4())
     entry = {
         "id": entry_id,
-        "timestamp": datetime.datetime.utcnow().isoformat(),
+        "timestamp": datetime.datetime.now(timezone.utc).isoformat(),
         "task": task,
         "context": context,
         "result": result,
@@ -137,7 +138,7 @@ def run_task(task_id: str, context: Dict[str, Any]) -> Any:
         history.append(
             {
                 "id": log_entry_id,
-                "timestamp": datetime.datetime.utcnow().isoformat(),
+                "timestamp": datetime.datetime.now(timezone.utc).isoformat(),
                 "task": task_id,
                 "context": context,
                 "error": result.get("error"),

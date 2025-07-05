@@ -3,7 +3,7 @@
 import os
 import httpx
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from utils.text_helpers import clean_ai_response
 from utils.template_loader import render_template
@@ -22,9 +22,9 @@ API_URL_TEMPLATE = "https://generativelanguage.googleapis.com/v1beta/models/{mod
 def _append_log(prompt: str, completion: str) -> None:
     log_dir = Path("logs")
     log_dir.mkdir(exist_ok=True)
-    fname = log_dir / f"gemini_{datetime.utcnow().date()}.txt"
+    fname = log_dir / f"gemini_{datetime.now(timezone.utc).date()}.txt"
     with fname.open("a", encoding="utf-8") as f:
-        f.write(f"[{datetime.utcnow().isoformat()}]\nPrompt: {prompt}\nResponse: {completion}\n\n")
+        f.write(f"[{datetime.now(timezone.utc).isoformat()}]\nPrompt: {prompt}\nResponse: {completion}\n\n")
 
 
 def run(context: dict) -> dict:

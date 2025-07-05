@@ -2,7 +2,7 @@
 
 import logging
 import shutil
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 
@@ -20,7 +20,7 @@ def run(context: dict) -> dict:
 
     backup_root = Path("/backups")
     backup_root.mkdir(exist_ok=True)
-    timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S")
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
     backup_name = context.get("backup_name", f"site_backup_{timestamp}")
     archive_path = backup_root / backup_name
 

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -19,7 +19,7 @@ def log_prompt(model: str, task_id: str, prompt: str, output: str) -> None:
         "model": model,
         "prompt": truncate(prompt, 2000),
         "output": truncate(output, 2000),
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
     }
     history: list[dict[str, Any]] = []
     if path.exists():

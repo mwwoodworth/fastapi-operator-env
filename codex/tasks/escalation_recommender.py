@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List
 
 from codex.memory import agent_inbox
@@ -16,7 +16,7 @@ _IDLE_LIMIT = timedelta(days=2)
 
 def run(context: Dict[str, Any] | None = None) -> Dict[str, Any]:
     tasks = agent_inbox.get_pending_tasks(50)
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     idle = []
     for t in tasks:
         ts = t.get("timestamp")
