@@ -209,3 +209,11 @@ rag_cache/
 logs/
 recurring_tasks.json
 delayed_tasks.json
+
+# Node
+node_modules/
+.dashboard_ui/.next/
+dashboard_ui/.next/
+dashboard_ui/out/
+dashboard_ui/node_modules
+
