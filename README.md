@@ -49,6 +49,7 @@ Additional helpful endpoints:
 - `/agent/inbox/approve` - approve or reject tasks.
 - `/agent/inbox/summary` - inbox counts overview.
 - `/dashboard/full` - extended operator metrics.
+- `/dashboard/metrics` - summary counts of tasks and memory logs.
 - `/mobile/task` - quick mobile task capture.
 - `/agent/forecast/weekly` - generate a 7-day forecast plan.
 - `/dashboard/forecast` - view the rolling task timeline.
