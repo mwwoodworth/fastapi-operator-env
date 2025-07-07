@@ -120,9 +120,11 @@ Include the dashboard in another site using:
 ```html
 <iframe src="/dashboard/ui" width="100%" height="600" style="border:0;"></iframe>
 ```
+The same snippet works in Tana, Google Sites or any platform that allows iframes.
 
-### Customization
+-### Customization
 
-- API endpoint base URL and auth can be set via `NEXT_PUBLIC_API_BASE` and TODO auth headers in `dashboard_ui` components.
+- API endpoint base URL is configured with `NEXT_PUBLIC_API_BASE`.
+- Set `NEXT_PUBLIC_AUTH_HEADER` if your FastAPI server requires HTTP Basic or JWT auth (e.g. `"Basic dXNlcjpwYXNz"` or `"Bearer <token>").
 - Branding and styling can be tweaked in `dashboard_ui/styles` and React components.
 
