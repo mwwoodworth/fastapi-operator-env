@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { motion } from 'framer-motion';
 import Layout from '../components/Layout';
 import StatusCards from '../components/StatusCards';
 import MemoryChart from '../components/MemoryChart';
@@ -6,24 +7,21 @@ import TaskList from '../components/TaskList';
 import ErrorsList from '../components/ErrorsList';
 import FeedbackForm from '../components/FeedbackForm';
 import OnboardingOverlay from '../components/OnboardingOverlay';
+import SearchBar from '../components/SearchBar';
+import { apiFetch } from '../lib/api';
 
 export default function Home({ theme, setTheme }) {
   const [metrics, setMetrics] = useState(null);
   const [tasks, setTasks] = useState([]);
   const [errors, setErrors] = useState([]);
   const [loading, setLoading] = useState(true);
-  const API_BASE = process.env.NEXT_PUBLIC_API_BASE || '';
-
   const load = async () => {
     try {
-      const [mRes, tRes, eRes] = await Promise.all([
-        fetch(`${API_BASE}/dashboard/metrics`),
-        fetch(`${API_BASE}/dashboard/tasks`),
-        fetch(`${API_BASE}/logs/errors?limit=5`)
+      const [m, t, e] = await Promise.all([
+        apiFetch('/dashboard/metrics'),
+        apiFetch('/dashboard/tasks'),
+        apiFetch('/logs/errors?limit=5')
       ]);
-      const m = await mRes.json();
-      const t = await tRes.json();
-      const e = await eRes.json();
       setMetrics(m);
       setTasks(t.tasks || t);
       setErrors(e.entries || e);
@@ -45,9 +43,10 @@ export default function Home({ theme, setTheme }) {
       {loading ? (
         <p>Loading...</p>
       ) : (
-        <div className="grid gap-4">
+        <motion.div className="grid gap-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
           <StatusCards metrics={metrics} />
           <MemoryChart metrics={metrics} />
+          <SearchBar />
           <section>
             <h2 className="font-semibold mb-2">Tasks</h2>
             <TaskList tasks={tasks} />
@@ -60,7 +59,7 @@ export default function Home({ theme, setTheme }) {
             <h2 className="font-semibold mb-2">Send Feedback</h2>
             <FeedbackForm />
           </section>
-        </div>
+        </motion.div>
       )}
     </Layout>
   );

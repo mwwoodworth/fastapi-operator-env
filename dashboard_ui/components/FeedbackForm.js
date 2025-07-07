@@ -1,12 +1,11 @@
 import { useState } from 'react';
+import { apiFetch } from '../lib/api';
 
 export default function FeedbackForm({ onSent }) {
   const [text, setText] = useState('');
-  const API_BASE = process.env.NEXT_PUBLIC_API_BASE || '';
-
   const send = async () => {
     if (!text) return;
-    await fetch(`${API_BASE}/feedback/report`, {
+    await apiFetch('/feedback/report', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message: text })
