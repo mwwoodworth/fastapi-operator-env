@@ -39,6 +39,7 @@ from codex.memory import memory_store, agent_inbox
 from codex.integrations.make_webhook import router as make_webhook_router
 from codex.memory.memory_api import router as memory_api_router
 from codex.ai.gemini_webhook import router as gemini_webhook_router
+from chat_task_api import router as chat_task_router
 import codex.ai.claude_sync as claude_sync
 from utils.ai_router import get_ai_model
 
@@ -107,6 +108,7 @@ app = FastAPI(lifespan=lifespan, dependencies=[Depends(get_current_user)])
 app.include_router(make_webhook_router)
 app.include_router(memory_api_router)
 app.include_router(gemini_webhook_router)
+app.include_router(chat_task_router)
 
 # Serve dashboard with authentication
 dashboard_app = FastAPI(dependencies=[Depends(get_current_user)])
