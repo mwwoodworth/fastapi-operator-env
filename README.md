@@ -81,6 +81,7 @@ Additional helpful endpoints:
 - `/dashboard/full` - extended operator metrics.
 - `/dashboard/metrics` - summary counts of tasks and memory logs.
 - `/dashboard/ui` - live dashboard interface.
+- `/dashboard/copilot-v2` - memory-assisted Copilot v2.
 - `/memory/search` - search memories with filters.
 - `/logs/errors` - recent error entries.
 - `/mobile/task` - quick mobile task capture.
