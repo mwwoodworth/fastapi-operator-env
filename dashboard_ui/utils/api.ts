@@ -1,4 +1,4 @@
-export const API_BASE = 'https://brainops-operator.onrender.com';
+import { API_BASE } from './config';
 
 export async function postMemoryQuery(query: string) {
   const res = await fetch(`${API_BASE}/memory/query`, {
