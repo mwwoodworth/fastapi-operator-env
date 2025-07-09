@@ -1,0 +1,25 @@
+import React from 'react';
+import Link from 'next/link';
+import '../../styles/globals.css';
+
+export const metadata = {
+  title: 'BrainOps Dashboard',
+};
+
+export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="min-h-screen flex">
+      <aside className="w-64 bg-muted p-4 hidden md:block">
+        <h1 className="font-bold mb-4">BrainOps</h1>
+        <nav className="space-y-2">
+          <Link href="/dashboard" className="block">Home</Link>
+          <Link href="/dashboard/memory" className="block">Memory</Link>
+          <Link href="/dashboard/copilot" className="block">Copilot</Link>
+        </nav>
+      </aside>
+      <div className="flex-1 p-4">
+        {children}
+      </div>
+    </div>
+  );
+}
