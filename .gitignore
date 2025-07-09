@@ -217,3 +217,7 @@ dashboard_ui/.next/
 dashboard_ui/out/
 dashboard_ui/node_modules
 
+
+# Icon assets
+*.ico
+*.svg
