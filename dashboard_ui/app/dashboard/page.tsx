@@ -17,6 +17,16 @@ export default function DashboardHome() {
             Copilot Assistant
           </Link>
         </li>
+        <li>
+          <Link href="/dashboard/sync" className="text-blue-600 underline">
+            Claude Sync
+          </Link>
+        </li>
+        <li>
+          <Link href="/dashboard/documents" className="text-blue-600 underline">
+            Documents
+          </Link>
+        </li>
       </ul>
     </div>
   );
