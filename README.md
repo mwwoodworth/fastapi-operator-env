@@ -137,3 +137,6 @@ The same snippet works in Tana, Google Sites or any platform that allows iframes
 The dashboard includes a persistent chat widget that proxies to the FastAPI `/chat` endpoint via `/api/assistant/chat`.
 Use it to summarize memory or trigger tasks. Conversations are saved to Supabase for later review.
 
+
+### Icon Assets
+Icon files such as `favicon.svg` are not stored in this repository. After merging any changes, upload the required `.svg` and `.ico` assets manually on GitHub.
