@@ -27,6 +27,11 @@ export default function DashboardHome() {
             Documents
           </Link>
         </li>
+        <li>
+          <Link href="/dashboard/export" className="text-blue-600 underline">
+            Export
+          </Link>
+        </li>
       </ul>
     </div>
   );
