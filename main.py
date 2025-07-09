@@ -19,6 +19,7 @@ from fastapi.security import HTTPBasic, HTTPBasicCredentials
 import secrets as pysecrets
 from pydantic import BaseModel
 from utils.slack import send_slack_message
+from db.session import init_db
 
 from codex.tasks import (
     secrets as secrets_task,
@@ -98,6 +99,7 @@ async def lifespan(app: FastAPI):
         logger.warning("Missing env vars: %s", ", ".join(missing))
     tasks = ", ".join(get_registry().keys())
     logger.info("Available tasks: %s", tasks)
+    init_db()
     yield
 
 
