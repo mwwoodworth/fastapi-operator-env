@@ -17,6 +17,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <Link href="/dashboard/copilot" className="block">Copilot</Link>
           <Link href="/dashboard/sync" className="block">Sync</Link>
           <Link href="/dashboard/documents" className="block">Documents</Link>
+          <Link href="/dashboard/export" className="block">Export</Link>
         </nav>
       </aside>
       <div className="flex-1 p-4">
