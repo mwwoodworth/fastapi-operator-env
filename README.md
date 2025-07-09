@@ -123,9 +123,14 @@ Include the dashboard in another site using:
 ```
 The same snippet works in Tana, Google Sites or any platform that allows iframes.
 
--### Customization
+### Customization
 
 - API endpoint base URL is configured with `NEXT_PUBLIC_API_BASE`.
 - Set `NEXT_PUBLIC_AUTH_HEADER` if your FastAPI server requires HTTP Basic or JWT auth (e.g. `"Basic dXNlcjpwYXNz"` or `"Bearer <token>").
 - Branding and styling can be tweaked in `dashboard_ui/styles` and React components.
+
+### BrainOps AI Assistant
+
+The dashboard includes a persistent chat widget that proxies to the FastAPI `/chat` endpoint via `/api/assistant/chat`.
+Use it to summarize memory or trigger tasks. Conversations are saved to Supabase for later review.
 

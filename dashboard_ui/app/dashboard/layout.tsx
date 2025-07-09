@@ -1,6 +1,7 @@
 import React from 'react';
 import Link from 'next/link';
 import '../../styles/globals.css';
+import AssistantChatWidget from '../../components/AssistantChatWidget';
 
 export const metadata = {
   title: 'BrainOps Dashboard',
@@ -18,12 +19,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <Link href="/dashboard/copilot-v2" className="block">Copilot v2</Link>
           <Link href="/dashboard/sync" className="block">Sync</Link>
           <Link href="/dashboard/documents" className="block">Documents</Link>
+          <Link href="/dashboard/generate" className="block">Generate</Link>
           <Link href="/dashboard/export" className="block">Export</Link>
         </nav>
       </aside>
       <div className="flex-1 p-4">
         {children}
       </div>
+      <AssistantChatWidget />
     </div>
   );
 }
