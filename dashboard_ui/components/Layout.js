@@ -1,5 +1,6 @@
 import ThemeToggle from './ThemeToggle';
 import InstallPrompt from './InstallPrompt';
+import AssistantChatWidget from './AssistantChatWidget';
 
 export default function Layout({ children, theme, setTheme }) {
   return (
@@ -12,6 +13,7 @@ export default function Layout({ children, theme, setTheme }) {
       <footer className="text-center text-sm mt-4 opacity-75">
         Powered by FastAPI
       </footer>
+      <AssistantChatWidget />
       <InstallPrompt />
     </div>
   );
