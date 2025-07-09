@@ -1,5 +1,6 @@
 'use client';
 import React, { useState, useRef } from 'react';
+import { motion } from 'framer-motion';
 import CopilotHeader from './CopilotHeader';
 import CopilotResponse from './CopilotResponse';
 import { postMemoryQuery, writeMemory } from '../utils/api';
@@ -12,6 +13,8 @@ export default function CopilotV2() {
   const [input, setInput] = useState('');
   const [model, setModel] = useState('claude');
   const [loading, setLoading] = useState(false);
+  const [memPreview, setMemPreview] = useState('');
+  const [showMem, setShowMem] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
 
   async function send() {
@@ -23,6 +26,7 @@ export default function CopilotV2() {
     try {
       const mem = await postMemoryQuery(userText);
       const top = mem.results?.[0]?.content_chunk || '';
+      setMemPreview(top);
       const prompt = `Context:\n${top}\n\nPrompt:\n${userText}`;
       const aiFunc = model === 'claude' ? promptClaude : promptChatGPT;
       const res = await aiFunc(prompt);
@@ -55,14 +59,32 @@ export default function CopilotV2() {
   return (
     <div className="flex flex-col h-full">
       <CopilotHeader model={model} onModelChange={setModel} />
+      {memPreview && (
+        <button
+          onClick={() => setShowMem(!showMem)}
+          className="self-end text-xs underline mb-1"
+        >
+          {showMem ? 'Hide memory' : 'Show memory'}
+        </button>
+      )}
+      {showMem && memPreview && (
+        <div className="border rounded p-2 text-xs whitespace-pre-wrap mb-2 bg-muted">
+          {memPreview}
+        </div>
+      )}
       <div className="flex-1 overflow-auto p-2 space-y-2">
+        {messages.length === 0 && !loading && (
+          <p className="text-sm opacity-60">Ask me anything to begin...</p>
+        )}
         {messages.map((m, idx) => (
           <CopilotResponse key={idx} role={m.role} text={m.content} />
         ))}
         {loading && <p className="text-sm opacity-60">Loading...</p>}
         <div ref={endRef} />
       </div>
-      <form
+      <motion.form
+        initial={{ y: 50, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
         onSubmit={e => {
           e.preventDefault();
           send();
@@ -82,7 +104,7 @@ export default function CopilotV2() {
         >
           Send
         </button>
-      </form>
+      </motion.form>
     </div>
   );
 }

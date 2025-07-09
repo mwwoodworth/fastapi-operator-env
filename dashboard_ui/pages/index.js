@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import Layout from '../components/Layout';
 import StatusCards from '../components/StatusCards';
 import MemoryChart from '../components/MemoryChart';
+import MetricsHistoryChart from '../components/MetricsHistoryChart';
 import TaskList from '../components/TaskList';
 import ErrorsList from '../components/ErrorsList';
 import FeedbackForm from '../components/FeedbackForm';
@@ -12,6 +13,7 @@ import { apiFetch } from '../lib/api';
 
 export default function Home({ theme, setTheme }) {
   const [metrics, setMetrics] = useState(null);
+  const [history, setHistory] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [errors, setErrors] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -23,6 +25,14 @@ export default function Home({ theme, setTheme }) {
         apiFetch('/logs/errors?limit=5')
       ]);
       setMetrics(m);
+      setHistory(h => [
+        ...h.slice(-19),
+        {
+          time: Date.now(),
+          memory_entries: m.memory_entries,
+          claude_logs: m.tasks_logged,
+        },
+      ]);
       setTasks(t.tasks || t);
       setErrors(e.entries || e);
     } catch (err) {
@@ -46,6 +56,7 @@ export default function Home({ theme, setTheme }) {
         <motion.div className="grid gap-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
           <StatusCards metrics={metrics} />
           <MemoryChart metrics={metrics} />
+          <MetricsHistoryChart history={history} />
           <SearchBar />
           <section>
             <h2 className="font-semibold mb-2">Tasks</h2>

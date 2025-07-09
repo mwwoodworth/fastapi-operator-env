@@ -37,3 +37,7 @@ export async function writeMemory(entry: {
     body: JSON.stringify(entry),
   }).then(r => r.json());
 }
+
+export async function fetchProductDocs() {
+  return fetch(`${API_BASE}/memory/query?tags=product&limit=50`).then(r => r.json());
+}

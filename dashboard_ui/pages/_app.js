@@ -1,5 +1,6 @@
 import '../styles/globals.css';
 import { useEffect, useState } from 'react';
+import Head from 'next/head';
 
 export default function App({ Component, pageProps }) {
   const [theme, setTheme] = useState('light');
@@ -14,5 +15,13 @@ export default function App({ Component, pageProps }) {
     localStorage.setItem('theme', theme);
   }, [theme]);
 
-  return <Component {...pageProps} theme={theme} setTheme={setTheme} />;
+  return (
+    <>
+      <Head>
+        <title>BrainOps Dashboard</title>
+        <link rel="icon" href="/favicon.svg" />
+      </Head>
+      <Component {...pageProps} theme={theme} setTheme={setTheme} />
+    </>
+  );
 }

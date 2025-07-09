@@ -20,6 +20,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <Link href="/dashboard/sync" className="block">Sync</Link>
           <Link href="/dashboard/documents" className="block">Documents</Link>
           <Link href="/dashboard/generate" className="block">Generate</Link>
+          <Link href="/dashboard/pipeline" className="block">Pipeline</Link>
+          <Link href="/dashboard/products" className="block">Products</Link>
           <Link href="/dashboard/export" className="block">Export</Link>
         </nav>
       </aside>
