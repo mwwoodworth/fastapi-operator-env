@@ -82,6 +82,9 @@ Additional helpful endpoints:
 - `/dashboard/metrics` - summary counts of tasks and memory logs.
 - `/dashboard/ui` - live dashboard interface.
 - `/dashboard/copilot-v2` - memory-assisted Copilot v2.
+- `/dashboard/pipeline` - Claude category pipelines.
+- `/dashboard/products` - marketplace-ready documents.
+- `/dashboard/export` - export markdown system.
 - `/memory/search` - search memories with filters.
 - `/logs/errors` - recent error entries.
 - `/mobile/task` - quick mobile task capture.

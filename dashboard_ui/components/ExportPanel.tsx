@@ -12,6 +12,7 @@ interface ExportFile {
   uploaded?: boolean;
   drive_url?: string;
   path?: string;
+  summary?: string;
 }
 
 export default function ExportPanel() {
@@ -31,6 +32,8 @@ export default function ExportPanel() {
 
   useEffect(() => {
     load();
+    const id = setInterval(handleExport, 21600000);
+    return () => clearInterval(id);
   }, []);
 
   async function handleExport() {
@@ -69,6 +72,9 @@ export default function ExportPanel() {
               <span>{f.title || f.name}</span>
               <span className="text-xs opacity-60">{f.created_at || f.date}</span>
             </div>
+            {f.summary && (
+              <p className="text-xs mt-1 whitespace-pre-wrap">{f.summary}</p>
+            )}
             <div className="flex items-center gap-2 mt-1 text-sm">
               <button
                 onClick={() => handleUpload(f.id)}

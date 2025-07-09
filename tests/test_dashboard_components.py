@@ -23,3 +23,13 @@ def test_assistant_chat_api_route_exists():
     path = pathlib.Path('dashboard_ui/app/api/assistant/chat/route.ts')
     text = path.read_text()
     assert 'async function POST' in text
+
+
+def test_pipeline_component_exists():
+    path = pathlib.Path('dashboard_ui/components/ClaudePipeline.tsx')
+    assert path.exists()
+
+
+def test_products_page_exists():
+    path = pathlib.Path('dashboard_ui/app/dashboard/products/page.tsx')
+    assert path.exists()
