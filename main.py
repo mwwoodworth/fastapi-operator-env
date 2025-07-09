@@ -36,6 +36,9 @@ from codex.tasks import (
 from codex import get_registry, run_task
 from codex.memory import memory_store, agent_inbox
 from codex.integrations.make_webhook import router as make_webhook_router
+from codex.memory.memory_api import router as memory_api_router
+from codex.ai.gemini_webhook import router as gemini_webhook_router
+import codex.ai.claude_sync as claude_sync
 from utils.ai_router import get_ai_model
 
 logging.basicConfig(level=logging.INFO)
@@ -100,6 +103,8 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan, dependencies=[Depends(get_current_user)])
 app.include_router(make_webhook_router)
+app.include_router(memory_api_router)
+app.include_router(gemini_webhook_router)
 
 # Serve dashboard with authentication
 dashboard_app = FastAPI(dependencies=[Depends(get_current_user)])
