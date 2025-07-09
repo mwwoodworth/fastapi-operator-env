@@ -44,7 +44,7 @@ class Thread(Base):
 
     id = Column(Integer, primary_key=True)
     title = Column(String(255))
-    participants = Column(ARRAY(String))
+    participants = Column(JSON)
     project_id = Column(String(255), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -61,7 +61,7 @@ class Message(Base):
     recipient = Column(String(50), nullable=True)
     content = Column(Text)
     created_at = Column(DateTime, default=datetime.utcnow)
-    metadata = Column(JSON)
+    meta = Column('metadata', JSON)
     attachments = Column(JSON, nullable=True)
 
     thread = relationship("Thread", back_populates="messages")
@@ -80,7 +80,7 @@ class Task(Base):
     parent_task = Column(Integer, ForeignKey("tasks.id"), nullable=True)
     thread_id = Column(Integer, ForeignKey("threads.id"), nullable=True)
     priority = Column(Integer)
-    tags = Column(ARRAY(String))
+    tags = Column(JSON)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -99,7 +99,7 @@ class File(Base):
     thread_id = Column(Integer, ForeignKey("threads.id"), nullable=True)
     task_id = Column(Integer, ForeignKey("tasks.id"), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
-    metadata = Column(JSON)
+    meta = Column('metadata', JSON)
 
     thread = relationship("Thread")
     task = relationship("Task", back_populates="files")
