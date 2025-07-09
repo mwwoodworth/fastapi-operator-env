@@ -24,3 +24,16 @@ export async function updateDocument(id: string, content: string) {
     body: JSON.stringify({ document_id: id, content }),
   }).then(r => r.json());
 }
+
+export async function writeMemory(entry: {
+  project_id: string;
+  title: string;
+  content: string;
+  author_id: string;
+}) {
+  return fetch(`${API_BASE}/memory/write`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(entry),
+  }).then(r => r.json());
+}

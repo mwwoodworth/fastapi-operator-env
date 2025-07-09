@@ -18,6 +18,11 @@ export default function DashboardHome() {
           </Link>
         </li>
         <li>
+          <Link href="/dashboard/copilot-v2" className="text-blue-600 underline">
+            Copilot v2
+          </Link>
+        </li>
+        <li>
           <Link href="/dashboard/sync" className="text-blue-600 underline">
             Claude Sync
           </Link>
