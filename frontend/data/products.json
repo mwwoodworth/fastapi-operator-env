@@ -1,0 +1,23 @@
+[
+  {
+    "id": "brainops-starter",
+    "title": "BrainOps Starter Kit",
+    "description": "Essential playbooks and setup guides for new teams.",
+    "link": "#",
+    "cta": "Buy Now"
+  },
+  {
+    "id": "growth-playbook",
+    "title": "Growth Automation Playbook",
+    "description": "Automated workflows to scale your marketing and analytics.",
+    "link": "#",
+    "cta": "Purchase"
+  },
+  {
+    "id": "ai-stack-guides",
+    "title": "AI Stack Guides",
+    "description": "Integrate AI capabilities into your product with minimal effort.",
+    "link": "#",
+    "cta": "Learn More"
+  }
+]
