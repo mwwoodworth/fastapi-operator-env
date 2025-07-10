@@ -45,3 +45,11 @@ export async function fetchProductDocs() {
 export async function fetchOpsMetrics() {
   return fetch(`${API_BASE}/dashboard/ops`).then(r => r.json());
 }
+
+export async function fetchRecentPosts() {
+  return fetch(`${API_BASE}/memory/search?limit=5`).then(r => r.json());
+}
+
+export async function fetchRecentTasks() {
+  return fetch(`${API_BASE}/dashboard/tasks`).then(r => r.json());
+}

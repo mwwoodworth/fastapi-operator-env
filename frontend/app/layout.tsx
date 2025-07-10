@@ -15,8 +15,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <Link href="/" className="font-bold text-xl">BrainStackStudio</Link>
           <nav className="space-x-4">
             <Link href="/products">Products</Link>
+            <Link href="/services">Services</Link>
             <Link href="/about">About</Link>
             <Link href="/blog">Blog</Link>
+            <Link href="/newsletter">Newsletter</Link>
             <Link href="/contact">Contact</Link>
             <Link href="/dashboard" className="font-semibold">Dashboard</Link>
           </nav>

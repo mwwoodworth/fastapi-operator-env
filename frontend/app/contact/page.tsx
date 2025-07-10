@@ -9,8 +9,16 @@ export default function ContactPage() {
   const [message, setMessage] = useState('');
   const [status, setStatus] = useState('');
 
+  function isValidEmail(val: string) {
+    return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(val);
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!name || !isValidEmail(email) || !message) {
+      setStatus('error');
+      return;
+    }
     setStatus('sending');
     const res = await fetch('/api/contact', {
       method: 'POST',
@@ -34,7 +42,7 @@ export default function ContactPage() {
         <input className="w-full border p-2" placeholder="Name" value={name} onChange={e => setName(e.target.value)} />
         <input className="w-full border p-2" type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} />
         <textarea className="w-full border p-2" rows={5} placeholder="Message" value={message} onChange={e => setMessage(e.target.value)} />
-        <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded">Send</button>
+        <button type="submit" disabled={!name || !isValidEmail(email) || !message || status==='sending'} className="bg-blue-600 text-white px-4 py-2 rounded disabled:opacity-50">Send</button>
       </form>
       {status === 'sent' && <p className='text-green-600'>Thanks! We\'ll be in touch.</p>}
       {status === 'error' && <p className='text-red-600'>Something went wrong.</p>}

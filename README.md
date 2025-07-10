@@ -113,7 +113,7 @@ A production-ready dashboard is located in `dashboard_ui/` built with Next.js, T
 
 ## Marketing Site
 
-The same Next.js project also hosts a lightweight marketing site for BrainStack Studio. Visit `/`, `/products`, `/about`, `/contact` or `/blog` for the public pages. The contact form submits to `/api/contact` and forwards data to the `MAKE_WEBHOOK_URL` if set.
+The same Next.js project also hosts a lightweight marketing site for BrainStack Studio. Visit `/`, `/products`, `/services`, `/about`, `/contact`, `/newsletter` or `/blog` for the public pages. The contact form submits to `/api/contact` and forwards data to the `MAKE_WEBHOOK_URL` if set. Newsletter signups are sent to `/api/newsletter/subscribe` using the provider configured in `.env`.
 
 ### Build & Export
 
