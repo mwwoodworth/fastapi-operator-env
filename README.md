@@ -102,6 +102,10 @@ The dashboard at `/dashboard/ui` includes a PWA manifest. Open the page in a mod
 
 A production-ready dashboard is located in `dashboard_ui/` built with Next.js, Tailwind CSS and shadcn/ui components. It can be deployed statically or embedded via `<iframe>`.
 
+## Marketing Site
+
+The same Next.js project also hosts a lightweight marketing site for BrainStack Studio. Visit `/`, `/products`, `/about`, `/contact` or `/blog` for the public pages. The contact form submits to `/api/contact` and forwards data to the `MAKE_WEBHOOK_URL` if set.
+
 ### Build & Export
 
 ```bash
@@ -130,6 +134,7 @@ The same snippet works in Tana, Google Sites or any platform that allows iframes
 
 - API endpoint base URL is configured with `NEXT_PUBLIC_API_BASE`.
 - Set `NEXT_PUBLIC_AUTH_HEADER` if your FastAPI server requires HTTP Basic or JWT auth (e.g. `"Basic dXNlcjpwYXNz"` or `"Bearer <token>").
+- Optional `MAKE_WEBHOOK_URL` is used by the contact form to forward submissions.
 - Branding and styling can be tweaked in `dashboard_ui/styles` and React components.
 
 ### BrainOps AI Assistant

@@ -21,6 +21,8 @@ def get_client():
     os.environ["AGENT_KEYS"] = '{"agent":"secret"}'
     importlib.reload(chat_task_api)
     importlib.reload(main_module)
+    import db.session
+    db.session.init_db()
     return TestClient(main_module.app)
 
 headers = {"X-Agent-Key": "secret"}
