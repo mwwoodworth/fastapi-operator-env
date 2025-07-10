@@ -1,0 +1,220 @@
+{
+  "name": "Multi-Channel Content Distribution",
+  "flow": [
+    {
+      "id": 1,
+      "module": "builtin:Gateway",
+      "version": 1,
+      "parameters": {},
+      "mapper": {
+        "mode": "merge"
+      },
+      "metadata": {
+        "designer": {
+          "x": 0,
+          "y": 0
+        }
+      }
+    },
+    {
+      "id": 2,
+      "module": "notion:WatchDatabaseItems",
+      "version": 1,
+      "parameters": {
+        "account": "{{TODO: Add Notion connection ID}}",
+        "database": "{{TODO: Add Blog Posts database ID}}",
+        "limit": 1
+      },
+      "filter": {
+        "name": "New Published Posts",
+        "conditions": [
+          {
+            "a": "{{properties.Published.checkbox}}",
+            "b": true,
+            "operator": "equal"
+          },
+          {
+            "a": "{{properties.Distributed.checkbox}}",
+            "b": false,
+            "operator": "equal"
+          }
+        ]
+      },
+      "mapper": {},
+      "metadata": {
+        "designer": {
+          "x": -300,
+          "y": -150
+        },
+        "target": 1
+      }
+    },
+    {
+      "id": 3,
+      "module": "youtube:WatchVideos",
+      "version": 1,
+      "parameters": {
+        "account": "{{TODO: Add YouTube connection ID}}",
+        "channelId": "{{TODO: Add channel ID}}",
+        "maxResults": 1
+      },
+      "mapper": {},
+      "metadata": {
+        "designer": {
+          "x": -300,
+          "y": 150
+        },
+        "target": 1
+      }
+    },
+    {
+      "id": 4,
+      "module": "openai:CreateCompletion",
+      "version": 1,
+      "parameters": {
+        "account": "{{TODO: Add OpenAI connection ID}}",
+        "model": "gpt-4",
+        "max_tokens": 300,
+        "temperature": 0.7
+      },
+      "mapper": {
+        "messages": [
+          {
+            "role": "system",
+            "content": "You are BrainOps' social media specialist. Create engaging LinkedIn posts that showcase expertise in AI-enhanced project management and automation. Be professional yet conversational. Include relevant hashtags."
+          },
+          {
+            "role": "user",
+            "content": "{{if(1.source === 'notion', 'Create a LinkedIn post announcing this new blog article:\\n\\nTitle: ' + 1.properties.Title.title[0].text.content + '\\n\\nSummary: ' + 1.properties.Summary.rich_text[0].text.content + '\\n\\nURL: ' + 1.properties.URL.url, 'Create a LinkedIn post announcing this new video:\\n\\nTitle: ' + 1.snippet.title + '\\n\\nDescription: ' + 1.snippet.description + '\\n\\nURL: https://youtu.be/' + 1.id.videoId)}}"
+          }
+        ]
+      },
+      "metadata": {
+        "designer": {
+          "x": 300,
+          "y": 0
+        }
+      }
+    },
+    {
+      "id": 5,
+      "module": "linkedin:CreateAPost",
+      "version": 1,
+      "parameters": {
+        "account": "{{TODO: Add LinkedIn connection ID}}",
+        "author": "{{TODO: Add LinkedIn person/company URN}}"
+      },
+      "mapper": {
+        "text": "{{4.choices[0].message.content}}",
+        "visibility": "PUBLIC"
+      },
+      "metadata": {
+        "designer": {
+          "x": 600,
+          "y": 0
+        }
+      }
+    },
+    {
+      "id": 6,
+      "module": "twitter:CreateATweet",
+      "version": 1,
+      "parameters": {
+        "account": "{{TODO: Add Twitter connection ID (if applicable)}}"
+      },
+      "mapper": {
+        "text": "{{substring(4.choices[0].message.content, 0, 280)}}"
+      },
+      "metadata": {
+        "designer": {
+          "x": 900,
+          "y": -150
+        }
+      }
+    },
+    {
+      "id": 7,
+      "module": "notion:UpdateADatabaseItem",
+      "version": 1,
+      "parameters": {
+        "account": "{{TODO: Add Notion connection ID}}"
+      },
+      "filter": {
+        "name": "Update if Notion source",
+        "conditions": [
+          {
+            "a": "{{1.source}}",
+            "b": "notion",
+            "operator": "equal"
+          }
+        ]
+      },
+      "mapper": {
+        "database_item": "{{1.id}}",
+        "properties": {
+          "Distributed": {
+            "checkbox": true
+          },
+          "LinkedIn Posted": {
+            "date": {
+              "start": "{{now}}"
+            }
+          },
+          "Social Post": {
+            "rich_text": [
+              {
+                "text": {
+                  "content": "{{4.choices[0].message.content}}"
+                }
+              }
+            ]
+          }
+        }
+      },
+      "metadata": {
+        "designer": {
+          "x": 900,
+          "y": 150
+        }
+      }
+    },
+    {
+      "id": 8,
+      "module": "slack:CreateAMessage",
+      "version": 1,
+      "parameters": {
+        "account": "{{TODO: Add Slack connection ID}}"
+      },
+      "mapper": {
+        "channel": "{{TODO: Add marketing channel ID}}",
+        "text": "📢 Content distributed!\n\n*{{if(1.source === 'notion', 'Blog', 'Video')}}:* {{if(1.source === 'notion', 1.properties.Title.title[0].text.content, 1.snippet.title)}}\n\n✅ LinkedIn\n{{if(6.id, '✅ Twitter', '')}}\n\n<{{if(1.source === 'notion', 1.properties.URL.url, 'https://youtu.be/' + 1.id.videoId)}}|View Original>",
+        "parse": "full"
+      },
+      "metadata": {
+        "designer": {
+          "x": 1200,
+          "y": 0
+        }
+      }
+    }
+  ],
+  "metadata": {
+    "instant": false,
+    "version": 1,
+    "scenario": {
+      "roundtrips": 1,
+      "maxErrors": 3,
+      "autoCommit": true,
+      "autoCommitTriggerLast": true,
+      "sequential": true,
+      "confidential": false,
+      "dataloss": false,
+      "dlq": false,
+      "freshVariables": false
+    },
+    "designer": {
+      "orphans": []
+    },
+    "zone": "us1.make.com"
+  }
+}

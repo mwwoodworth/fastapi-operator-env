@@ -1,0 +1,302 @@
+{
+  "name": "Lead Capture to CRM Pipeline",
+  "flow": [
+    {
+      "id": 1,
+      "module": "gateway:CustomWebHook",
+      "version": 1,
+      "parameters": {
+        "name": "Lead Form Submission",
+        "hook": null,
+        "note": "TODO: Configure webhook URL for form provider (Typeform/ClickUp Form)"
+      },
+      "mapper": {},
+      "metadata": {
+        "designer": {
+          "x": 0,
+          "y": 0
+        },
+        "restore": {
+          "parameters": {
+            "hook": {
+              "label": "Lead Capture Webhook"
+            }
+          }
+        },
+        "expect": [
+          {
+            "name": "name",
+            "type": "text",
+            "label": "Lead Name",
+            "required": true
+          },
+          {
+            "name": "email",
+            "type": "email",
+            "label": "Email Address",
+            "required": true
+          },
+          {
+            "name": "company",
+            "type": "text",
+            "label": "Company Name"
+          },
+          {
+            "name": "phone",
+            "type": "text",
+            "label": "Phone Number"
+          },
+          {
+            "name": "project_details",
+            "type": "text",
+            "label": "Project Details"
+          },
+          {
+            "name": "source",
+            "type": "text",
+            "label": "Lead Source"
+          }
+        ]
+      }
+    },
+    {
+      "id": 2,
+      "module": "builtin:BasicFeeder",
+      "version": 1,
+      "parameters": {},
+      "filter": {
+        "name": "Validate Required Fields",
+        "conditions": [
+          [
+            {
+              "a": "{{1.email}}",
+              "o": "text:notempty"
+            },
+            {
+              "a": "{{1.name}}",
+              "o": "text:notempty"
+            }
+          ]
+        ]
+      },
+      "mapper": {
+        "array": "{{1}}"
+      },
+      "metadata": {
+        "designer": {
+          "x": 300,
+          "y": 0
+        }
+      }
+    },
+    {
+      "id": 3,
+      "module": "notion:CreateADatabaseItem",
+      "version": 2,
+      "parameters": {
+        "__IMTCONN__": "TODO: Add Notion connection ID"
+      },
+      "mapper": {
+        "parent": {
+          "database_id": "TODO: Add CRM database ID in Notion"
+        },
+        "properties": {
+          "Name": {
+            "title": [
+              {
+                "text": {
+                  "content": "{{2.name}}"
+                }
+              }
+            ]
+          },
+          "Email": {
+            "email": "{{2.email}}"
+          },
+          "Company": {
+            "rich_text": [
+              {
+                "text": {
+                  "content": "{{2.company}}"
+                }
+              }
+            ]
+          },
+          "Phone": {
+            "phone_number": "{{2.phone}}"
+          },
+          "Status": {
+            "select": {
+              "name": "New Lead"
+            }
+          },
+          "Project Details": {
+            "rich_text": [
+              {
+                "text": {
+                  "content": "{{2.project_details}}"
+                }
+              }
+            ]
+          },
+          "Lead Source": {
+            "select": {
+              "name": "{{2.source}}"
+            }
+          },
+          "Created Date": {
+            "date": {
+              "start": "{{formatDate(now; 'YYYY-MM-DD')}}"
+            }
+          }
+        }
+      },
+      "metadata": {
+        "designer": {
+          "x": 600,
+          "y": 0
+        },
+        "restore": {
+          "expect": {
+            "parent": {
+              "mode": "chose"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": 4,
+      "module": "google-contacts:createContact",
+      "version": 1,
+      "parameters": {
+        "__IMTCONN__": "TODO: Add Google Contacts connection ID"
+      },
+      "mapper": {
+        "names": [
+          {
+            "familyName": "{{last(split(2.name; ' '))}}",
+            "givenName": "{{first(split(2.name; ' '))}}"
+          }
+        ],
+        "emailAddresses": [
+          {
+            "value": "{{2.email}}",
+            "type": "work"
+          }
+        ],
+        "phoneNumbers": [
+          {
+            "value": "{{2.phone}}",
+            "type": "work"
+          }
+        ],
+        "organizations": [
+          {
+            "name": "{{2.company}}",
+            "type": "work"
+          }
+        ],
+        "notes": "Lead from: {{2.source}}\nProject: {{2.project_details}}\nCaptured: {{formatDate(now; 'YYYY-MM-DD HH:mm')}}"
+      },
+      "metadata": {
+        "designer": {
+          "x": 600,
+          "y": 150
+        }
+      }
+    },
+    {
+      "id": 5,
+      "module": "gmail:SendAnEmail",
+      "version": 2,
+      "parameters": {
+        "__IMTCONN__": "TODO: Add Gmail connection ID"
+      },
+      "mapper": {
+        "to": [
+          "{{2.email}}"
+        ],
+        "cc": [],
+        "bcc": [],
+        "subject": "Thank you for your interest in BrainOps",
+        "text": "Hi {{2.name}},\n\nThank you for reaching out to BrainOps. We've received your inquiry and appreciate your interest in our services.\n\nOne of our team members will review your project details and follow up with you within 1-2 business days.\n\nIn the meantime, feel free to explore our resources:\n- Website: [Your Website]\n- Documentation: [Link to docs]\n\nIf you have any urgent questions, please don't hesitate to reply to this email.\n\nBest regards,\nThe BrainOps Team",
+        "html": "<p>Hi {{2.name}},</p>\n<p>Thank you for reaching out to BrainOps. We've received your inquiry and appreciate your interest in our services.</p>\n<p>One of our team members will review your project details and follow up with you within 1-2 business days.</p>\n<p>In the meantime, feel free to explore our resources:</p>\n<ul>\n<li>Website: <a href=\"TODO: Add website URL\">BrainOps</a></li>\n<li>Documentation: <a href=\"TODO: Add docs URL\">Resources</a></li>\n</ul>\n<p>If you have any urgent questions, please don't hesitate to reply to this email.</p>\n<p>Best regards,<br>The BrainOps Team</p>",
+        "attachments": []
+      },
+      "metadata": {
+        "designer": {
+          "x": 900,
+          "y": 0
+        }
+      }
+    },
+    {
+      "id": 6,
+      "module": "clickup:createTask",
+      "version": 1,
+      "parameters": {
+        "__IMTCONN__": "TODO: Add ClickUp connection ID"
+      },
+      "mapper": {
+        "name": "Follow up: {{2.name}} - {{2.company}}",
+        "description": "New lead requires follow-up\n\n**Contact Details:**\n- Name: {{2.name}}\n- Email: {{2.email}}\n- Phone: {{2.phone}}\n- Company: {{2.company}}\n\n**Project Details:**\n{{2.project_details}}\n\n**Lead Source:** {{2.source}}\n\n**Next Steps:**\n1. Review project requirements\n2. Schedule discovery call\n3. Send relevant resources",
+        "list": "TODO: Add Sales Pipeline list ID",
+        "status": "to do",
+        "priority": 2,
+        "due_date": "{{addDays(now; 2)}}",
+        "assignees": ["TODO: Add assignee user ID"],
+        "tags": ["lead", "follow-up"],
+        "custom_fields": [
+          {
+            "id": "TODO: Add custom field ID for Lead Email",
+            "value": "{{2.email}}"
+          }
+        ]
+      },
+      "metadata": {
+        "designer": {
+          "x": 900,
+          "y": 150
+        }
+      }
+    },
+    {
+      "id": 7,
+      "module": "slack:postMessage",
+      "version": 3,
+      "parameters": {
+        "__IMTCONN__": "TODO: Add Slack connection ID"
+      },
+      "mapper": {
+        "channel": "#sales-notifications",
+        "text": "🎯 New Lead Captured!\n\n*Name:* {{2.name}}\n*Company:* {{2.company}}\n*Email:* {{2.email}}\n*Source:* {{2.source}}\n\n*Project Details:*\n{{2.project_details}}\n\n_Follow-up task created in ClickUp_",
+        "parse": "full"
+      },
+      "metadata": {
+        "designer": {
+          "x": 1200,
+          "y": 75
+        }
+      }
+    }
+  ],
+  "metadata": {
+    "instant": true,
+    "version": 1,
+    "scenario": {
+      "roundtrips": 1,
+      "maxErrors": 3,
+      "autoCommit": true,
+      "autoCommitTriggerLast": true,
+      "sequential": true,
+      "confidential": false,
+      "dataloss": false,
+      "dlq": false
+    },
+    "designer": {
+      "orphans": []
+    },
+    "zone": "us1.make.com"
+  }
+}

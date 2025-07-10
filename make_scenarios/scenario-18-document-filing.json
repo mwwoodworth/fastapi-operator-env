@@ -1,0 +1,379 @@
+{
+  "name": "BrainOps Document Filing & Organization",
+  "description": "Automatically files important documents (receipts, invoices, contracts) from email into organized Google Drive folders and maintains searchable index in Notion.",
+  "trigger": {
+    "id": 1,
+    "module": "gmail:watchEmails",
+    "version": 3,
+    "parameters": {
+      "connection": "{{TODO: Add Gmail connection ID}}",
+      "folder": "INBOX",
+      "markAsRead": false,
+      "maxResults": 10
+    },
+    "mapper": {
+      "q": "((from:stripe.com OR from:gumroad.com OR from:adobe.com OR subject:invoice OR subject:receipt OR subject:contract) has:attachment) OR label:to-file",
+      "includeSpamTrash": false
+    },
+    "metadata": {
+      "name": "Watch for Documents to File",
+      "designer": {
+        "x": 0,
+        "y": 150
+      }
+    }
+  },
+  "modules": [
+    {
+      "id": 2,
+      "module": "builtin:BasicFeeder",
+      "version": 1,
+      "parameters": {},
+      "mapper": {
+        "array": "{{1.emails}}"
+      },
+      "metadata": {
+        "name": "Process Each Email",
+        "designer": {
+          "x": 300,
+          "y": 150
+        }
+      }
+    },
+    {
+      "id": 3,
+      "module": "tools:setMultipleVariables",
+      "version": 1,
+      "parameters": {},
+      "mapper": {
+        "variables": [
+          {
+            "name": "documentType",
+            "value": "{{if(contains(lower(2.subject + \" \" + 2.from); \"invoice\"); \"invoice\"; if(contains(lower(2.subject + \" \" + 2.from); \"receipt\"); \"receipt\"; if(contains(lower(2.subject + \" \" + 2.from); \"contract\"); \"contract\"; if(contains(lower(2.subject + \" \" + 2.from); \"agreement\"); \"contract\"; \"other\"))))}}"
+          },
+          {
+            "name": "vendor",
+            "value": "{{if(contains(2.from; \"stripe.com\"); \"Stripe\"; if(contains(2.from; \"gumroad.com\"); \"Gumroad\"; if(contains(2.from; \"adobe.com\"); \"Adobe\"; if(contains(2.from; \"@\"); first(split(last(split(2.from; \"<\")); \"@\")); \"Unknown\"))))}}"
+          },
+          {
+            "name": "year",
+            "value": "{{formatDate(2.date; \"YYYY\")}}"
+          },
+          {
+            "name": "folderPath",
+            "value": "{{if(3.documentType = \"invoice\"; \"Finance/Invoices/\" + 3.year; if(3.documentType = \"receipt\"; \"Finance/Receipts/\" + 3.year + \"/\" + 3.vendor; if(3.documentType = \"contract\"; \"Contracts/\" + 3.year; \"Documents/Unfiled/\" + 3.year)))}}"
+          }
+        ],
+        "scope": "roundtrip"
+      },
+      "metadata": {
+        "name": "Determine Filing Parameters",
+        "designer": {
+          "x": 600,
+          "y": 150
+        }
+      }
+    },
+    {
+      "id": 4,
+      "module": "google-drive:searchFolders",
+      "version": 3,
+      "parameters": {
+        "connection": "{{TODO: Add Google Drive connection ID}}",
+        "limit": 1
+      },
+      "mapper": {
+        "query": "name = '{{last(split(3.folderPath; \"/\"))}}' and mimeType = 'application/vnd.google-apps.folder'",
+        "fields": "files(id,name,parents)"
+      },
+      "metadata": {
+        "name": "Check if Target Folder Exists",
+        "designer": {
+          "x": 900,
+          "y": 150
+        }
+      }
+    },
+    {
+      "id": 5,
+      "module": "google-drive:createFolder",
+      "version": 3,
+      "parameters": {
+        "connection": "{{TODO: Add Google Drive connection ID}}"
+      },
+      "mapper": {
+        "name": "{{last(split(3.folderPath; \"/\"))}}",
+        "parentId": ["{{TODO: Add parent folder ID for document storage}}"]
+      },
+      "metadata": {
+        "name": "Create Folder if Needed",
+        "designer": {
+          "x": 1200,
+          "y": 300
+        }
+      },
+      "filter": {
+        "name": "If folder doesn't exist",
+        "conditions": [[{
+          "a": "{{length(4.files)}}",
+          "b": "0",
+          "o": "number:equal"
+        }]]
+      }
+    },
+    {
+      "id": 6,
+      "module": "builtin:BasicFeeder",
+      "version": 1,
+      "parameters": {},
+      "mapper": {
+        "array": "{{2.attachments}}"
+      },
+      "metadata": {
+        "name": "Process Each Attachment",
+        "designer": {
+          "x": 1500,
+          "y": 150
+        }
+      },
+      "filter": {
+        "name": "If has attachments",
+        "conditions": [[{
+          "a": "{{length(2.attachments)}}",
+          "b": "0",
+          "o": "number:greater"
+        }]]
+      }
+    },
+    {
+      "id": 7,
+      "module": "gmail:downloadAttachment",
+      "version": 1,
+      "parameters": {
+        "connection": "{{TODO: Add Gmail connection ID}}"
+      },
+      "mapper": {
+        "messageId": "{{2.id}}",
+        "attachmentId": "{{6.attachmentId}}"
+      },
+      "metadata": {
+        "name": "Download Attachment",
+        "designer": {
+          "x": 1800,
+          "y": 150
+        }
+      }
+    },
+    {
+      "id": 8,
+      "module": "tools:setVariable",
+      "version": 1,
+      "parameters": {},
+      "mapper": {
+        "name": "fileName",
+        "scope": "roundtrip",
+        "value": "{{formatDate(2.date; \"YYYY-MM-DD\")}} - {{3.vendor}} - {{replace(6.filename; \"/\"; \"-\")}}"
+      },
+      "metadata": {
+        "name": "Generate Standardized Filename",
+        "designer": {
+          "x": 2100,
+          "y": 150
+        }
+      }
+    },
+    {
+      "id": 9,
+      "module": "google-drive:uploadFile",
+      "version": 3,
+      "parameters": {
+        "connection": "{{TODO: Add Google Drive connection ID}}"
+      },
+      "mapper": {
+        "folderId": "{{if(length(4.files) > 0; 4.files[1].id; 5.id)}}",
+        "fileName": "{{8.fileName}}",
+        "data": "{{7.data}}",
+        "mimeType": "{{6.contentType}}",
+        "convert": false
+      },
+      "metadata": {
+        "name": "Upload to Google Drive",
+        "designer": {
+          "x": 2400,
+          "y": 150
+        }
+      }
+    },
+    {
+      "id": 10,
+      "module": "notion:createDatabaseItem",
+      "version": 3,
+      "parameters": {
+        "connection": "{{TODO: Add Notion connection ID}}"
+      },
+      "mapper": {
+        "databaseId": "{{TODO: Insert Document Index Database ID}}",
+        "properties": {
+          "Document_Name": {
+            "title": [{
+              "text": {
+                "content": "{{8.fileName}}"
+              }
+            }]
+          },
+          "Type": {
+            "select": {
+              "name": "{{3.documentType}}"
+            }
+          },
+          "Vendor": {
+            "rich_text": [{
+              "text": {
+                "content": "{{3.vendor}}"
+              }
+            }]
+          },
+          "Date": {
+            "date": {
+              "start": "{{formatDate(2.date; \"YYYY-MM-DD\")}}"
+            }
+          },
+          "Amount": {
+            "number": "{{TODO: Extract from email or attachment if possible}}"
+          },
+          "Drive_Link": {
+            "url": "https://drive.google.com/file/d/{{9.id}}/view"
+          },
+          "Email_Subject": {
+            "rich_text": [{
+              "text": {
+                "content": "{{2.subject}}"
+              }
+            }]
+          },
+          "Email_From": {
+            "email": "{{2.from}}"
+          },
+          "Filed_Date": {
+            "date": {
+              "start": "{{formatDate(now; \"YYYY-MM-DD\")}}"
+            }
+          },
+          "Status": {
+            "select": {
+              "name": "Auto-Filed"
+            }
+          }
+        }
+      },
+      "metadata": {
+        "name": "Create Document Index Entry",
+        "designer": {
+          "x": 2700,
+          "y": 150
+        }
+      }
+    },
+    {
+      "id": 11,
+      "module": "gmail:modifyLabels",
+      "version": 2,
+      "parameters": {
+        "connection": "{{TODO: Add Gmail connection ID}}"
+      },
+      "mapper": {
+        "messageId": "{{2.id}}",
+        "addLabelIds": ["{{TODO: Add 'Filed' label ID}}"],
+        "removeLabelIds": ["{{TODO: Add 'to-file' label ID if using}}"]
+      },
+      "metadata": {
+        "name": "Mark Email as Filed",
+        "designer": {
+          "x": 3000,
+          "y": 150
+        }
+      }
+    },
+    {
+      "id": 12,
+      "module": "slack:createMessage",
+      "version": 1,
+      "parameters": {
+        "connection": "{{TODO: Add Slack connection ID}}"
+      },
+      "mapper": {
+        "channel": "{{TODO: Add operations channel ID}}",
+        "text": ":file_folder: Document auto-filed:\n*Type:* {{3.documentType}}\n*Vendor:* {{3.vendor}}\n*File:* {{8.fileName}}\n*Location:* {{3.folderPath}}\n<https://drive.google.com/file/d/{{9.id}}/view|View in Drive>"
+      },
+      "metadata": {
+        "name": "Notify Document Filed",
+        "designer": {
+          "x": 3300,
+          "y": 150
+        }
+      }
+    }
+  ],
+  "settings": {
+    "executionTimeout": 40,
+    "maxCycles": 500,
+    "dlq": true,
+    "keepExecutionHistory": true,
+    "errorHandlers": [
+      {
+        "id": 100,
+        "module": "builtin:Ignore",
+        "version": 1,
+        "filter": {
+          "name": "Handle filing errors",
+          "conditions": [[{
+            "a": "{{true}}",
+            "b": "{{true}}",
+            "o": "equal"
+          }]]
+        },
+        "mapper": {},
+        "metadata": {
+          "name": "Continue on Error"
+        },
+        "handlerType": "error",
+        "direction": [7, 9, 10]
+      },
+      {
+        "id": 101,
+        "module": "gmail:modifyLabels",
+        "version": 2,
+        "parameters": {
+          "connection": "{{TODO: Add Gmail connection ID}}"
+        },
+        "mapper": {
+          "messageId": "{{2.id}}",
+          "addLabelIds": ["{{TODO: Add 'ERROR-Filing' label ID}}"]
+        },
+        "metadata": {
+          "name": "Mark Email with Error"
+        },
+        "handlerType": "error",
+        "direction": [7, 9, 10]
+      },
+      {
+        "id": 102,
+        "module": "slack:createMessage",
+        "version": 1,
+        "parameters": {
+          "connection": "{{TODO: Add Slack connection ID}}"
+        },
+        "mapper": {
+          "channel": "{{TODO: Add operations channel ID}}",
+          "text": ":warning: Document filing error:\n*Email:* {{2.subject}}\n*From:* {{2.from}}\n*Error:* {{100.error.message}}\n\nManual filing required."
+        },
+        "metadata": {
+          "name": "Alert on Error"
+        },
+        "handlerType": "error",
+        "direction": [7, 9, 10]
+      }
+    ]
+  },
+  "notes": "## Document Filing & Organization Automation\n\n### Purpose\nAutomatically files email attachments (receipts, invoices, contracts) into organized Google Drive folders and maintains searchable index in Notion.\n\n### Setup Requirements\n1. Create Gmail labels: 'to-file', 'Filed', 'ERROR-Filing'\n2. Set up Google Drive folder structure:\n   - Finance/\n     - Invoices/[Year]\n     - Receipts/[Year]/[Vendor]\n   - Contracts/[Year]\n   - Documents/Unfiled/[Year]\n3. Create Notion database for document index with properties:\n   - Document_Name (title)\n   - Type (select: invoice, receipt, contract, other)\n   - Vendor (text)\n   - Date (date)\n   - Amount (number)\n   - Drive_Link (url)\n   - Email_Subject (text)\n   - Email_From (email)\n   - Filed_Date (date)\n   - Status (select: Auto-Filed, Manual, Error)\n4. Configure all connection IDs\n\n### TODO for Operator\n- Create and configure all Gmail labels\n- Set up Google Drive folder structure\n- Create Notion document index database\n- Add all connection IDs\n- Consider adding OCR module to extract amounts from receipts\n- Test with sample documents before enabling\n- Configure email search query for specific vendors/senders"
+}

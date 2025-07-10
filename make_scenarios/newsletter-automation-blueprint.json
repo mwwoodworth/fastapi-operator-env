@@ -1,0 +1,436 @@
+{
+  "name": "Automated Newsletter & Content Email Distribution",
+  "flow": [
+    {
+      "id": 1,
+      "module": "schedule:schedule",
+      "version": 1,
+      "parameters": {
+        "name": "Monthly Newsletter Schedule",
+        "schedule": {
+          "type": "schedule",
+          "interval": "month",
+          "time": "09:00",
+          "date": "1",
+          "timezone": "America/Denver"
+        }
+      },
+      "metadata": {
+        "designer": {
+          "x": 0,
+          "y": 0
+        }
+      }
+    },
+    {
+      "id": 2,
+      "module": "notion:searchObjects",
+      "version": 2,
+      "parameters": {
+        "__IMTCONN__": "TODO: Add Notion connection ID"
+      },
+      "mapper": {
+        "filter": {
+          "and": [
+            {
+              "property": "Published",
+              "checkbox": {
+                "equals": true
+              }
+            },
+            {
+              "property": "Published Date",
+              "date": {
+                "after": "{{addDays(now; -30)}}"
+              }
+            }
+          ]
+        },
+        "database_id": "TODO: Add Blog Posts database ID",
+        "sorts": [
+          {
+            "property": "Published Date",
+            "direction": "descending"
+          }
+        ],
+        "limit": 5
+      },
+      "metadata": {
+        "designer": {
+          "x": 300,
+          "y": 0
+        }
+      }
+    },
+    {
+      "id": 3,
+      "module": "tools:aggregator",
+      "version": 1,
+      "parameters": {
+        "feeder": 2,
+        "target": "blogPosts"
+      },
+      "mapper": {
+        "title": "{{properties.Title.title[0].text.content}}",
+        "url": "{{properties.URL.url}}",
+        "summary": "{{properties.Summary.rich_text[0].text.content}}",
+        "category": "{{properties.Category.select.name}}"
+      },
+      "metadata": {
+        "designer": {
+          "x": 600,
+          "y": 0
+        }
+      }
+    },
+    {
+      "id": 4,
+      "module": "notion:searchObjects",
+      "version": 2,
+      "parameters": {
+        "__IMTCONN__": "TODO: Add Notion connection ID"
+      },
+      "mapper": {
+        "filter": {
+          "property": "Type",
+          "select": {
+            "equals": "Announcement"
+          }
+        },
+        "database_id": "TODO: Add Changelog/Updates database ID",
+        "sorts": [
+          {
+            "property": "Date",
+            "direction": "descending"
+          }
+        ],
+        "limit": 3
+      },
+      "metadata": {
+        "designer": {
+          "x": 300,
+          "y": 150
+        }
+      }
+    },
+    {
+      "id": 5,
+      "module": "tools:aggregator",
+      "version": 1,
+      "parameters": {
+        "feeder": 4,
+        "target": "updates"
+      },
+      "mapper": {
+        "title": "{{properties.Title.title[0].text.content}}",
+        "description": "{{properties.Description.rich_text[0].text.content}}"
+      },
+      "metadata": {
+        "designer": {
+          "x": 600,
+          "y": 150
+        }
+      }
+    },
+    {
+      "id": 6,
+      "module": "http:makeAPICall",
+      "version": 1,
+      "parameters": {
+        "url": "https://api.anthropic.com/v1/messages",
+        "method": "POST",
+        "headers": [
+          {
+            "name": "x-api-key",
+            "value": "TODO: Add Claude API key"
+          },
+          {
+            "name": "anthropic-version",
+            "value": "2023-06-01"
+          },
+          {
+            "name": "content-type",
+            "value": "application/json"
+          }
+        ],
+        "note": "Using Claude as Content Director AI for newsletter drafting"
+      },
+      "mapper": {
+        "data": "{\n  \"model\": \"claude-3-opus-20240229\",\n  \"max_tokens\": 2000,\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"You are the Content Director for BrainOps. Draft our monthly newsletter for {{formatDate(now; 'MMMM YYYY')}}. Use a friendly but professional tone that provides value to our subscribers interested in AI, automation, and business optimization.\\n\\nInclude the following recent content:\\n\\nBlog Posts:\\n{{join(map(3.blogPosts; '- ' + title + ': ' + summary); '\\n')}}\\n\\nRecent Updates:\\n{{join(map(5.updates; '- ' + title + ': ' + description); '\\n')}}\\n\\nAlso include:\\n- A brief intro highlighting the month's theme\\n- One actionable tip about AI or automation\\n- A call-to-action for our consulting services\\n\\nFormat the newsletter in HTML suitable for email. Keep it concise (under 500 words) and scannable.\"\n    }\n  ]\n}"
+      },
+      "metadata": {
+        "designer": {
+          "x": 900,
+          "y": 75
+        }
+      }
+    },
+    {
+      "id": 7,
+      "module": "tools:setVariable",
+      "version": 1,
+      "parameters": {},
+      "mapper": {
+        "name": "newsletterContent",
+        "scope": "roundtrip",
+        "value": "{{parseJson(6.body).content[0].text}}"
+      },
+      "metadata": {
+        "designer": {
+          "x": 1200,
+          "y": 75
+        }
+      }
+    },
+    {
+      "id": 8,
+      "module": "router:Router",
+      "version": 1,
+      "parameters": {},
+      "mapper": null,
+      "metadata": {
+        "designer": {
+          "x": 1500,
+          "y": 75
+        }
+      },
+      "routes": [
+        {
+          "name": "Auto-Send Route",
+          "filter": {
+            "name": "Auto-Send Enabled",
+            "conditions": [
+              [
+                {
+                  "a": "TODO: Add config variable for auto_send_newsletter",
+                  "o": "text:equal",
+                  "b": "true"
+                }
+              ]
+            ]
+          },
+          "flow": [
+            {
+              "id": 9,
+              "module": "convertkit:createBroadcast",
+              "version": 1,
+              "parameters": {
+                "__IMTCONN__": "TODO: Add ConvertKit connection ID"
+              },
+              "mapper": {
+                "subject": "BrainOps Monthly Update - {{formatDate(now; 'MMMM YYYY')}}",
+                "content": "{{7.newsletterContent}}",
+                "public": false,
+                "published_at": "{{now}}",
+                "send_at": "{{now}}"
+              },
+              "metadata": {
+                "designer": {
+                  "x": 1800,
+                  "y": 0
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Draft Review Route",
+          "flow": [
+            {
+              "id": 10,
+              "module": "convertkit:createBroadcast",
+              "version": 1,
+              "parameters": {
+                "__IMTCONN__": "TODO: Add ConvertKit connection ID"
+              },
+              "mapper": {
+                "subject": "[DRAFT] BrainOps Monthly Update - {{formatDate(now; 'MMMM YYYY')}}",
+                "content": "{{7.newsletterContent}}",
+                "public": false,
+                "published_at": null,
+                "send_at": null
+              },
+              "metadata": {
+                "designer": {
+                  "x": 1800,
+                  "y": 150
+                }
+              }
+            },
+            {
+              "id": 11,
+              "module": "slack:postMessage",
+              "version": 3,
+              "parameters": {
+                "__IMTCONN__": "TODO: Add Slack connection ID"
+              },
+              "mapper": {
+                "channel": "#content-review",
+                "text": "📧 Newsletter Draft Ready for Review\n\n*Month:* {{formatDate(now; 'MMMM YYYY')}}\n*Status:* Draft created in ConvertKit\n\n*Content Summary:*\n- {{length(3.blogPosts)}} blog posts featured\n- {{length(5.updates)}} updates included\n\n*Action Required:*\n1. Review draft in ConvertKit\n2. Make any edits needed\n3. Schedule or send when ready\n\n<https://app.convertkit.com/campaigns|View in ConvertKit>",
+                "parse": "full"
+              },
+              "metadata": {
+                "designer": {
+                  "x": 1800,
+                  "y": 300
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "module": "notion:CreateAPage",
+      "version": 2,
+      "parameters": {
+        "__IMTCONN__": "TODO: Add Notion connection ID"
+      },
+      "mapper": {
+        "parent": {
+          "database_id": "TODO: Add Newsletter Archive database ID"
+        },
+        "properties": {
+          "Title": {
+            "title": [
+              {
+                "text": {
+                  "content": "Newsletter - {{formatDate(now; 'MMMM YYYY')}}"
+                }
+              }
+            ]
+          },
+          "Date Sent": {
+            "date": {
+              "start": "{{formatDate(now; 'YYYY-MM-DD')}}"
+            }
+          },
+          "Status": {
+            "select": {
+              "name": "{{if(9.id; 'Sent'; 'Draft')}}"
+            }
+          },
+          "Content Type": {
+            "select": {
+              "name": "Monthly Newsletter"
+            }
+          },
+          "Posts Included": {
+            "number": "{{length(3.blogPosts)}}"
+          }
+        },
+        "children": [
+          {
+            "object": "block",
+            "type": "heading_1",
+            "heading_1": {
+              "rich_text": [
+                {
+                  "type": "text",
+                  "text": {
+                    "content": "Newsletter Content"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "object": "block",
+            "type": "code",
+            "code": {
+              "rich_text": [
+                {
+                  "type": "text",
+                  "text": {
+                    "content": "{{7.newsletterContent}}"
+                  }
+                }
+              ],
+              "language": "html"
+            }
+          },
+          {
+            "object": "block",
+            "type": "heading_2",
+            "heading_2": {
+              "rich_text": [
+                {
+                  "type": "text",
+                  "text": {
+                    "content": "Featured Content"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "object": "block",
+            "type": "bulleted_list_item",
+            "bulleted_list_item": {
+              "rich_text": [
+                {
+                  "type": "text",
+                  "text": {
+                    "content": "{{join(map(3.blogPosts; title); ', ')}}"
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "metadata": {
+        "designer": {
+          "x": 2100,
+          "y": 75
+        }
+      }
+    },
+    {
+      "id": 13,
+      "module": "datastore:addItem",
+      "version": 1,
+      "parameters": {
+        "__IMTCONN__": "TODO: Configure datastore connection"
+      },
+      "mapper": {
+        "datastore": "newsletter_log",
+        "data": {
+          "date": "{{formatDate(now; 'YYYY-MM-DD')}}",
+          "month": "{{formatDate(now; 'MMMM YYYY')}}",
+          "status": "{{if(9.id; 'sent'; 'draft')}}",
+          "blog_count": "{{length(3.blogPosts)}}",
+          "update_count": "{{length(5.updates)}}",
+          "convertkit_broadcast_id": "{{ifempty(9.broadcast.id; 10.broadcast.id)}}",
+          "notion_archive_id": "{{12.id}}"
+        }
+      },
+      "metadata": {
+        "designer": {
+          "x": 2100,
+          "y": 225
+        }
+      }
+    }
+  ],
+  "metadata": {
+    "instant": false,
+    "version": 1,
+    "scenario": {
+      "roundtrips": 1,
+      "maxErrors": 3,
+      "autoCommit": true,
+      "autoCommitTriggerLast": true,
+      "sequential": true,
+      "confidential": false,
+      "dataloss": false,
+      "dlq": false,
+      "scheduleScenario": true
+    },
+    "designer": {
+      "orphans": []
+    },
+    "zone": "us1.make.com"
+  }
+}

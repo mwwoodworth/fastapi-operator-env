@@ -1,0 +1,197 @@
+{
+  "name": "AI-Generated Drafts on Demand",
+  "flow": [
+    {
+      "id": 1,
+      "module": "notion:WatchDatabaseItems",
+      "version": 1,
+      "parameters": {
+        "account": "{{TODO: Add Notion connection ID}}",
+        "database": "{{TODO: Add Content Ideas database ID}}",
+        "limit": 5
+      },
+      "filter": {
+        "name": "Ready for Draft Filter",
+        "conditions": [
+          {
+            "a": "{{properties.Status.select.name}}",
+            "b": "Ready for Draft",
+            "operator": "equal"
+          }
+        ]
+      },
+      "mapper": {},
+      "metadata": {
+        "designer": {
+          "x": 0,
+          "y": 0
+        }
+      }
+    },
+    {
+      "id": 2,
+      "module": "openai:CreateCompletion",
+      "version": 1,
+      "parameters": {
+        "account": "{{TODO: Add Claude/OpenAI connection ID}}",
+        "model": "claude-3-opus-20240229",
+        "max_tokens": 2000,
+        "temperature": 0.7
+      },
+      "mapper": {
+        "messages": [
+          {
+            "role": "system",
+            "content": "You are BrainOps' Content Director AI. Write high-quality content that demonstrates expertise in AI-enhanced project management, automation, and specialized industry knowledge. Focus on practical value, clear explanations, and actionable insights. Write in a professional yet accessible tone."
+          },
+          {
+            "role": "user",
+            "content": "Write a {{1.properties.Type.select.name}} on the topic: '{{1.properties.Title.title[0].text.content}}'\n\nTarget Audience: {{1.properties.Audience.select.name}}\n\nKey Points to Cover:\n{{1.properties.Key Points.rich_text[0].text.content}}\n\nContent Type Requirements:\n{{switch(1.properties.Type.select.name, 'Blog Post', '1500-2000 words with introduction, main sections with subheadings, practical examples, and conclusion with CTA', 'Tutorial', 'Step-by-step guide with clear instructions, prerequisites, and expected outcomes', 'Social Post', '200-300 words, engaging hook, key insight, and soft CTA', 'Documentation', 'Clear structure, technical accuracy, examples, and troubleshooting section')}}"
+          }
+        ]
+      },
+      "metadata": {
+        "designer": {
+          "x": 300,
+          "y": 0
+        }
+      }
+    },
+    {
+      "id": 3,
+      "module": "notion:CreateAPage",
+      "version": 1,
+      "parameters": {
+        "account": "{{TODO: Add Notion connection ID}}",
+        "parent": "{{TODO: Add Drafts parent page/database ID}}"
+      },
+      "mapper": {
+        "properties": {
+          "Name": {
+            "title": [
+              {
+                "text": {
+                  "content": "[DRAFT] {{1.properties.Title.title[0].text.content}}"
+                }
+              }
+            ]
+          },
+          "Type": {
+            "select": {
+              "name": "{{1.properties.Type.select.name}}"
+            }
+          },
+          "Status": {
+            "select": {
+              "name": "Draft Ready"
+            }
+          },
+          "Created Date": {
+            "date": {
+              "start": "{{now}}"
+            }
+          },
+          "Source Idea": {
+            "relation": [
+              {
+                "id": "{{1.id}}"
+              }
+            ]
+          }
+        },
+        "children": [
+          {
+            "object": "block",
+            "type": "paragraph",
+            "paragraph": {
+              "rich_text": [
+                {
+                  "type": "text",
+                  "text": {
+                    "content": "{{2.choices[0].message.content}}"
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "metadata": {
+        "designer": {
+          "x": 600,
+          "y": 0
+        }
+      }
+    },
+    {
+      "id": 4,
+      "module": "notion:UpdateADatabaseItem",
+      "version": 1,
+      "parameters": {
+        "account": "{{TODO: Add Notion connection ID}}"
+      },
+      "mapper": {
+        "database_item": "{{1.id}}",
+        "properties": {
+          "Status": {
+            "select": {
+              "name": "Draft Created"
+            }
+          },
+          "Draft Link": {
+            "url": "{{3.url}}"
+          },
+          "Draft Created Date": {
+            "date": {
+              "start": "{{now}}"
+            }
+          }
+        }
+      },
+      "metadata": {
+        "designer": {
+          "x": 900,
+          "y": 0
+        }
+      }
+    },
+    {
+      "id": 5,
+      "module": "slack:CreateAMessage",
+      "version": 1,
+      "parameters": {
+        "account": "{{TODO: Add Slack connection ID}}"
+      },
+      "mapper": {
+        "channel": "{{TODO: Add content channel ID}}",
+        "text": "📝 New draft ready for review!\n\n*Title:* {{1.properties.Title.title[0].text.content}}\n*Type:* {{1.properties.Type.select.name}}\n*Audience:* {{1.properties.Audience.select.name}}\n\n<{{3.url}}|Review Draft in Notion>",
+        "parse": "full"
+      },
+      "metadata": {
+        "designer": {
+          "x": 1200,
+          "y": 0
+        }
+      }
+    }
+  ],
+  "metadata": {
+    "instant": false,
+    "version": 1,
+    "scenario": {
+      "roundtrips": 1,
+      "maxErrors": 3,
+      "autoCommit": true,
+      "autoCommitTriggerLast": true,
+      "sequential": true,
+      "confidential": false,
+      "dataloss": false,
+      "dlq": false,
+      "freshVariables": false
+    },
+    "designer": {
+      "orphans": []
+    },
+    "zone": "us1.make.com"
+  }
+}

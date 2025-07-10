@@ -1,0 +1,285 @@
+{
+  "name": "New Subscriber Onboarding Sequence",
+  "flow": [
+    {
+      "id": 1,
+      "module": "gateway:CustomWebHook",
+      "version": 1,
+      "parameters": {
+        "hook": "{{TODO: Create webhook for form submissions or ConvertKit events}}",
+        "maxResults": 1
+      },
+      "mapper": {},
+      "metadata": {
+        "designer": {
+          "x": 0,
+          "y": 0
+        },
+        "restore": {
+          "parameters": {
+            "hook": {
+              "data": {
+                "editable": "true"
+              },
+              "label": "Newsletter Signup Webhook"
+            }
+          }
+        },
+        "expect": [
+          {
+            "name": "email",
+            "type": "email",
+            "label": "Email",
+            "required": true
+          },
+          {
+            "name": "name",
+            "type": "text",
+            "label": "Name",
+            "required": false
+          },
+          {
+            "name": "source",
+            "type": "text",
+            "label": "Lead Source",
+            "required": true
+          },
+          {
+            "name": "lead_magnet",
+            "type": "text",
+            "label": "Lead Magnet ID",
+            "required": false
+          }
+        ]
+      }
+    },
+    {
+      "id": 2,
+      "module": "convertkit:GetSubscriber",
+      "version": 1,
+      "parameters": {
+        "account": "{{TODO: Add ConvertKit connection ID}}"
+      },
+      "mapper": {
+        "email": "{{1.email}}"
+      },
+      "metadata": {
+        "designer": {
+          "x": 300,
+          "y": 0
+        }
+      }
+    },
+    {
+      "id": 3,
+      "module": "builtin:BasicRouter",
+      "version": 1,
+      "parameters": {
+        "routes": [
+          {
+            "flow": [
+              {
+                "id": 4,
+                "module": "convertkit:CreateSubscriber",
+                "version": 1,
+                "parameters": {
+                  "account": "{{TODO: Add ConvertKit connection ID}}"
+                },
+                "mapper": {
+                  "email": "{{1.email}}",
+                  "first_name": "{{split(1.name, ' ')[0]}}",
+                  "fields": {
+                    "source": "{{1.source}}"
+                  }
+                },
+                "metadata": {
+                  "designer": {
+                    "x": 600,
+                    "y": -150
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "flow": [
+              {
+                "id": 5,
+                "module": "tools:SetVariable",
+                "version": 1,
+                "parameters": {},
+                "mapper": {
+                  "name": "subscriber_id",
+                  "scope": "roundtrip",
+                  "value": "{{2.subscriber.id}}"
+                },
+                "metadata": {
+                  "designer": {
+                    "x": 600,
+                    "y": 150
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "mapper": null,
+      "metadata": {
+        "designer": {
+          "x": 450,
+          "y": 0
+        },
+        "parameters": {
+          "conditions": {
+            "0": {
+              "name": "New Subscriber",
+              "condition": "{{2.error}}"
+            },
+            "1": {
+              "name": "Existing Subscriber",
+              "condition": "{{!2.error}}"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": 6,
+      "module": "convertkit:TagSubscriber",
+      "version": 1,
+      "parameters": {
+        "account": "{{TODO: Add ConvertKit connection ID}}"
+      },
+      "mapper": {
+        "email": "{{1.email}}",
+        "tag": "{{switch(1.source, 'blog', {{TODO: Blog tag ID}}, 'lead_magnet', {{TODO: Lead magnet tag ID}}, 'webinar', {{TODO: Webinar tag ID}}, {{TODO: Default tag ID}})}}"
+      },
+      "metadata": {
+        "designer": {
+          "x": 900,
+          "y": 0
+        }
+      }
+    },
+    {
+      "id": 7,
+      "module": "convertkit:AddSubscriberToSequence",
+      "version": 1,
+      "parameters": {
+        "account": "{{TODO: Add ConvertKit connection ID}}"
+      },
+      "mapper": {
+        "email": "{{1.email}}",
+        "sequence": "{{TODO: Add welcome sequence ID}}"
+      },
+      "metadata": {
+        "designer": {
+          "x": 1200,
+          "y": 0
+        }
+      }
+    },
+    {
+      "id": 8,
+      "module": "gmail:ActionSendEmail",
+      "version": 2,
+      "parameters": {
+        "account": "{{TODO: Add Gmail connection ID}}"
+      },
+      "filter": {
+        "name": "Send lead magnet if applicable",
+        "conditions": [
+          {
+            "a": "{{1.lead_magnet}}",
+            "b": "",
+            "operator": "notEmpty"
+          }
+        ]
+      },
+      "mapper": {
+        "to": [
+          "{{1.email}}"
+        ],
+        "subject": "Your {{switch(1.lead_magnet, 'checklist', 'Commercial Roofing Checklist', 'template', 'Project Management Template', 'guide', 'AI Implementation Guide', 'Requested Resource')}} is here!",
+        "html": "<h2>Welcome to BrainOps!</h2>\n\n<p>Hi {{1.name}},</p>\n\n<p>Thank you for joining our community. As promised, here's your free resource:</p>\n\n<p><a href=\"{{switch(1.lead_magnet, 'checklist', '{{TODO: Checklist URL}}', 'template', '{{TODO: Template URL}}', 'guide', '{{TODO: Guide URL}}', '{{TODO: Default URL}}')}}\">Download Your {{switch(1.lead_magnet, 'checklist', 'Checklist', 'template', 'Template', 'guide', 'Guide', 'Resource')}}</a></p>\n\n<p>Over the next few days, I'll share some tips on how to get the most value from this resource.</p>\n\n<p>If you have any questions, just reply to this email.</p>\n\n<p>Welcome aboard!</p>\n\n<p>{{TODO: Add founder signature}}<br>\nBrainOps</p>"
+      },
+      "metadata": {
+        "designer": {
+          "x": 1500,
+          "y": 0
+        }
+      }
+    },
+    {
+      "id": 9,
+      "module": "notion:CreateADatabaseItem",
+      "version": 1,
+      "parameters": {
+        "account": "{{TODO: Add Notion connection ID}}",
+        "database": "{{TODO: Add Email Subscribers database ID}}"
+      },
+      "mapper": {
+        "properties": {
+          "Email": {
+            "email": "{{1.email}}"
+          },
+          "Name": {
+            "title": [
+              {
+                "text": {
+                  "content": "{{1.name}}"
+                }
+              }
+            ]
+          },
+          "Source": {
+            "select": {
+              "name": "{{1.source}}"
+            }
+          },
+          "Lead Magnet": {
+            "select": {
+              "name": "{{1.lead_magnet}}"
+            }
+          },
+          "Signup Date": {
+            "date": {
+              "start": "{{now}}"
+            }
+          },
+          "Status": {
+            "select": {
+              "name": "Active"
+            }
+          }
+        }
+      },
+      "metadata": {
+        "designer": {
+          "x": 1800,
+          "y": 0
+        }
+      }
+    }
+  ],
+  "metadata": {
+    "instant": true,
+    "version": 1,
+    "scenario": {
+      "roundtrips": 1,
+      "maxErrors": 3,
+      "autoCommit": true,
+      "autoCommitTriggerLast": true,
+      "sequential": true,
+      "confidential": false,
+      "dataloss": false,
+      "dlq": false,
+      "freshVariables": false
+    },
+    "designer": {
+      "orphans": []
+    },
+    "zone": "us1.make.com"
+  }
+}

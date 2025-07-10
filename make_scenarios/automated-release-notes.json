@@ -1,0 +1,271 @@
+{
+  "name": "Automated Release Notes & Changelog Publication",
+  "flow": [
+    {
+      "id": 1,
+      "module": "gateway:CustomWebHook",
+      "version": 1,
+      "parameters": {
+        "hook": "{{TODO: Create webhook for GitHub release events}}",
+        "maxResults": 1
+      },
+      "mapper": {},
+      "metadata": {
+        "designer": {
+          "x": 0,
+          "y": 0
+        },
+        "restore": {
+          "parameters": {
+            "hook": {
+              "data": {
+                "editable": "true"
+              },
+              "label": "GitHub Release Webhook"
+            }
+          }
+        },
+        "expect": [
+          {
+            "name": "action",
+            "type": "text",
+            "label": "Action",
+            "required": true
+          },
+          {
+            "name": "release",
+            "type": "collection",
+            "label": "Release",
+            "required": true,
+            "spec": [
+              {
+                "name": "tag_name",
+                "type": "text",
+                "label": "Tag Name"
+              },
+              {
+                "name": "name",
+                "type": "text",
+                "label": "Release Name"
+              },
+              {
+                "name": "body",
+                "type": "text",
+                "label": "Release Body"
+              }
+            ]
+          },
+          {
+            "name": "repository",
+            "type": "collection",
+            "label": "Repository",
+            "required": true,
+            "spec": [
+              {
+                "name": "name",
+                "type": "text",
+                "label": "Repository Name"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 2,
+      "module": "tools:BasicFilter",
+      "version": 1,
+      "parameters": {},
+      "mapper": {
+        "conditions": [
+          {
+            "a": "{{1.action}}",
+            "b": "published",
+            "operator": "equal"
+          }
+        ]
+      },
+      "metadata": {
+        "designer": {
+          "x": 300,
+          "y": 0
+        }
+      }
+    },
+    {
+      "id": 3,
+      "module": "github:GetCommits",
+      "version": 1,
+      "parameters": {
+        "account": "{{TODO: Add GitHub connection ID}}",
+        "owner": "{{TODO: Add repository owner}}",
+        "repo": "{{1.repository.name}}"
+      },
+      "mapper": {
+        "since": "{{TODO: Previous release date or use tag comparison}}",
+        "per_page": 100
+      },
+      "metadata": {
+        "designer": {
+          "x": 600,
+          "y": 0
+        }
+      }
+    },
+    {
+      "id": 4,
+      "module": "tools:Aggregator",
+      "version": 1,
+      "parameters": {
+        "feeder": 3,
+        "target": "text",
+        "separator": "\n"
+      },
+      "mapper": {
+        "value": "- {{commit.message}}"
+      },
+      "metadata": {
+        "designer": {
+          "x": 900,
+          "y": 0
+        }
+      }
+    },
+    {
+      "id": 5,
+      "module": "openai:CreateCompletion",
+      "version": 1,
+      "parameters": {
+        "account": "{{TODO: Add Claude/OpenAI connection ID}}",
+        "model": "claude-3-opus-20240229",
+        "max_tokens": 800,
+        "temperature": 0.3
+      },
+      "mapper": {
+        "messages": [
+          {
+            "role": "system",
+            "content": "You are BrainOps' release notes writer. Create clear, user-focused changelog entries that explain what changed and why it matters. Group changes by type (Features, Improvements, Fixes). Be concise and technical where appropriate."
+          },
+          {
+            "role": "user",
+            "content": "Generate release notes for version {{1.release.tag_name}}.\n\nRelease title: {{1.release.name}}\n\nCommit messages:\n{{4.text}}\n\nFormat as:\n## [Version] - [Date]\n### Features\n### Improvements\n### Fixes\n\nFocus on user impact, not implementation details."
+          }
+        ]
+      },
+      "metadata": {
+        "designer": {
+          "x": 1200,
+          "y": 0
+        }
+      }
+    },
+    {
+      "id": 6,
+      "module": "notion:UpdateAPage",
+      "version": 1,
+      "parameters": {
+        "account": "{{TODO: Add Notion connection ID}}",
+        "page": "{{TODO: Add Changelog page ID}}"
+      },
+      "mapper": {
+        "children": [
+          {
+            "object": "block",
+            "type": "divider",
+            "divider": {}
+          },
+          {
+            "object": "block",
+            "type": "paragraph",
+            "paragraph": {
+              "rich_text": [
+                {
+                  "type": "text",
+                  "text": {
+                    "content": "{{5.choices[0].message.content}}"
+                  }
+                }
+              ]
+            }
+          }
+        ],
+        "append": true
+      },
+      "metadata": {
+        "designer": {
+          "x": 1500,
+          "y": 0
+        }
+      }
+    },
+    {
+      "id": 7,
+      "module": "convertkit:SendBroadcast",
+      "version": 1,
+      "parameters": {
+        "account": "{{TODO: Add ConvertKit connection ID}}"
+      },
+      "filter": {
+        "name": "Only for major releases",
+        "conditions": [
+          {
+            "a": "{{not(contains(1.release.tag_name, 'beta'))}}",
+            "b": true,
+            "operator": "equal"
+          }
+        ]
+      },
+      "mapper": {
+        "subject": "BrainOps Update: {{1.release.name}}",
+        "from_email": "{{TODO: Add from email}}",
+        "content": "<h2>New Update Available!</h2>\n\n<p>We've just released {{1.release.tag_name}} with several improvements based on your feedback.</p>\n\n{{replace(5.choices[0].message.content, '\n', '<br>\n')}}\n\n<p><a href=\"{{TODO: Add product URL}}\">Access Your Updated Dashboard</a></p>\n\n<p>Questions? Just reply to this email.</p>",
+        "segment_ids": ["{{TODO: Add product users segment ID}}"]
+      },
+      "metadata": {
+        "designer": {
+          "x": 1800,
+          "y": 0
+        }
+      }
+    },
+    {
+      "id": 8,
+      "module": "slack:CreateAMessage",
+      "version": 1,
+      "parameters": {
+        "account": "{{TODO: Add Slack connection ID}}"
+      },
+      "mapper": {
+        "channel": "{{TODO: Add product channel ID}}",
+        "text": "🚀 Release Notes Published!\n\n*Version:* {{1.release.tag_name}}\n*Name:* {{1.release.name}}\n\n✅ Changelog updated in Notion\n{{if(7.broadcast_id, '✅ Email sent to users', '')}}\n\n<{{TODO: Add changelog URL}}|View Changelog>",
+        "parse": "full"
+      },
+      "metadata": {
+        "designer": {
+          "x": 2100,
+          "y": 0
+        }
+      }
+    }
+  ],
+  "metadata": {
+    "instant": true,
+    "version": 1,
+    "scenario": {
+      "roundtrips": 1,
+      "maxErrors": 3,
+      "autoCommit": true,
+      "autoCommitTriggerLast": true,
+      "sequential": true,
+      "confidential": false,
+      "dataloss": false,
+      "dlq": false,
+      "freshVariables": false
+    },
+    "designer": {
+      "orphans": []
+    },
+    "zone": "us1.make.com"
+  }
+}

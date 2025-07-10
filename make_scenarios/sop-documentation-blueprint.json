@@ -1,0 +1,409 @@
+{
+  "name": "SOP Documentation Sync & Backup",
+  "flow": [
+    {
+      "id": 1,
+      "module": "schedule:schedule",
+      "version": 1,
+      "parameters": {
+        "name": "Nightly Documentation Backup",
+        "schedule": {
+          "type": "schedule",
+          "interval": "day",
+          "time": "02:00",
+          "timezone": "America/Denver"
+        }
+      },
+      "metadata": {
+        "designer": {
+          "x": 0,
+          "y": 0
+        }
+      }
+    },
+    {
+      "id": 2,
+      "module": "notion:searchObjects",
+      "version": 2,
+      "parameters": {
+        "__IMTCONN__": "TODO: Add Notion connection ID"
+      },
+      "mapper": {
+        "filter": {
+          "property": "Auto Backup",
+          "checkbox": {
+            "equals": true
+          }
+        },
+        "database_id": "TODO: Add SOP/Documentation database ID",
+        "sorts": [
+          {
+            "property": "Last Edited",
+            "direction": "descending"
+          }
+        ],
+        "limit": 100
+      },
+      "metadata": {
+        "designer": {
+          "x": 300,
+          "y": 0
+        }
+      }
+    },
+    {
+      "id": 3,
+      "module": "tools:iteratorModule",
+      "version": 1,
+      "parameters": {},
+      "mapper": {
+        "array": "{{2.results}}"
+      },
+      "metadata": {
+        "designer": {
+          "x": 600,
+          "y": 0
+        }
+      }
+    },
+    {
+      "id": 4,
+      "module": "notion:retrievePageContent",
+      "version": 2,
+      "parameters": {
+        "__IMTCONN__": "TODO: Add Notion connection ID"
+      },
+      "mapper": {
+        "pageId": "{{3.id}}"
+      },
+      "metadata": {
+        "designer": {
+          "x": 900,
+          "y": 0
+        }
+      }
+    },
+    {
+      "id": 5,
+      "module": "notion:exportPageToMarkdown",
+      "version": 1,
+      "parameters": {
+        "__IMTCONN__": "TODO: Add Notion connection ID",
+        "note": "TODO: This module is conceptual - use Notion API to get blocks and convert to markdown"
+      },
+      "mapper": {
+        "pageId": "{{3.id}}",
+        "includeMetadata": true,
+        "includeSubpages": false
+      },
+      "metadata": {
+        "designer": {
+          "x": 1200,
+          "y": 0
+        }
+      }
+    },
+    {
+      "id": 6,
+      "module": "datastore:searchRecords",
+      "version": 1,
+      "parameters": {
+        "__IMTCONN__": "TODO: Configure datastore connection"
+      },
+      "mapper": {
+        "datastore": "documentation_versions",
+        "filter": [
+          {
+            "field": "page_id",
+            "operator": "equal",
+            "value": "{{3.id}}"
+          }
+        ],
+        "limit": 1,
+        "sort": [
+          {
+            "field": "backup_date",
+            "order": "desc"
+          }
+        ]
+      },
+      "metadata": {
+        "designer": {
+          "x": 900,
+          "y": 150
+        }
+      }
+    },
+    {
+      "id": 7,
+      "module": "tools:md5",
+      "version": 1,
+      "parameters": {},
+      "mapper": {
+        "data": "{{5.markdown}}"
+      },
+      "metadata": {
+        "designer": {
+          "x": 1200,
+          "y": 150
+        }
+      }
+    },
+    {
+      "id": 8,
+      "module": "builtin:BasicRouter",
+      "version": 1,
+      "mapper": null,
+      "metadata": {
+        "designer": {
+          "x": 1500,
+          "y": 75
+        }
+      },
+      "routes": [
+        {
+          "flow": [
+            {
+              "id": 9,
+              "module": "google-drive:uploadAFile",
+              "version": 3,
+              "parameters": {
+                "__IMTCONN__": "TODO: Add Google Drive connection ID"
+              },
+              "filter": {
+                "name": "Content Changed",
+                "conditions": [
+                  [
+                    {
+                      "a": "{{7.md5}}",
+                      "o": "text:notequal",
+                      "b": "{{6.bundles[0].content_hash}}"
+                    }
+                  ],
+                  [
+                    {
+                      "a": "{{length(6.bundles)}}",
+                      "o": "numeric:equal",
+                      "b": 0
+                    }
+                  ]
+                ]
+              },
+              "mapper": {
+                "folderId": "TODO: Add Documentation Backup folder ID",
+                "fileName": "{{3.properties.Title.title[0].text.content}}_{{formatDate(now; 'YYYY-MM-DD_HHmmss')}}.md",
+                "data": "{{5.markdown}}",
+                "convert": false,
+                "mimeType": "text/markdown"
+              },
+              "metadata": {
+                "designer": {
+                  "x": 1800,
+                  "y": 0
+                }
+              }
+            },
+            {
+              "id": 10,
+              "module": "github:createFile",
+              "version": 1,
+              "parameters": {
+                "__IMTCONN__": "TODO: Add GitHub connection ID"
+              },
+              "mapper": {
+                "owner": "TODO: Add GitHub username/org",
+                "repo": "brainops-documentation",
+                "path": "sops/{{replace(3.properties.Title.title[0].text.content; ' '; '-')}}.md",
+                "message": "Backup: {{3.properties.Title.title[0].text.content}} - {{formatDate(now; 'YYYY-MM-DD HH:mm')}}",
+                "content": "{{toBase64(5.markdown)}}",
+                "branch": "main",
+                "sha": "{{if(6.bundles[0].github_sha; 6.bundles[0].github_sha; '')}}"
+              },
+              "metadata": {
+                "designer": {
+                  "x": 1800,
+                  "y": 150
+                }
+              }
+            },
+            {
+              "id": 11,
+              "module": "datastore:addItem",
+              "version": 1,
+              "parameters": {
+                "__IMTCONN__": "TODO: Configure datastore connection"
+              },
+              "mapper": {
+                "datastore": "documentation_versions",
+                "data": {
+                  "page_id": "{{3.id}}",
+                  "page_title": "{{3.properties.Title.title[0].text.content}}",
+                  "backup_date": "{{now}}",
+                  "content_hash": "{{7.md5}}",
+                  "google_drive_id": "{{9.id}}",
+                  "google_drive_link": "{{9.webViewLink}}",
+                  "github_sha": "{{10.content.sha}}",
+                  "version_number": "{{length(6.bundles) + 1}}"
+                }
+              },
+              "metadata": {
+                "designer": {
+                  "x": 1800,
+                  "y": 300
+                }
+              }
+            },
+            {
+              "id": 12,
+              "module": "tools:setVariable",
+              "version": 1,
+              "parameters": {},
+              "mapper": {
+                "name": "changedDocs",
+                "scope": "execution",
+                "value": "{{add(get(changedDocs); 1)}}"
+              },
+              "metadata": {
+                "designer": {
+                  "x": 1800,
+                  "y": 450
+                }
+              }
+            }
+          ]
+        },
+        {
+          "flow": [
+            {
+              "id": 13,
+              "module": "builtin:BasicFeeder",
+              "version": 1,
+              "parameters": {},
+              "mapper": {
+                "array": "[1]",
+                "note": "No changes detected - skip backup"
+              },
+              "metadata": {
+                "designer": {
+                  "x": 1800,
+                  "y": 600
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 14,
+      "module": "tools:sleep",
+      "version": 1,
+      "parameters": {
+        "duration": 1000,
+        "unit": "milliseconds"
+      },
+      "metadata": {
+        "designer": {
+          "x": 2100,
+          "y": 300
+        },
+        "parameters": {
+          "duration": 1000
+        },
+        "note": "Rate limiting between API calls"
+      }
+    },
+    {
+      "id": 15,
+      "module": "builtin:BasicRouter",
+      "version": 1,
+      "mapper": null,
+      "metadata": {
+        "designer": {
+          "x": 2400,
+          "y": 300
+        }
+      },
+      "routes": [
+        {
+          "flow": [
+            {
+              "id": 16,
+              "module": "gateway:WebhookRespond",
+              "version": 1,
+              "parameters": {
+                "status": "200",
+                "headers": [],
+                "body": "{\"status\": \"success\", \"documents_checked\": {{length(2.results)}}, \"documents_updated\": {{get(changedDocs)}}}",
+                "note": "TODO: This is for monitoring - remove if not using webhook trigger"
+              },
+              "metadata": {
+                "designer": {
+                  "x": 2700,
+                  "y": 0
+                }
+              }
+            },
+            {
+              "id": 17,
+              "module": "slack:postMessage",
+              "version": 3,
+              "parameters": {
+                "__IMTCONN__": "TODO: Add Slack connection ID"
+              },
+              "mapper": {
+                "channel": "#ops-notifications",
+                "text": "📚 Documentation Backup Complete\n\n*Date:* {{formatDate(now; 'YYYY-MM-DD HH:mm')}}\n*Documents Checked:* {{length(2.results)}}\n*Documents Backed Up:* {{get(changedDocs)}}\n\n✅ All critical documentation is backed up to Google Drive and GitHub",
+                "parse": "full"
+              },
+              "metadata": {
+                "designer": {
+                  "x": 2700,
+                  "y": 150
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 18,
+      "module": "googleDriveForBusiness:uploadToNotebookLM",
+      "version": 1,
+      "parameters": {
+        "__IMTCONN__": "TODO: Add Google Drive connection ID",
+        "note": "TODO: This is conceptual - NotebookLM integration may require manual setup or API when available"
+      },
+      "mapper": {
+        "folderId": "TODO: Add NotebookLM sync folder ID",
+        "documents": "{{map(filter(11.bundles; content_hash != ''); google_drive_id)}}"
+      },
+      "metadata": {
+        "designer": {
+          "x": 2700,
+          "y": 300
+        }
+      }
+    }
+  ],
+  "metadata": {
+    "instant": false,
+    "version": 1,
+    "scenario": {
+      "roundtrips": 1,
+      "maxErrors": 10,
+      "autoCommit": true,
+      "autoCommitTriggerLast": true,
+      "sequential": true,
+      "confidential": false,
+      "dataloss": false,
+      "dlq": false,
+      "scheduleScenario": true
+    },
+    "designer": {
+      "orphans": []
+    },
+    "zone": "us1.make.com"
+  }
+}

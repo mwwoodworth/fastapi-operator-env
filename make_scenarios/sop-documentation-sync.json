@@ -1,0 +1,204 @@
+{
+  "name": "SOP Documentation Sync & Backup",
+  "flow": [
+    {
+      "id": 1,
+      "module": "schedule:BasicSchedule",
+      "version": 1,
+      "parameters": {
+        "schedule": "0 2 * * *"
+      },
+      "mapper": {},
+      "metadata": {
+        "designer": {
+          "x": 0,
+          "y": 0
+        },
+        "parameters": {
+          "schedule": {
+            "label": "Daily at 2:00 AM"
+          }
+        }
+      }
+    },
+    {
+      "id": 2,
+      "module": "notion:SearchPages",
+      "version": 1,
+      "parameters": {
+        "account": "{{TODO: Add Notion connection ID}}",
+        "filter": {
+          "property": "Auto Backup",
+          "checkbox": {
+            "equals": true
+          }
+        }
+      },
+      "mapper": {
+        "page_size": 100
+      },
+      "metadata": {
+        "designer": {
+          "x": 300,
+          "y": 0
+        }
+      }
+    },
+    {
+      "id": 3,
+      "module": "builtin:Iterator",
+      "version": 1,
+      "parameters": {
+        "source": "{{2.results}}"
+      },
+      "mapper": {},
+      "metadata": {
+        "designer": {
+          "x": 600,
+          "y": 0
+        }
+      }
+    },
+    {
+      "id": 4,
+      "module": "notion:GetPageContent",
+      "version": 1,
+      "parameters": {
+        "account": "{{TODO: Add Notion connection ID}}"
+      },
+      "mapper": {
+        "page": "{{3.id}}"
+      },
+      "metadata": {
+        "designer": {
+          "x": 900,
+          "y": 0
+        }
+      }
+    },
+    {
+      "id": 5,
+      "module": "tools:TextParser",
+      "version": 1,
+      "parameters": {
+        "pattern": "markdown"
+      },
+      "mapper": {
+        "text": "{{4.content}}"
+      },
+      "metadata": {
+        "designer": {
+          "x": 1200,
+          "y": 0
+        }
+      }
+    },
+    {
+      "id": 6,
+      "module": "google-drive:CreateAFile",
+      "version": 1,
+      "parameters": {
+        "account": "{{TODO: Add Google connection ID}}",
+        "folderId": "{{TODO: Add backup folder ID}}"
+      },
+      "mapper": {
+        "name": "{{3.properties.Name.title[0].text.content}} - {{formatDate(now, 'YYYY-MM-DD')}}.md",
+        "data": "{{5.markdown}}",
+        "mimeType": "text/markdown"
+      },
+      "metadata": {
+        "designer": {
+          "x": 1500,
+          "y": 0
+        }
+      }
+    },
+    {
+      "id": 7,
+      "module": "github:CreateAFile",
+      "version": 1,
+      "parameters": {
+        "account": "{{TODO: Add GitHub connection ID (optional)}}",
+        "owner": "{{TODO: Add repository owner}}",
+        "repo": "{{TODO: Add repository name}}"
+      },
+      "filter": {
+        "name": "Only if GitHub backup enabled",
+        "conditions": [
+          {
+            "a": "{{TODO: Set to true if using GitHub}}",
+            "b": true,
+            "operator": "equal"
+          }
+        ]
+      },
+      "mapper": {
+        "path": "backups/{{formatDate(now, 'YYYY-MM-DD')}}/{{3.properties.Name.title[0].text.content}}.md",
+        "message": "Backup: {{3.properties.Name.title[0].text.content}} - {{formatDate(now, 'YYYY-MM-DD HH:mm')}}",
+        "content": "{{5.markdown}}",
+        "branch": "main"
+      },
+      "metadata": {
+        "designer": {
+          "x": 1800,
+          "y": 0
+        }
+      }
+    },
+    {
+      "id": 8,
+      "module": "tools:SetVariable",
+      "version": 1,
+      "parameters": {},
+      "mapper": {
+        "name": "backup_log",
+        "scope": "execution",
+        "value": "{{add(get(variables.backup_log; []), 3.properties.Name.title[0].text.content)}}"
+      },
+      "metadata": {
+        "designer": {
+          "x": 2100,
+          "y": 0
+        }
+      }
+    },
+    {
+      "id": 9,
+      "module": "slack:CreateAMessage",
+      "version": 1,
+      "parameters": {
+        "account": "{{TODO: Add Slack connection ID}}"
+      },
+      "mapper": {
+        "channel": "{{TODO: Add operations channel ID}}",
+        "text": "📚 Documentation Backup Complete\n\n*Date:* {{formatDate(now, 'MMM DD, YYYY @ h:mm A')}}\n*Documents Backed Up:* {{length(2.results)}}\n\n✅ Google Drive backup complete\n{{if(7.sha, '✅ GitHub backup complete', '')}}\n\n*Files:*\n{{join(variables.backup_log, '\n• ')}}",
+        "parse": "full"
+      },
+      "metadata": {
+        "designer": {
+          "x": 2400,
+          "y": 0
+        }
+      }
+    }
+  ],
+  "metadata": {
+    "instant": false,
+    "version": 1,
+    "scenario": {
+      "roundtrips": 1,
+      "maxErrors": 3,
+      "autoCommit": true,
+      "autoCommitTriggerLast": true,
+      "sequential": true,
+      "confidential": false,
+      "dataloss": false,
+      "dlq": false,
+      "freshVariables": false
+    },
+    "designer": {
+      "orphans": []
+    },
+    "zone": "us1.make.com"
+  }
+}

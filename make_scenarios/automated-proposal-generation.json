@@ -1,0 +1,269 @@
+{
+  "name": "Automated Proposal & Quote Generation",
+  "flow": [
+    {
+      "id": 1,
+      "module": "clickup:WatchTasks",
+      "version": 1,
+      "parameters": {
+        "account": "{{TODO: Add ClickUp connection ID}}",
+        "list": "{{TODO: Add CRM/Pipeline list ID}}",
+        "limit": 5
+      },
+      "filter": {
+        "name": "Proposal Stage Filter",
+        "conditions": [
+          {
+            "a": "{{status}}",
+            "b": "Proposal",
+            "operator": "equal"
+          }
+        ]
+      },
+      "mapper": {},
+      "metadata": {
+        "designer": {
+          "x": 0,
+          "y": 0
+        }
+      }
+    },
+    {
+      "id": 2,
+      "module": "google-docs:CopyADocument",
+      "version": 1,
+      "parameters": {
+        "account": "{{TODO: Add Google connection ID}}",
+        "templateId": "{{TODO: Add proposal template document ID}}",
+        "folderId": "{{TODO: Add proposals folder ID}}"
+      },
+      "mapper": {
+        "name": "Proposal - {{1.name}} - {{formatDate(now, 'YYYY-MM-DD')}}"
+      },
+      "metadata": {
+        "designer": {
+          "x": 300,
+          "y": 0
+        }
+      }
+    },
+    {
+      "id": 3,
+      "module": "openai:CreateCompletion",
+      "version": 1,
+      "parameters": {
+        "account": "{{TODO: Add OpenAI connection ID}}",
+        "model": "gpt-4",
+        "max_tokens": 500,
+        "temperature": 0.7
+      },
+      "mapper": {
+        "messages": [
+          {
+            "role": "system",
+            "content": "You are a proposal writer for BrainOps. Generate customized project approach sections based on client needs. Focus on AI-enhanced solutions, automation benefits, and ROI. Keep it professional and specific."
+          },
+          {
+            "role": "user",
+            "content": "Generate a project approach paragraph for:\nClient: {{1.name}}\nIndustry: {{1.custom_fields.industry}}\nNeeds: {{1.description}}\n\nHighlight how our solution addresses their specific challenges."
+          }
+        ]
+      },
+      "metadata": {
+        "designer": {
+          "x": 600,
+          "y": 0
+        }
+      }
+    },
+    {
+      "id": 4,
+      "module": "google-docs:ReplaceTextInDocument",
+      "version": 1,
+      "parameters": {
+        "account": "{{TODO: Add Google connection ID}}"
+      },
+      "mapper": {
+        "documentId": "{{2.id}}",
+        "requests": [
+          {
+            "replaceAllText": {
+              "containsText": {
+                "text": "{{CLIENT_NAME}}",
+                "matchCase": false
+              },
+              "replaceText": "{{1.name}}"
+            }
+          },
+          {
+            "replaceAllText": {
+              "containsText": {
+                "text": "{{COMPANY_NAME}}",
+                "matchCase": false
+              },
+              "replaceText": "{{1.custom_fields.company}}"
+            }
+          },
+          {
+            "replaceAllText": {
+              "containsText": {
+                "text": "{{PROJECT_APPROACH}}",
+                "matchCase": false
+              },
+              "replaceText": "{{3.choices[0].message.content}}"
+            }
+          },
+          {
+            "replaceAllText": {
+              "containsText": {
+                "text": "{{PROPOSAL_DATE}}",
+                "matchCase": false
+              },
+              "replaceText": "{{formatDate(now, 'MMMM DD, YYYY')}}"
+            }
+          },
+          {
+            "replaceAllText": {
+              "containsText": {
+                "text": "{{VALID_UNTIL}}",
+                "matchCase": false
+              },
+              "replaceText": "{{formatDate(addDays(now, 30), 'MMMM DD, YYYY')}}"
+            }
+          },
+          {
+            "replaceAllText": {
+              "containsText": {
+                "text": "{{PRICING}}",
+                "matchCase": false
+              },
+              "replaceText": "{{1.custom_fields.proposed_price}}"
+            }
+          }
+        ]
+      },
+      "metadata": {
+        "designer": {
+          "x": 900,
+          "y": 0
+        }
+      }
+    },
+    {
+      "id": 5,
+      "module": "google-drive:ExportAFile",
+      "version": 1,
+      "parameters": {
+        "account": "{{TODO: Add Google connection ID}}"
+      },
+      "mapper": {
+        "fileId": "{{2.id}}",
+        "mimeType": "application/pdf"
+      },
+      "metadata": {
+        "designer": {
+          "x": 1200,
+          "y": 0
+        }
+      }
+    },
+    {
+      "id": 6,
+      "module": "gmail:ActionSendEmail",
+      "version": 2,
+      "parameters": {
+        "account": "{{TODO: Add Gmail connection ID}}"
+      },
+      "mapper": {
+        "to": [
+          "{{1.custom_fields.email}}"
+        ],
+        "subject": "Your BrainOps Proposal - {{1.name}}",
+        "html": "<p>Dear {{1.name}},</p>\n\n<p>Thank you for considering BrainOps for your project needs. I'm pleased to present our proposal for your review.</p>\n\n<p>The attached proposal outlines:</p>\n<ul>\n<li>Our understanding of your requirements</li>\n<li>Recommended approach and solution</li>\n<li>Project timeline and milestones</li>\n<li>Investment details</li>\n</ul>\n\n<p>This proposal is valid until {{formatDate(addDays(now, 30), 'MMMM DD, YYYY')}}.</p>\n\n<p>I'm available to discuss any questions you may have. You can schedule a call directly here: {{TODO: Add Calendly link}}</p>\n\n<p>Looking forward to the opportunity to work together.</p>\n\n<p>Best regards,<br>\n{{TODO: Add founder name}}<br>\nBrainOps</p>",
+        "attachments": [
+          {
+            "data": "{{5.data}}",
+            "filename": "BrainOps Proposal - {{1.name}}.pdf"
+          }
+        ]
+      },
+      "metadata": {
+        "designer": {
+          "x": 1500,
+          "y": 0
+        }
+      }
+    },
+    {
+      "id": 7,
+      "module": "clickup:UpdateATask",
+      "version": 1,
+      "parameters": {
+        "account": "{{TODO: Add ClickUp connection ID}}"
+      },
+      "mapper": {
+        "task": "{{1.id}}",
+        "status": "Proposal Sent",
+        "custom_fields": [
+          {
+            "id": "{{TODO: Add Proposal Sent Date field ID}}",
+            "value": "{{now}}"
+          },
+          {
+            "id": "{{TODO: Add Proposal Doc URL field ID}}",
+            "value": "{{2.webViewLink}}"
+          }
+        ]
+      },
+      "metadata": {
+        "designer": {
+          "x": 1800,
+          "y": 0
+        }
+      }
+    },
+    {
+      "id": 8,
+      "module": "clickup:CreateATask",
+      "version": 1,
+      "parameters": {
+        "account": "{{TODO: Add ClickUp connection ID}}",
+        "list": "{{TODO: Add CRM/Pipeline list ID}}"
+      },
+      "mapper": {
+        "name": "Follow up on proposal - {{1.name}}",
+        "description": "Proposal sent on {{formatDate(now, 'MMM DD')}}\nFollow up if no response",
+        "status": "To Do",
+        "due_date": "{{addDays(now, 7)}}",
+        "assignees": ["{{TODO: Add founder's ClickUp user ID}}"],
+        "parent": "{{1.id}}",
+        "priority": 2
+      },
+      "metadata": {
+        "designer": {
+          "x": 2100,
+          "y": 0
+        }
+      }
+    }
+  ],
+  "metadata": {
+    "instant": false,
+    "version": 1,
+    "scenario": {
+      "roundtrips": 1,
+      "maxErrors": 3,
+      "autoCommit": true,
+      "autoCommitTriggerLast": true,
+      "sequential": true,
+      "confidential": false,
+      "dataloss": false,
+      "dlq": false,
+      "freshVariables": false
+    },
+    "designer": {
+      "orphans": []
+    },
+    "zone": "us1.make.com"
+  }
+}

@@ -1,0 +1,362 @@
+{
+  "name": "In-App AI Copilot Support & Logging",
+  "flow": [
+    {
+      "id": 1,
+      "module": "gateway:CustomWebHook",
+      "version": 1,
+      "parameters": {
+        "hook": "{{TODO: Create webhook for FastAPI logging}}",
+        "maxResults": 1
+      },
+      "mapper": {},
+      "metadata": {
+        "designer": {
+          "x": 0,
+          "y": 0
+        },
+        "restore": {
+          "parameters": {
+            "hook": {
+              "data": {
+                "editable": "true"
+              },
+              "label": "AI Copilot Log Webhook"
+            }
+          }
+        },
+        "expect": [
+          {
+            "name": "user_id",
+            "type": "text",
+            "label": "User ID",
+            "required": true
+          },
+          {
+            "name": "session_id",
+            "type": "text",
+            "label": "Session ID",
+            "required": true
+          },
+          {
+            "name": "question",
+            "type": "text",
+            "label": "User Question",
+            "required": true
+          },
+          {
+            "name": "answer",
+            "type": "text",
+            "label": "AI Answer",
+            "required": true
+          },
+          {
+            "name": "context",
+            "type": "collection",
+            "label": "Context",
+            "required": false,
+            "spec": [
+              {
+                "name": "page",
+                "type": "text",
+                "label": "Current Page"
+              },
+              {
+                "name": "product",
+                "type": "text",
+                "label": "Product"
+              }
+            ]
+          },
+          {
+            "name": "feedback",
+            "type": "text",
+            "label": "User Feedback",
+            "required": false
+          },
+          {
+            "name": "tokens_used",
+            "type": "number",
+            "label": "Tokens Used",
+            "required": false
+          },
+          {
+            "name": "response_time",
+            "type": "number",
+            "label": "Response Time (ms)",
+            "required": false
+          },
+          {
+            "name": "error",
+            "type": "text",
+            "label": "Error Message",
+            "required": false
+          }
+        ]
+      }
+    },
+    {
+      "id": 2,
+      "module": "google-sheets:AddARow",
+      "version": 2,
+      "parameters": {
+        "account": "{{TODO: Add Google connection ID}}",
+        "spreadsheet": "{{TODO: Add AI Copilot Logs spreadsheet ID}}",
+        "sheet": "Q&A Log"
+      },
+      "mapper": {
+        "values": {
+          "0": "{{formatDate(now, 'YYYY-MM-DD HH:mm:ss')}}",
+          "1": "{{1.user_id}}",
+          "2": "{{1.session_id}}",
+          "3": "{{1.question}}",
+          "4": "{{1.answer}}",
+          "5": "{{1.context.page}}",
+          "6": "{{1.context.product}}",
+          "7": "{{1.feedback}}",
+          "8": "{{1.tokens_used}}",
+          "9": "{{1.response_time}}",
+          "10": "{{1.error}}"
+        }
+      },
+      "metadata": {
+        "designer": {
+          "x": 300,
+          "y": 0
+        },
+        "parameters": {
+          "tableColumns": [
+            "Timestamp",
+            "User ID",
+            "Session ID",
+            "Question",
+            "Answer",
+            "Page",
+            "Product",
+            "Feedback",
+            "Tokens",
+            "Response Time",
+            "Error"
+          ]
+        }
+      }
+    },
+    {
+      "id": 3,
+      "module": "builtin:BasicRouter",
+      "version": 1,
+      "parameters": {
+        "routes": [
+          {
+            "flow": [
+              {
+                "id": 4,
+                "module": "slack:CreateAMessage",
+                "version": 1,
+                "parameters": {
+                  "account": "{{TODO: Add Slack connection ID}}"
+                },
+                "mapper": {
+                  "channel": "{{TODO: Add alerts channel ID}}",
+                  "text": "🚨 AI Copilot Error Alert\n\n*User:* {{1.user_id}}\n*Question:* {{1.question}}\n*Error:* {{1.error}}\n*Context:* {{1.context.page}} - {{1.context.product}}\n\nPlease investigate and fix.",
+                  "parse": "full"
+                },
+                "metadata": {
+                  "designer": {
+                    "x": 600,
+                    "y": -150
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "flow": [
+              {
+                "id": 5,
+                "module": "notion:CreateADatabaseItem",
+                "version": 1,
+                "parameters": {
+                  "account": "{{TODO: Add Notion connection ID}}",
+                  "database": "{{TODO: Add AI FAQ database ID}}"
+                },
+                "mapper": {
+                  "properties": {
+                    "Question": {
+                      "title": [
+                        {
+                          "text": {
+                            "content": "{{1.question}}"
+                          }
+                        }
+                      ]
+                    },
+                    "Answer": {
+                      "rich_text": [
+                        {
+                          "text": {
+                            "content": "{{1.answer}}"
+                          }
+                        }
+                      ]
+                    },
+                    "Product": {
+                      "select": {
+                        "name": "{{1.context.product}}"
+                      }
+                    },
+                    "Category": {
+                      "select": {
+                        "name": "{{TODO: Implement categorization logic}}"
+                      }
+                    },
+                    "Rating": {
+                      "select": {
+                        "name": "{{if(1.feedback === 'positive', 'Good', if(1.feedback === 'negative', 'Needs Improvement', 'Neutral'))}}"
+                      }
+                    },
+                    "Frequency": {
+                      "number": 1
+                    }
+                  }
+                },
+                "metadata": {
+                  "designer": {
+                    "x": 600,
+                    "y": 150
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "mapper": null,
+      "metadata": {
+        "designer": {
+          "x": 450,
+          "y": 0
+        },
+        "parameters": {
+          "conditions": {
+            "0": {
+              "name": "Error Occurred",
+              "condition": "{{1.error !== null && 1.error !== ''}}"
+            },
+            "1": {
+              "name": "Negative Feedback",
+              "condition": "{{1.feedback === 'negative'}}"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": 6,
+      "module": "schedule:BasicSchedule",
+      "version": 1,
+      "parameters": {
+        "schedule": "0 9 * * 1"
+      },
+      "mapper": {},
+      "metadata": {
+        "designer": {
+          "x": 0,
+          "y": 300
+        },
+        "parameters": {
+          "schedule": {
+            "label": "Weekly Analytics - Monday 9 AM"
+          }
+        }
+      }
+    },
+    {
+      "id": 7,
+      "module": "google-sheets:GetValues",
+      "version": 2,
+      "parameters": {
+        "account": "{{TODO: Add Google connection ID}}",
+        "spreadsheet": "{{TODO: Add AI Copilot Logs spreadsheet ID}}",
+        "sheet": "Q&A Log"
+      },
+      "mapper": {
+        "range": "A:K",
+        "tableContainsHeaders": true,
+        "filters": [
+          {
+            "column": "0",
+            "operator": "greaterThan",
+            "value": "{{formatDate(addDays(now, -7), 'YYYY-MM-DD')}}"
+          }
+        ]
+      },
+      "metadata": {
+        "designer": {
+          "x": 300,
+          "y": 300
+        }
+      }
+    },
+    {
+      "id": 8,
+      "module": "tools:Aggregator",
+      "version": 1,
+      "parameters": {
+        "feeder": 7,
+        "groupBy": "{{3}}",
+        "target": "array"
+      },
+      "mapper": {
+        "question": "{{3}}",
+        "count": 1,
+        "avg_response_time": "{{9}}",
+        "tokens": "{{8}}"
+      },
+      "metadata": {
+        "designer": {
+          "x": 600,
+          "y": 300
+        }
+      }
+    },
+    {
+      "id": 9,
+      "module": "slack:CreateAMessage",
+      "version": 1,
+      "parameters": {
+        "account": "{{TODO: Add Slack connection ID}}"
+      },
+      "mapper": {
+        "channel": "{{TODO: Add product channel ID}}",
+        "text": "🤖 Weekly AI Copilot Analytics\n\n*Period:* {{formatDate(addDays(now, -7), 'MMM DD')}} - {{formatDate(now, 'MMM DD')}}\n\n📊 *Usage Stats:*\n• Total Questions: {{length(7.rows)}}\n• Unique Users: {{TODO: Calculate unique users}}\n• Avg Response Time: {{TODO: Calculate average}}ms\n• Total Tokens: {{TODO: Sum tokens}}\n\n❓ *Top Questions:*\n{{TODO: Format top 5 questions by frequency}}\n\n⚠️ *Errors:* {{TODO: Count errors}}\n👎 *Negative Feedback:* {{TODO: Count negative feedback}}",
+        "parse": "full"
+      },
+      "metadata": {
+        "designer": {
+          "x": 900,
+          "y": 300
+        }
+      }
+    }
+  ],
+  "metadata": {
+    "instant": true,
+    "version": 1,
+    "scenario": {
+      "roundtrips": 2,
+      "maxErrors": 3,
+      "autoCommit": true,
+      "autoCommitTriggerLast": true,
+      "sequential": false,
+      "confidential": false,
+      "dataloss": false,
+      "dlq": false,
+      "freshVariables": false
+    },
+    "designer": {
+      "orphans": []
+    },
+    "zone": "us1.make.com"
+  }
+}

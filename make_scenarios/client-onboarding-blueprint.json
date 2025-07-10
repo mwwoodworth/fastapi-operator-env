@@ -1,0 +1,365 @@
+{
+  "name": "New Client Onboarding Workflow",
+  "flow": [
+    {
+      "id": 1,
+      "module": "clickup:WatchTasks",
+      "version": 1,
+      "parameters": {
+        "__IMTCONN__": "TODO: Add ClickUp connection ID",
+        "listId": "TODO: Add Sales Pipeline list ID",
+        "limit": 10
+      },
+      "filter": {
+        "name": "Deal Won Status",
+        "conditions": [
+          [
+            {
+              "a": "{{status.status}}",
+              "o": "text:equal",
+              "b": "closed won"
+            }
+          ]
+        ]
+      },
+      "metadata": {
+        "designer": {
+          "x": 0,
+          "y": 0
+        }
+      }
+    },
+    {
+      "id": 2,
+      "module": "stripe:watchEvents",
+      "version": 1,
+      "parameters": {
+        "__IMTCONN__": "TODO: Add Stripe connection ID",
+        "events": ["invoice.payment_succeeded"],
+        "metadata": true
+      },
+      "filter": {
+        "name": "Consulting Package Payment",
+        "conditions": [
+          [
+            {
+              "a": "{{1.data.object.metadata.type}}",
+              "o": "text:equal",
+              "b": "consulting"
+            }
+          ]
+        ]
+      },
+      "metadata": {
+        "designer": {
+          "x": 0,
+          "y": 150
+        }
+      }
+    },
+    {
+      "id": 3,
+      "module": "router:Router",
+      "version": 1,
+      "parameters": {},
+      "mapper": null,
+      "metadata": {
+        "designer": {
+          "x": 300,
+          "y": 75
+        }
+      },
+      "routes": [
+        {
+          "flow": [
+            {
+              "id": 4,
+              "module": "clickup:createFolder",
+              "version": 1,
+              "parameters": {
+                "__IMTCONN__": "TODO: Add ClickUp connection ID"
+              },
+              "mapper": {
+                "space": "TODO: Add Client Projects space ID",
+                "name": "{{ifempty(1.name; 2.data.object.customer_name)}} - {{formatDate(now; 'YYYY-MM')}}",
+                "hidden": false
+              },
+              "metadata": {
+                "designer": {
+                  "x": 600,
+                  "y": 0
+                }
+              }
+            },
+            {
+              "id": 5,
+              "module": "clickup:createListFromTemplate",
+              "version": 1,
+              "parameters": {
+                "__IMTCONN__": "TODO: Add ClickUp connection ID"
+              },
+              "mapper": {
+                "folder": "{{4.id}}",
+                "name": "Project Tasks",
+                "template": "TODO: Add Client Project template ID",
+                "content": {
+                  "tasks": [
+                    {
+                      "name": "Initial Consultation",
+                      "description": "Schedule and conduct kickoff meeting",
+                      "due_date": "{{addDays(now; 3)}}",
+                      "assignees": ["TODO: Add assignee ID"]
+                    },
+                    {
+                      "name": "Requirements Gathering",
+                      "description": "Document all project requirements and specifications",
+                      "due_date": "{{addDays(now; 7)}}"
+                    },
+                    {
+                      "name": "Project Plan Development",
+                      "description": "Create detailed project plan and timeline",
+                      "due_date": "{{addDays(now; 10)}}"
+                    },
+                    {
+                      "name": "Deliverables",
+                      "description": "Main project deliverables",
+                      "due_date": "{{addDays(now; 30)}}"
+                    },
+                    {
+                      "name": "Feedback Survey",
+                      "description": "Collect client feedback on project",
+                      "due_date": "{{addDays(now; 35)}}"
+                    }
+                  ]
+                }
+              },
+              "metadata": {
+                "designer": {
+                  "x": 900,
+                  "y": 0
+                }
+              }
+            },
+            {
+              "id": 6,
+              "module": "notion:CreateAPage",
+              "version": 2,
+              "parameters": {
+                "__IMTCONN__": "TODO: Add Notion connection ID"
+              },
+              "mapper": {
+                "parent": {
+                  "database_id": "TODO: Add Client Wiki database ID"
+                },
+                "properties": {
+                  "Name": {
+                    "title": [
+                      {
+                        "text": {
+                          "content": "{{ifempty(1.name; 2.data.object.customer_name)}} Client Portal"
+                        }
+                      }
+                    ]
+                  },
+                  "Client Name": {
+                    "rich_text": [
+                      {
+                        "text": {
+                          "content": "{{ifempty(1.name; 2.data.object.customer_name)}}"
+                        }
+                      }
+                    ]
+                  },
+                  "Project Start": {
+                    "date": {
+                      "start": "{{formatDate(now; 'YYYY-MM-DD')}}"
+                    }
+                  },
+                  "Status": {
+                    "select": {
+                      "name": "Active"
+                    }
+                  },
+                  "ClickUp Project": {
+                    "url": "https://app.clickup.com/{{4.id}}"
+                  }
+                },
+                "children": [
+                  {
+                    "object": "block",
+                    "type": "heading_1",
+                    "heading_1": {
+                      "rich_text": [
+                        {
+                          "type": "text",
+                          "text": {
+                            "content": "Project Overview"
+                          }
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "object": "block",
+                    "type": "paragraph",
+                    "paragraph": {
+                      "rich_text": [
+                        {
+                          "type": "text",
+                          "text": {
+                            "content": "Welcome to your BrainOps client portal. This space contains all project documentation, meeting notes, and resources."
+                          }
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "object": "block",
+                    "type": "heading_2",
+                    "heading_2": {
+                      "rich_text": [
+                        {
+                          "type": "text",
+                          "text": {
+                            "content": "Meeting Notes"
+                          }
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "object": "block",
+                    "type": "heading_2",
+                    "heading_2": {
+                      "rich_text": [
+                        {
+                          "type": "text",
+                          "text": {
+                            "content": "Project Files"
+                          }
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "object": "block",
+                    "type": "heading_2",
+                    "heading_2": {
+                      "rich_text": [
+                        {
+                          "type": "text",
+                          "text": {
+                            "content": "Resources"
+                          }
+                        }
+                      ]
+                    }
+                  }
+                ]
+              },
+              "metadata": {
+                "designer": {
+                  "x": 900,
+                  "y": 150
+                }
+              }
+            },
+            {
+              "id": 7,
+              "module": "gmail:SendAnEmail",
+              "version": 2,
+              "parameters": {
+                "__IMTCONN__": "TODO: Add Gmail connection ID"
+              },
+              "mapper": {
+                "to": [
+                  "{{ifempty(1.custom_fields.email; 2.data.object.customer_email)}}"
+                ],
+                "cc": [],
+                "bcc": [],
+                "subject": "Welcome to BrainOps - Your Project Has Started!",
+                "text": "Dear {{ifempty(1.name; 2.data.object.customer_name)}},\n\nWelcome to BrainOps! We're excited to begin working with you on your project.\n\nWe've set up your project infrastructure:\n\n1. Project Management Space: Your dedicated ClickUp project folder has been created with all necessary tasks and milestones.\n\n2. Client Portal: Your Notion client portal is ready at: {{6.url}}\n   This will be your central hub for all project documentation, meeting notes, and resources.\n\n3. Next Steps:\n   - You'll receive a calendar invitation for our kickoff meeting within the next 24 hours\n   - Please review the project portal and familiarize yourself with the structure\n   - If you have any immediate questions or materials to share, please reply to this email\n\nWhat to Expect:\n- Regular project updates via email and your client portal\n- Clear communication channels for questions and feedback\n- Milestone reviews at key project stages\n\nImportant Resources:\n- Client Portal: {{6.url}}\n- Support Email: support@brainops.com\n- Emergency Contact: [TODO: Add phone number]\n\nWe're committed to making this a smooth and successful project. Thank you for choosing BrainOps!\n\nBest regards,\nThe BrainOps Team",
+                "html": "<p>Dear {{ifempty(1.name; 2.data.object.customer_name)}},</p>\n<p>Welcome to BrainOps! We're excited to begin working with you on your project.</p>\n<p><strong>We've set up your project infrastructure:</strong></p>\n<ol>\n<li><strong>Project Management Space:</strong> Your dedicated ClickUp project folder has been created with all necessary tasks and milestones.</li>\n<li><strong>Client Portal:</strong> Your Notion client portal is ready at: <a href=\"{{6.url}}\">{{6.url}}</a><br>This will be your central hub for all project documentation, meeting notes, and resources.</li>\n<li><strong>Next Steps:</strong>\n<ul>\n<li>You'll receive a calendar invitation for our kickoff meeting within the next 24 hours</li>\n<li>Please review the project portal and familiarize yourself with the structure</li>\n<li>If you have any immediate questions or materials to share, please reply to this email</li>\n</ul>\n</li>\n</ol>\n<p><strong>What to Expect:</strong></p>\n<ul>\n<li>Regular project updates via email and your client portal</li>\n<li>Clear communication channels for questions and feedback</li>\n<li>Milestone reviews at key project stages</li>\n</ul>\n<p><strong>Important Resources:</strong></p>\n<ul>\n<li>Client Portal: <a href=\"{{6.url}}\">{{6.url}}</a></li>\n<li>Support Email: support@brainops.com</li>\n<li>Emergency Contact: [TODO: Add phone number]</li>\n</ul>\n<p>We're committed to making this a smooth and successful project. Thank you for choosing BrainOps!</p>\n<p>Best regards,<br>The BrainOps Team</p>",
+                "attachments": [
+                  {
+                    "fileName": "BrainOps_Welcome_Pack.pdf",
+                    "data": "TODO: Add base64 encoded welcome PDF or link to Google Drive file"
+                  }
+                ]
+              },
+              "metadata": {
+                "designer": {
+                  "x": 1200,
+                  "y": 0
+                }
+              }
+            },
+            {
+              "id": 8,
+              "module": "slack:postMessage",
+              "version": 3,
+              "parameters": {
+                "__IMTCONN__": "TODO: Add Slack connection ID"
+              },
+              "mapper": {
+                "channel": "#client-onboarding",
+                "text": "🎉 New Client Onboarded!\n\n*Client:* {{ifempty(1.name; 2.data.object.customer_name)}}\n*Project Start:* {{formatDate(now; 'YYYY-MM-DD')}}\n\n*Setup Complete:*\n✅ ClickUp Project: {{4.name}}\n✅ Notion Portal: <{{6.url}}|View Portal>\n✅ Welcome Email: Sent\n\n*Action Required:*\n- Schedule kickoff meeting\n- Review project requirements\n- Assign team members",
+                "parse": "full"
+              },
+              "metadata": {
+                "designer": {
+                  "x": 1200,
+                  "y": 150
+                }
+              }
+            },
+            {
+              "id": 9,
+              "module": "datastore:addItem",
+              "version": 1,
+              "parameters": {
+                "__IMTCONN__": "TODO: Configure datastore connection"
+              },
+              "mapper": {
+                "datastore": "client_onboarding_log",
+                "data": {
+                  "client_name": "{{ifempty(1.name; 2.data.object.customer_name)}}",
+                  "client_email": "{{ifempty(1.custom_fields.email; 2.data.object.customer_email)}}",
+                  "onboarding_date": "{{now}}",
+                  "clickup_folder_id": "{{4.id}}",
+                  "notion_page_id": "{{6.id}}",
+                  "notion_page_url": "{{6.url}}",
+                  "status": "completed"
+                }
+              },
+              "metadata": {
+                "designer": {
+                  "x": 1200,
+                  "y": 300
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "metadata": {
+    "instant": false,
+    "version": 1,
+    "scenario": {
+      "roundtrips": 1,
+      "maxErrors": 3,
+      "autoCommit": true,
+      "autoCommitTriggerLast": true,
+      "sequential": true,
+      "confidential": false,
+      "dataloss": false,
+      "dlq": true
+    },
+    "designer": {
+      "orphans": []
+    },
+    "zone": "us1.make.com"
+  }
+}

@@ -1,0 +1,332 @@
+{
+  "name": "Unified Revenue Tracking Dashboard",
+  "flow": [
+    {
+      "id": 1,
+      "module": "gateway:CustomWebHook",
+      "version": 1,
+      "parameters": {
+        "hook": "{{TODO: Create webhook for Stripe events}}",
+        "maxResults": 1
+      },
+      "mapper": {},
+      "metadata": {
+        "designer": {
+          "x": 0,
+          "y": 0
+        },
+        "restore": {
+          "parameters": {
+            "hook": {
+              "data": {
+                "editable": "true"
+              },
+              "label": "Stripe Payment Webhook"
+            }
+          }
+        },
+        "expect": [
+          {
+            "name": "type",
+            "type": "text",
+            "label": "Event Type",
+            "required": true
+          },
+          {
+            "name": "data",
+            "type": "collection",
+            "label": "Event Data",
+            "required": true
+          }
+        ]
+      }
+    },
+    {
+      "id": 2,
+      "module": "tools:BasicFilter",
+      "version": 1,
+      "parameters": {},
+      "mapper": {
+        "conditions": [
+          {
+            "a": "{{1.type}}",
+            "b": [
+              "charge.succeeded",
+              "invoice.payment_succeeded",
+              "payment_intent.succeeded"
+            ],
+            "operator": "in"
+          }
+        ]
+      },
+      "metadata": {
+        "designer": {
+          "x": 300,
+          "y": 0
+        }
+      }
+    },
+    {
+      "id": 3,
+      "module": "tools:SetMultipleVariables",
+      "version": 1,
+      "parameters": {},
+      "mapper": {
+        "variables": [
+          {
+            "name": "amount",
+            "value": "{{1.data.object.amount / 100}}"
+          },
+          {
+            "name": "fee",
+            "value": "{{1.data.object.balance_transaction.fee / 100}}"
+          },
+          {
+            "name": "net_amount",
+            "value": "{{(1.data.object.amount - 1.data.object.balance_transaction.fee) / 100}}"
+          },
+          {
+            "name": "customer_email",
+            "value": "{{1.data.object.billing_details.email}}"
+          },
+          {
+            "name": "description",
+            "value": "{{1.data.object.description}}"
+          },
+          {
+            "name": "payment_id",
+            "value": "{{1.data.object.id}}"
+          },
+          {
+            "name": "source",
+            "value": "Stripe"
+          }
+        ]
+      },
+      "metadata": {
+        "designer": {
+          "x": 600,
+          "y": 0
+        }
+      }
+    },
+    {
+      "id": 4,
+      "module": "google-sheets:AddARow",
+      "version": 2,
+      "parameters": {
+        "account": "{{TODO: Add Google connection ID}}",
+        "spreadsheet": "{{TODO: Add Revenue Tracking spreadsheet ID}}",
+        "sheet": "Revenue 2025"
+      },
+      "mapper": {
+        "values": {
+          "0": "{{formatDate(now, 'YYYY-MM-DD HH:mm:ss')}}",
+          "1": "{{3.source}}",
+          "2": "{{3.customer_email}}",
+          "3": "{{3.description}}",
+          "4": "{{3.amount}}",
+          "5": "{{3.fee}}",
+          "6": "{{3.net_amount}}",
+          "7": "{{3.payment_id}}",
+          "8": "{{formatDate(now, 'MMMM')}}",
+          "9": "{{formatDate(now, 'YYYY')}}",
+          "10": "{{switch(3.description, 'contains:consulting', 'Consulting', 'contains:template', 'Digital Product', 'contains:subscription', 'Subscription', 'Other')}}"
+        }
+      },
+      "metadata": {
+        "designer": {
+          "x": 900,
+          "y": 0
+        },
+        "parameters": {
+          "tableColumns": [
+            "Date",
+            "Source",
+            "Customer",
+            "Description",
+            "Amount",
+            "Fee",
+            "Net Amount",
+            "Transaction ID",
+            "Month",
+            "Year",
+            "Category"
+          ]
+        }
+      }
+    },
+    {
+      "id": 5,
+      "module": "builtin:BasicRouter",
+      "version": 1,
+      "parameters": {
+        "routes": [
+          {
+            "flow": [
+              {
+                "id": 6,
+                "module": "slack:CreateAMessage",
+                "version": 1,
+                "parameters": {
+                  "account": "{{TODO: Add Slack connection ID}}"
+                },
+                "mapper": {
+                  "channel": "{{TODO: Add finance channel ID}}",
+                  "text": "💰 Large Payment Alert!\n\n*Amount:* ${{3.amount}}\n*Customer:* {{3.customer_email}}\n*Description:* {{3.description}}\n*Net (after fees):* ${{3.net_amount}}\n\nTransaction logged to revenue tracker.",
+                  "parse": "full"
+                },
+                "metadata": {
+                  "designer": {
+                    "x": 1200,
+                    "y": -150
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "mapper": null,
+      "metadata": {
+        "designer": {
+          "x": 1050,
+          "y": 0
+        },
+        "parameters": {
+          "conditions": {
+            "0": {
+              "name": "Large Transaction (>$1000)",
+              "condition": "{{3.amount > 1000}}"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": 7,
+      "module": "schedule:BasicSchedule",
+      "version": 1,
+      "parameters": {
+        "schedule": "0 9 * * 1"
+      },
+      "mapper": {},
+      "metadata": {
+        "designer": {
+          "x": 0,
+          "y": 300
+        },
+        "parameters": {
+          "schedule": {
+            "label": "Weekly Summary - Monday 9 AM"
+          }
+        }
+      }
+    },
+    {
+      "id": 8,
+      "module": "google-sheets:GetValues",
+      "version": 2,
+      "parameters": {
+        "account": "{{TODO: Add Google connection ID}}",
+        "spreadsheet": "{{TODO: Add Revenue Tracking spreadsheet ID}}",
+        "sheet": "Revenue 2025"
+      },
+      "mapper": {
+        "range": "A:K",
+        "tableContainsHeaders": true,
+        "filters": [
+          {
+            "column": "0",
+            "operator": "greaterThan",
+            "value": "{{formatDate(addDays(now, -7), 'YYYY-MM-DD')}}"
+          }
+        ]
+      },
+      "metadata": {
+        "designer": {
+          "x": 300,
+          "y": 300
+        }
+      }
+    },
+    {
+      "id": 9,
+      "module": "tools:Aggregator",
+      "version": 1,
+      "parameters": {
+        "feeder": 8,
+        "target": "array"
+      },
+      "mapper": {
+        "amount": "{{4}}",
+        "net_amount": "{{6}}",
+        "category": "{{10}}"
+      },
+      "metadata": {
+        "designer": {
+          "x": 600,
+          "y": 300
+        }
+      }
+    },
+    {
+      "id": 10,
+      "module": "tools:NumericAggregator",
+      "version": 1,
+      "parameters": {
+        "function": "sum"
+      },
+      "mapper": {
+        "value": "{{9.array.amount}}"
+      },
+      "metadata": {
+        "designer": {
+          "x": 900,
+          "y": 300
+        }
+      }
+    },
+    {
+      "id": 11,
+      "module": "gmail:ActionSendEmail",
+      "version": 2,
+      "parameters": {
+        "account": "{{TODO: Add Gmail connection ID}}"
+      },
+      "mapper": {
+        "to": [
+          "{{TODO: Add founder email}}"
+        ],
+        "subject": "Weekly Revenue Summary - {{formatDate(now, 'MMM DD')}}",
+        "html": "<h2>Weekly Revenue Report</h2>\n\n<p>Here's your revenue summary for the past 7 days:</p>\n\n<table border=\"1\" cellpadding=\"10\">\n<tr>\n<th>Metric</th>\n<th>Value</th>\n</tr>\n<tr>\n<td>Total Revenue</td>\n<td>${{10.result}}</td>\n</tr>\n<tr>\n<td>Number of Transactions</td>\n<td>{{length(9.array)}}</td>\n</tr>\n<tr>\n<td>Average Transaction</td>\n<td>${{round(10.result / length(9.array), 2)}}</td>\n</tr>\n</table>\n\n<p>View full details in the <a href=\"{{TODO: Add spreadsheet URL}}\">Revenue Tracker</a></p>\n\n<p>Have a great week!</p>",
+        "attachments": []
+      },
+      "metadata": {
+        "designer": {
+          "x": 1200,
+          "y": 300
+        }
+      }
+    }
+  ],
+  "metadata": {
+    "instant": true,
+    "version": 1,
+    "scenario": {
+      "roundtrips": 2,
+      "maxErrors": 3,
+      "autoCommit": true,
+      "autoCommitTriggerLast": true,
+      "sequential": false,
+      "confidential": false,
+      "dataloss": false,
+      "dlq": false,
+      "freshVariables": false
+    },
+    "designer": {
+      "orphans": []
+    },
+    "zone": "us1.make.com"
+  }
+}

@@ -1,0 +1,350 @@
+{
+  "name": "AI Knowledge Update Propagation",
+  "flow": [
+    {
+      "id": 1,
+      "module": "notion:watchDatabaseItems",
+      "version": 1,
+      "parameters": {
+        "__IMTCONN__": "TODO: Add Notion connection ID",
+        "databaseId": "TODO: Add Knowledge Base database ID",
+        "limit": 10
+      },
+      "filter": {
+        "name": "Ready for AI",
+        "conditions": [
+          [
+            {
+              "a": "{{properties['Ready for AI'].checkbox}}",
+              "o": "equal",
+              "b": true
+            }
+          ]
+        ]
+      },
+      "metadata": {
+        "designer": {
+          "x": 0,
+          "y": 0
+        }
+      }
+    },
+    {
+      "id": 2,
+      "module": "notion:retrievePageContent",
+      "version": 2,
+      "parameters": {
+        "__IMTCONN__": "TODO: Add Notion connection ID"
+      },
+      "mapper": {
+        "pageId": "{{1.id}}"
+      },
+      "metadata": {
+        "designer": {
+          "x": 300,
+          "y": 0
+        }
+      }
+    },
+    {
+      "id": 3,
+      "module": "notion:exportToMarkdown",
+      "version": 1,
+      "parameters": {
+        "__IMTCONN__": "TODO: Add Notion connection ID",
+        "note": "TODO: Custom module to convert Notion blocks to markdown"
+      },
+      "mapper": {
+        "pageId": "{{1.id}}",
+        "includeProperties": true
+      },
+      "metadata": {
+        "designer": {
+          "x": 600,
+          "y": 0
+        }
+      }
+    },
+    {
+      "id": 4,
+      "module": "google-drive:uploadAFile",
+      "version": 3,
+      "parameters": {
+        "__IMTCONN__": "TODO: Add Google Drive connection ID"
+      },
+      "mapper": {
+        "folderId": "TODO: Add NotebookLM Knowledge folder ID",
+        "fileName": "{{1.properties.Title.title[0].text.content}}_{{formatDate(now; 'YYYY-MM-DD')}}.md",
+        "data": "{{3.markdown}}",
+        "convert": false,
+        "mimeType": "text/markdown"
+      },
+      "metadata": {
+        "designer": {
+          "x": 900,
+          "y": 0
+        }
+      }
+    },
+    {
+      "id": 5,
+      "module": "openai:createCompletion",
+      "version": 1,
+      "parameters": {
+        "__IMTCONN__": "TODO: Add OpenAI connection ID",
+        "model": "gpt-4",
+        "max_tokens": 500,
+        "temperature": 0.3
+      },
+      "mapper": {
+        "prompt": "Summarize the following document update for AI executives. Focus on key changes, new information, and strategic implications. Keep it under 200 words.\n\nDocument Title: {{1.properties.Title.title[0].text.content}}\nDocument Type: {{1.properties.Type.select.name}}\n\nContent:\n{{substring(3.markdown; 0; 2000)}}\n\nSummary:",
+        "system": "You are creating concise briefings for AI executives about knowledge base updates."
+      },
+      "metadata": {
+        "designer": {
+          "x": 900,
+          "y": 150
+        }
+      }
+    },
+    {
+      "id": 6,
+      "module": "datastore:addItem",
+      "version": 1,
+      "parameters": {
+        "__IMTCONN__": "TODO: Configure datastore connection"
+      },
+      "mapper": {
+        "datastore": "ai_knowledge_updates",
+        "data": {
+          "document_id": "{{1.id}}",
+          "document_title": "{{1.properties.Title.title[0].text.content}}",
+          "document_type": "{{1.properties.Type.select.name}}",
+          "update_date": "{{now}}",
+          "summary": "{{5.choices[0].text}}",
+          "google_drive_id": "{{4.id}}",
+          "google_drive_link": "{{4.webViewLink}}",
+          "propagated": false
+        }
+      },
+      "metadata": {
+        "designer": {
+          "x": 1200,
+          "y": 75
+        }
+      }
+    },
+    {
+      "id": 7,
+      "module": "notion:CreateAPage",
+      "version": 2,
+      "parameters": {
+        "__IMTCONN__": "TODO: Add Notion connection ID"
+      },
+      "mapper": {
+        "parent": {
+          "database_id": "TODO: Add AI Context Updates database ID"
+        },
+        "properties": {
+          "Title": {
+            "title": [
+              {
+                "text": {
+                  "content": "Knowledge Update - {{formatDate(now; 'YYYY-MM-DD')}}"
+                }
+              }
+            ]
+          },
+          "Date": {
+            "date": {
+              "start": "{{formatDate(now; 'YYYY-MM-DD')}}"
+            }
+          },
+          "Status": {
+            "select": {
+              "name": "Pending Review"
+            }
+          }
+        },
+        "children": [
+          {
+            "object": "block",
+            "type": "heading_1",
+            "heading_1": {
+              "rich_text": [
+                {
+                  "type": "text",
+                  "text": {
+                    "content": "AI Knowledge Base Update"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "object": "block",
+            "type": "paragraph",
+            "paragraph": {
+              "rich_text": [
+                {
+                  "type": "text",
+                  "text": {
+                    "content": "The following document has been updated and is ready for AI executive context refresh:"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "object": "block",
+            "type": "heading_2",
+            "heading_2": {
+              "rich_text": [
+                {
+                  "type": "text",
+                  "text": {
+                    "content": "Document: {{1.properties.Title.title[0].text.content}}"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "object": "block",
+            "type": "quote",
+            "quote": {
+              "rich_text": [
+                {
+                  "type": "text",
+                  "text": {
+                    "content": "{{5.choices[0].text}}"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "object": "block",
+            "type": "paragraph",
+            "paragraph": {
+              "rich_text": [
+                {
+                  "type": "text",
+                  "text": {
+                    "content": "Full document available at: "
+                  },
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": "{{4.webViewLink}}",
+                      "link": {
+                        "url": "{{4.webViewLink}}"
+                      }
+                    }
+                  }
+                ]
+              ]
+            }
+          }
+        ]
+      },
+      "metadata": {
+        "designer": {
+          "x": 1500,
+          "y": 0
+        }
+      }
+    },
+    {
+      "id": 8,
+      "module": "notion:updateDatabaseItem",
+      "version": 1,
+      "parameters": {
+        "__IMTCONN__": "TODO: Add Notion connection ID"
+      },
+      "mapper": {
+        "databaseItemId": "{{1.id}}",
+        "properties": {
+          "Ready for AI": {
+            "checkbox": false
+          },
+          "Last AI Update": {
+            "date": {
+              "start": "{{formatDate(now; 'YYYY-MM-DD')}}"
+            }
+          },
+          "AI Update Link": {
+            "url": "{{7.url}}"
+          }
+        }
+      },
+      "metadata": {
+        "designer": {
+          "x": 1500,
+          "y": 150
+        }
+      }
+    },
+    {
+      "id": 9,
+      "module": "slack:postMessage",
+      "version": 3,
+      "parameters": {
+        "__IMTCONN__": "TODO: Add Slack connection ID"
+      },
+      "mapper": {
+        "channel": "#ai-board-updates",
+        "text": "🧠 AI Knowledge Update Available\n\n*Document:* {{1.properties.Title.title[0].text.content}}\n*Type:* {{1.properties.Type.select.name}}\n\n*Summary:*\n{{5.choices[0].text}}\n\n*Action Required:* AI executives should refresh their context in the next session.\n\n<{{7.url}}|View Update Details>",
+        "parse": "full"
+      },
+      "metadata": {
+        "designer": {
+          "x": 1800,
+          "y": 75
+        }
+      }
+    },
+    {
+      "id": 10,
+      "module": "clickup:createTask",
+      "version": 1,
+      "parameters": {
+        "__IMTCONN__": "TODO: Add ClickUp connection ID"
+      },
+      "mapper": {
+        "name": "AI Context Refresh Required - {{1.properties.Title.title[0].text.content}}",
+        "description": "A knowledge base document has been updated and AI executives need context refresh.\n\n**Document:** {{1.properties.Title.title[0].text.content}}\n**Summary:** {{5.choices[0].text}}\n\n**Next Steps:**\n1. Review the update summary\n2. In next AI session, provide updated context\n3. Mark this task complete after context refresh",
+        "list": "TODO: Add AI Operations list ID",
+        "status": "to do",
+        "priority": 2,
+        "due_date": "{{addDays(now; 3)}}",
+        "assignees": ["TODO: Add assignee user ID"],
+        "tags": ["ai-context", "knowledge-update"]
+      },
+      "metadata": {
+        "designer": {
+          "x": 1800,
+          "y": 225
+        }
+      }
+    }
+  ],
+  "metadata": {
+    "instant": true,
+    "version": 1,
+    "scenario": {
+      "roundtrips": 1,
+      "maxErrors": 3,
+      "autoCommit": true,
+      "autoCommitTriggerLast": true,
+      "sequential": true,
+      "confidential": false,
+      "dataloss": false,
+      "dlq": false
+    },
+    "designer": {
+      "orphans": []
+    },
+    "zone": "us1.make.com"
+  }
+}

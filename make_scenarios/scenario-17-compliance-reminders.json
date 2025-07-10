@@ -1,0 +1,503 @@
+{
+  "name": "BrainOps Compliance Calendar & Reminders",
+  "description": "Monitors compliance calendar for upcoming deadlines and sends timely reminders with preparation checklists. Prevents missed deadlines and regulatory fees.",
+  "trigger": {
+    "id": 1,
+    "module": "builtin:BasicTrigger",
+    "version": 1,
+    "parameters": {
+      "schedule": {
+        "type": "everyday",
+        "time": "08:00",
+        "timezone": "America/Denver"
+      }
+    },
+    "mapper": {},
+    "metadata": {
+      "name": "Daily Compliance Check",
+      "designer": {
+        "x": 0,
+        "y": 150
+      }
+    }
+  },
+  "modules": [
+    {
+      "id": 2,
+      "module": "google-calendar:searchEvents",
+      "version": 2,
+      "parameters": {
+        "connection": "{{TODO: Add Google Calendar connection ID}}",
+        "calendarId": "{{TODO: Insert Compliance Calendar ID}}",
+        "query": "",
+        "orderBy": "startTime",
+        "singleEvents": true,
+        "showDeleted": false,
+        "limit": 50
+      },
+      "mapper": {
+        "timeMin": "{{formatDate(now; \"YYYY-MM-DD\")}}T00:00:00Z",
+        "timeMax": "{{formatDate(addDays(now; 30); \"YYYY-MM-DD\")}}T23:59:59Z"
+      },
+      "metadata": {
+        "name": "Get Upcoming Compliance Events (30 days)",
+        "designer": {
+          "x": 300,
+          "y": 150
+        }
+      }
+    },
+    {
+      "id": 3,
+      "module": "builtin:BasicFeeder",
+      "version": 1,
+      "parameters": {},
+      "mapper": {
+        "array": "{{2.items}}"
+      },
+      "metadata": {
+        "name": "Iterate Through Events",
+        "designer": {
+          "x": 600,
+          "y": 150
+        }
+      }
+    },
+    {
+      "id": 4,
+      "module": "tools:setVariable",
+      "version": 1,
+      "parameters": {},
+      "mapper": {
+        "name": "daysUntilDeadline",
+        "scope": "roundtrip",
+        "value": "{{floor(div(timestamp(parseDate(3.start.dateTime; \"YYYY-MM-DD\")) - timestamp(now); 86400))}}"
+      },
+      "metadata": {
+        "name": "Calculate Days Until Deadline",
+        "designer": {
+          "x": 900,
+          "y": 150
+        }
+      }
+    },
+    {
+      "id": 5,
+      "module": "builtin:BasicRouter",
+      "version": 1,
+      "mapper": null,
+      "metadata": {
+        "name": "Route by Deadline Proximity",
+        "designer": {
+          "x": 1200,
+          "y": 150
+        }
+      },
+      "routes": [
+        {
+          "flow": [
+            {
+              "id": 6,
+              "module": "notion:searchObjects",
+              "version": 3,
+              "parameters": {
+                "connection": "{{TODO: Add Notion connection ID}}",
+                "databaseId": "{{TODO: Insert Compliance Tracker Database ID}}",
+                "filterType": "property",
+                "limit": 1
+              },
+              "mapper": {
+                "filter": {
+                  "and": [
+                    {
+                      "property": "Event_ID",
+                      "rich_text": {
+                        "equals": "{{3.id}}"
+                      }
+                    },
+                    {
+                      "property": "30_Day_Reminder_Sent",
+                      "checkbox": {
+                        "equals": false
+                      }
+                    }
+                  ]
+                }
+              },
+              "metadata": {
+                "name": "Check if 30-Day Reminder Sent",
+                "designer": {
+                  "x": 1500,
+                  "y": 0
+                }
+              }
+            },
+            {
+              "id": 7,
+              "module": "gmail:sendEmail",
+              "version": 2,
+              "parameters": {
+                "connection": "{{TODO: Add Gmail connection ID}}"
+              },
+              "mapper": {
+                "to": ["{{TODO: Add founder email}}", "{{TODO: Add accountant email if applicable}}"],
+                "subject": "⚠️ Compliance Reminder: {{3.summary}} - Due in 30 Days",
+                "content": "<!DOCTYPE html>\n<html>\n<head>\n<style>\nbody { font-family: Arial, sans-serif; }\n.header { background-color: #f4f4f4; padding: 20px; }\n.content { padding: 20px; }\n.checklist { background-color: #f9f9f9; padding: 15px; margin: 15px 0; }\n.footer { font-size: 12px; color: #666; margin-top: 30px; }\n</style>\n</head>\n<body>\n<div class=\"header\">\n<h2>Compliance Deadline Approaching</h2>\n</div>\n<div class=\"content\">\n<p><strong>Event:</strong> {{3.summary}}</p>\n<p><strong>Due Date:</strong> {{formatDate(3.start.dateTime; \"MMMM D, YYYY\")}}</p>\n<p><strong>Days Remaining:</strong> {{4.daysUntilDeadline}} days</p>\n\n<div class=\"checklist\">\n<h3>Preparation Checklist:</h3>\n{{3.description}}\n<!-- TODO: Parse checklist from event description or maintain separate checklist database -->\n</div>\n\n<p>Please begin gathering necessary documents and information. A follow-up reminder will be sent 7 days before the deadline.</p>\n</div>\n<div class=\"footer\">\n<p>This is an automated reminder from BrainOps Compliance System</p>\n</div>\n</body>\n</html>",
+                "attachments": []
+              },
+              "metadata": {
+                "name": "Send 30-Day Reminder Email",
+                "designer": {
+                  "x": 1800,
+                  "y": 0
+                }
+              },
+              "filter": {
+                "name": "If reminder not sent and results found",
+                "conditions": [[{
+                  "a": "{{length(6.results)}}",
+                  "b": "0",
+                  "o": "number:greater"
+                }]]
+              }
+            },
+            {
+              "id": 8,
+              "module": "clickup:createTask",
+              "version": 3,
+              "parameters": {
+                "connection": "{{TODO: Add ClickUp connection ID}}"
+              },
+              "mapper": {
+                "listId": "{{TODO: Insert Compliance List ID}}",
+                "name": "{{3.summary}} - Compliance Due {{formatDate(3.start.dateTime; \"MM/DD/YYYY\")}}",
+                "description": "**Compliance Item:** {{3.summary}}\n\n**Due Date:** {{formatDate(3.start.dateTime; \"MMMM D, YYYY\")}}\n\n**Preparation Steps:**\n{{3.description}}\n\n**Calendar Event ID:** {{3.id}}",
+                "assignees": ["{{TODO: Add founder ClickUp user ID}}"],
+                "tags": ["compliance", "regulatory"],
+                "priority": 2,
+                "dueDate": "{{timestamp(parseDate(3.start.dateTime; \"YYYY-MM-DD\"))}}000",
+                "startDate": "{{timestamp(now)}}000",
+                "notify": true
+              },
+              "metadata": {
+                "name": "Create ClickUp Compliance Task",
+                "designer": {
+                  "x": 2100,
+                  "y": 0
+                }
+              },
+              "filter": {
+                "name": "If reminder not sent",
+                "conditions": [[{
+                  "a": "{{length(6.results)}}",
+                  "b": "0",
+                  "o": "number:greater"
+                }]]
+              }
+            },
+            {
+              "id": 9,
+              "module": "notion:updateDatabaseItem",
+              "version": 3,
+              "parameters": {
+                "connection": "{{TODO: Add Notion connection ID}}"
+              },
+              "mapper": {
+                "databaseId": "{{TODO: Insert Compliance Tracker Database ID}}",
+                "pageId": "{{if(length(6.results) > 0; 6.results[1].id; null)}}",
+                "properties": {
+                  "30_Day_Reminder_Sent": {
+                    "checkbox": true
+                  },
+                  "30_Day_Sent_Date": {
+                    "date": {
+                      "start": "{{formatDate(now; \"YYYY-MM-DD\")}}"
+                    }
+                  },
+                  "ClickUp_Task_ID": {
+                    "rich_text": [{
+                      "text": {
+                        "content": "{{8.id}}"
+                      }
+                    }]
+                  }
+                }
+              },
+              "metadata": {
+                "name": "Update Notion Tracker",
+                "designer": {
+                  "x": 2400,
+                  "y": 0
+                }
+              },
+              "filter": {
+                "name": "If record exists",
+                "conditions": [[{
+                  "a": "{{length(6.results)}}",
+                  "b": "0",
+                  "o": "number:greater"
+                }]]
+              }
+            }
+          ],
+          "label": "30 Days Before"
+        },
+        {
+          "flow": [
+            {
+              "id": 10,
+              "module": "notion:searchObjects",
+              "version": 3,
+              "parameters": {
+                "connection": "{{TODO: Add Notion connection ID}}",
+                "databaseId": "{{TODO: Insert Compliance Tracker Database ID}}",
+                "filterType": "property",
+                "limit": 1
+              },
+              "mapper": {
+                "filter": {
+                  "and": [
+                    {
+                      "property": "Event_ID",
+                      "rich_text": {
+                        "equals": "{{3.id}}"
+                      }
+                    },
+                    {
+                      "property": "7_Day_Reminder_Sent",
+                      "checkbox": {
+                        "equals": false
+                      }
+                    }
+                  ]
+                }
+              },
+              "metadata": {
+                "name": "Check if 7-Day Reminder Sent",
+                "designer": {
+                  "x": 1500,
+                  "y": 300
+                }
+              }
+            },
+            {
+              "id": 11,
+              "module": "gmail:sendEmail",
+              "version": 2,
+              "parameters": {
+                "connection": "{{TODO: Add Gmail connection ID}}"
+              },
+              "mapper": {
+                "to": ["{{TODO: Add founder email}}", "{{TODO: Add accountant email if applicable}}"],
+                "subject": "🚨 URGENT: {{3.summary}} - Due in 7 Days",
+                "content": "<!DOCTYPE html>\n<html>\n<head>\n<style>\nbody { font-family: Arial, sans-serif; }\n.header { background-color: #ff6b6b; color: white; padding: 20px; }\n.content { padding: 20px; }\n.urgent { background-color: #ffe0e0; padding: 15px; margin: 15px 0; border-left: 5px solid #ff0000; }\n.checklist { background-color: #f9f9f9; padding: 15px; margin: 15px 0; }\n.footer { font-size: 12px; color: #666; margin-top: 30px; }\n</style>\n</head>\n<body>\n<div class=\"header\">\n<h2>URGENT: Compliance Deadline in 1 Week</h2>\n</div>\n<div class=\"content\">\n<div class=\"urgent\">\n<p><strong>⚠️ This compliance item is due in just 7 days!</strong></p>\n</div>\n\n<p><strong>Event:</strong> {{3.summary}}</p>\n<p><strong>Due Date:</strong> {{formatDate(3.start.dateTime; \"MMMM D, YYYY\")}}</p>\n<p><strong>Days Remaining:</strong> {{4.daysUntilDeadline}} days</p>\n\n<div class=\"checklist\">\n<h3>Final Preparation Checklist:</h3>\n{{3.description}}\n</div>\n\n<p><strong>Action Required:</strong> Please complete all preparation steps this week to avoid late fees or penalties.</p>\n\n{{if(8.id; \"<p><strong>ClickUp Task:</strong> <a href='https://app.clickup.com/t/\" + 8.id + \"'>View Task</a></p>\"; \"\")}}\n</div>\n<div class=\"footer\">\n<p>This is an automated reminder from BrainOps Compliance System</p>\n</div>\n</body>\n</html>",
+                "attachments": []
+              },
+              "metadata": {
+                "name": "Send 7-Day Urgent Reminder",
+                "designer": {
+                  "x": 1800,
+                  "y": 300
+                }
+              },
+              "filter": {
+                "name": "If reminder not sent and results found",
+                "conditions": [[{
+                  "a": "{{length(10.results)}}",
+                  "b": "0",
+                  "o": "number:greater"
+                }]]
+              }
+            },
+            {
+              "id": 12,
+              "module": "notion:updateDatabaseItem",
+              "version": 3,
+              "parameters": {
+                "connection": "{{TODO: Add Notion connection ID}}"
+              },
+              "mapper": {
+                "databaseId": "{{TODO: Insert Compliance Tracker Database ID}}",
+                "pageId": "{{if(length(10.results) > 0; 10.results[1].id; null)}}",
+                "properties": {
+                  "7_Day_Reminder_Sent": {
+                    "checkbox": true
+                  },
+                  "7_Day_Sent_Date": {
+                    "date": {
+                      "start": "{{formatDate(now; \"YYYY-MM-DD\")}}"
+                    }
+                  }
+                }
+              },
+              "metadata": {
+                "name": "Update 7-Day Reminder Status",
+                "designer": {
+                  "x": 2100,
+                  "y": 300
+                }
+              },
+              "filter": {
+                "name": "If record exists",
+                "conditions": [[{
+                  "a": "{{length(10.results)}}",
+                  "b": "0",
+                  "o": "number:greater"
+                }]]
+              }
+            }
+          ],
+          "label": "7 Days Before"
+        },
+        {
+          "flow": [
+            {
+              "id": 13,
+              "module": "slack:createMessage",
+              "version": 1,
+              "parameters": {
+                "connection": "{{TODO: Add Slack connection ID}}"
+              },
+              "mapper": {
+                "channel": "{{TODO: Add compliance channel ID or #general}}",
+                "text": ":information_source: Upcoming Compliance Item:\n*{{3.summary}}*\nDue: {{formatDate(3.start.dateTime; \"MMMM D, YYYY\")}} ({{4.daysUntilDeadline}} days)\n\nReminders have been configured for this item."
+              },
+              "metadata": {
+                "name": "Log Other Deadlines to Slack",
+                "designer": {
+                  "x": 1500,
+                  "y": 600
+                }
+              }
+            }
+          ],
+          "label": "Other Deadlines"
+        }
+      ],
+      "filter": {
+        "name": "Check deadline proximity",
+        "conditions": [
+          [{
+            "a": "{{4.daysUntilDeadline}}",
+            "b": "32",
+            "o": "number:lessequal"
+          }, {
+            "a": "{{4.daysUntilDeadline}}",
+            "b": "28",
+            "o": "number:greaterequal"
+          }],
+          [{
+            "a": "{{4.daysUntilDeadline}}",
+            "b": "8",
+            "o": "number:lessequal"
+          }, {
+            "a": "{{4.daysUntilDeadline}}",
+            "b": "6",
+            "o": "number:greaterequal"
+          }],
+          [{
+            "a": "{{4.daysUntilDeadline}}",
+            "b": "15",
+            "o": "number:lessequal"
+          }]
+        ]
+      }
+    },
+    {
+      "id": 14,
+      "module": "builtin:BasicAggregator",
+      "version": 1,
+      "parameters": {
+        "feeder": 3
+      },
+      "mapper": {
+        "targetStructure": [
+          {
+            "name": "summary",
+            "spec": {
+              "name": "summary",
+              "type": "text"
+            }
+          },
+          {
+            "name": "dueDate",
+            "spec": {
+              "name": "dueDate",
+              "type": "date"
+            }
+          },
+          {
+            "name": "daysUntil",
+            "spec": {
+              "name": "daysUntil",
+              "type": "number"
+            }
+          }
+        ],
+        "aggregatedFields": [
+          {
+            "name": "summary",
+            "value": "{{3.summary}}"
+          },
+          {
+            "name": "dueDate",
+            "value": "{{3.start.dateTime}}"
+          },
+          {
+            "name": "daysUntil",
+            "value": "{{4.daysUntilDeadline}}"
+          }
+        ]
+      },
+      "metadata": {
+        "name": "Aggregate Processed Events",
+        "designer": {
+          "x": 2700,
+          "y": 150
+        }
+      }
+    },
+    {
+      "id": 15,
+      "module": "notion:createDatabaseItem",
+      "version": 3,
+      "parameters": {
+        "connection": "{{TODO: Add Notion connection ID}}"
+      },
+      "mapper": {
+        "databaseId": "{{TODO: Insert Compliance Log Database ID}}",
+        "properties": {
+          "Run_Date": {
+            "date": {
+              "start": "{{formatDate(now; \"YYYY-MM-DD\")}}"
+            }
+          },
+          "Events_Processed": {
+            "number": "{{length(14.array)}}"
+          },
+          "Summary": {
+            "rich_text": [{
+              "text": {
+                "content": "Processed {{length(14.array)}} compliance events. Next 30 days contain: {{join(map(14.array; \"name\"; \"summary\"); \", \")}}"
+              }
+            }]
+          }
+        }
+      },
+      "metadata": {
+        "name": "Log Daily Run",
+        "designer": {
+          "x": 3000,
+          "y": 150
+        }
+      }
+    }
+  ],
+  "settings": {
+    "executionTimeout": 40,
+    "maxCycles": 500,
+    "dlq": false,
+    "keepExecutionHistory": true
+  },
+  "notes": "## Compliance Calendar & Reminders Automation\n\n### Purpose\nMonitors Google Calendar for compliance deadlines and sends timely reminders at 30 and 7 days before due dates.\n\n### Setup Requirements\n1. Create a dedicated Google Calendar for compliance events\n2. Create Notion database for tracking reminder status with fields:\n   - Event_ID (text)\n   - Event_Name (text)\n   - 30_Day_Reminder_Sent (checkbox)\n   - 7_Day_Reminder_Sent (checkbox)\n   - 30_Day_Sent_Date (date)\n   - 7_Day_Sent_Date (date)\n   - ClickUp_Task_ID (text)\n3. Create ClickUp list for compliance tasks\n4. Configure all connection IDs\n5. Add compliance events to calendar with checklists in description\n\n### TODO for Operator\n- Add all connection IDs for Google Calendar, Gmail, Notion, ClickUp, and Slack\n- Create and configure the Notion tracking database\n- Set up compliance calendar and populate with recurring events\n- Customize email templates with proper branding\n- Test with sample events before going live"
+}

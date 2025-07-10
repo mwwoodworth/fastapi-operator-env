@@ -1,0 +1,370 @@
+{
+  "name": "New Subscriber Onboarding Sequence",
+  "flow": [
+    {
+      "id": 1,
+      "module": "gateway:CustomWebHook",
+      "version": 1,
+      "parameters": {
+        "name": "Newsletter Signup Form",
+        "hook": null,
+        "note": "TODO: Configure webhook URL for newsletter form (website, landing page, etc.)"
+      },
+      "mapper": {},
+      "metadata": {
+        "designer": {
+          "x": 0,
+          "y": 0
+        },
+        "restore": {
+          "parameters": {
+            "hook": {
+              "label": "Newsletter Signup Webhook"
+            }
+          }
+        },
+        "expect": [
+          {
+            "name": "email",
+            "type": "email",
+            "label": "Email Address",
+            "required": true
+          },
+          {
+            "name": "first_name",
+            "type": "text",
+            "label": "First Name"
+          },
+          {
+            "name": "source",
+            "type": "text",
+            "label": "Lead Source",
+            "required": true
+          },
+          {
+            "name": "lead_magnet",
+            "type": "text",
+            "label": "Lead Magnet ID"
+          }
+        ]
+      }
+    },
+    {
+      "id": 2,
+      "module": "convertkit:watchSubscribers",
+      "version": 1,
+      "parameters": {
+        "__IMTCONN__": "TODO: Add ConvertKit connection ID",
+        "limit": 10
+      },
+      "metadata": {
+        "designer": {
+          "x": 0,
+          "y": 150
+        }
+      }
+    },
+    {
+      "id": 3,
+      "module": "router:Router",
+      "version": 1,
+      "parameters": {},
+      "mapper": null,
+      "metadata": {
+        "designer": {
+          "x": 300,
+          "y": 75
+        }
+      },
+      "routes": [
+        {
+          "name": "External Form Route",
+          "flow": [
+            {
+              "id": 4,
+              "module": "convertkit:addSubscriberToForm",
+              "version": 1,
+              "parameters": {
+                "__IMTCONN__": "TODO: Add ConvertKit connection ID"
+              },
+              "mapper": {
+                "formId": "TODO: Add main newsletter form ID",
+                "email": "{{1.email}}",
+                "firstName": "{{1.first_name}}",
+                "fields": {
+                  "lead_source": "{{1.source}}"
+                },
+                "tags": [
+                  "{{1.source}}",
+                  "{{if(1.lead_magnet; 'lead-magnet:' + 1.lead_magnet; 'newsletter-signup')}}"
+                ]
+              },
+              "metadata": {
+                "designer": {
+                  "x": 600,
+                  "y": 0
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "ConvertKit Native Route",
+          "flow": [
+            {
+              "id": 5,
+              "module": "builtin:BasicFeeder",
+              "version": 1,
+              "parameters": {},
+              "mapper": {
+                "array": "[{{2}}]"
+              },
+              "metadata": {
+                "designer": {
+                  "x": 600,
+                  "y": 150
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "module": "convertkit:applyTagToSubscriber",
+      "version": 1,
+      "parameters": {
+        "__IMTCONN__": "TODO: Add ConvertKit connection ID"
+      },
+      "mapper": {
+        "subscriberId": "{{ifempty(4.subscriber.id; 2.subscriber.id)}}",
+        "tagId": "TODO: Add tag ID based on source - use switch() function",
+        "note": "TODO: Create tags in ConvertKit for each source (website, lead-magnet-ebook, etc.)"
+      },
+      "metadata": {
+        "designer": {
+          "x": 900,
+          "y": 75
+        }
+      }
+    },
+    {
+      "id": 7,
+      "module": "convertkit:addSubscriberToSequence",
+      "version": 1,
+      "parameters": {
+        "__IMTCONN__": "TODO: Add ConvertKit connection ID"
+      },
+      "mapper": {
+        "sequenceId": "TODO: Add welcome sequence ID",
+        "email": "{{ifempty(1.email; 2.subscriber.email_address)}}"
+      },
+      "metadata": {
+        "designer": {
+          "x": 1200,
+          "y": 75
+        }
+      }
+    },
+    {
+      "id": 8,
+      "module": "gmail:SendAnEmail",
+      "version": 2,
+      "parameters": {
+        "__IMTCONN__": "TODO: Add Gmail connection ID"
+      },
+      "mapper": {
+        "to": ["{{ifempty(1.email; 2.subscriber.email_address)}}"],
+        "subject": "Welcome to BrainOps! {{if(1.lead_magnet; 'Your ' + 1.lead_magnet + ' is inside'; 'Let\\'s get started')}}",
+        "html": "{{if(1.lead_magnet; \n'<p>Hi ' + ifempty(1.first_name; 2.subscriber.first_name; 'there') + ',</p>\\n<p>Thanks for downloading our ' + 1.lead_magnet + '!</p>\\n<p><a href=\"TODO: Add lead magnet download URL\" style=\"background-color: #0066cc; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block;\">Download Your ' + 1.lead_magnet + '</a></p>\\n<p>While you\\'re here, you\\'ll also receive our weekly insights on:</p>\\n<ul>\\n<li>AI-powered project management strategies</li>\\n<li>Automation tips for scaling your business</li>\\n<li>Industry-specific solutions and case studies</li>\\n</ul>\\n<p>Keep an eye on your inbox for our next update!</p>\\n<p>Best regards,<br>The BrainOps Team</p>\\n<p style=\"font-size: 12px; color: #666; margin-top: 30px;\">P.S. Have questions? Just reply to this email - we read every message.</p>';\n\n'<p>Hi ' + ifempty(1.first_name; 2.subscriber.first_name; 'there') + ',</p>\\n<p>Welcome to the BrainOps community!</p>\\n<p>You\\'re now part of a group of forward-thinking professionals who are leveraging AI and automation to transform their businesses.</p>\\n<p>Here\\'s what you can expect:</p>\\n<ul>\\n<li><strong>Weekly Insights:</strong> Practical tips and strategies delivered every Tuesday</li>\\n<li><strong>Exclusive Resources:</strong> First access to our templates and tools</li>\\n<li><strong>Real Case Studies:</strong> See how others are implementing our systems</li>\\n</ul>\\n<p>To get started, check out these popular resources:</p>\\n<ul>\\n<li><a href=\"TODO: Add resource 1 URL\">5-Step Automation Audit Template</a></li>\\n<li><a href=\"TODO: Add resource 2 URL\">AI Project Management Guide</a></li>\\n<li><a href=\"TODO: Add resource 3 URL\">ROI Calculator for Automation Projects</a></li>\\n</ul>\\n<p>Looking forward to sharing our journey with you!</p>\\n<p>Best regards,<br>The BrainOps Team</p>\\n<p style=\"font-size: 12px; color: #666; margin-top: 30px;\">P.S. Want to fast-track your success? <a href=\"TODO: Add consultation booking link\">Book a free strategy call</a> with our team.</p>'\n)}}",
+        "attachments": []
+      },
+      "metadata": {
+        "designer": {
+          "x": 1200,
+          "y": 225
+        }
+      }
+    },
+    {
+      "id": 9,
+      "module": "notion:CreateADatabaseItem",
+      "version": 2,
+      "parameters": {
+        "__IMTCONN__": "TODO: Add Notion connection ID"
+      },
+      "mapper": {
+        "parent": {
+          "database_id": "TODO: Add Email Subscribers database ID"
+        },
+        "properties": {
+          "Email": {
+            "email": "{{ifempty(1.email; 2.subscriber.email_address)}}"
+          },
+          "First Name": {
+            "rich_text": [
+              {
+                "text": {
+                  "content": "{{ifempty(1.first_name; 2.subscriber.first_name; '')}}"
+                }
+              }
+            ]
+          },
+          "Source": {
+            "select": {
+              "name": "{{ifempty(1.source; first(2.subscriber.tags))}}"
+            }
+          },
+          "Lead Magnet": {
+            "rich_text": [
+              {
+                "text": {
+                  "content": "{{ifempty(1.lead_magnet; '')}}"
+                }
+              }
+            ]
+          },
+          "Signup Date": {
+            "date": {
+              "start": "{{formatDate(now; 'YYYY-MM-DD')}}"
+            }
+          },
+          "Status": {
+            "select": {
+              "name": "Active"
+            }
+          },
+          "ConvertKit ID": {
+            "number": "{{parseNumber(ifempty(4.subscriber.id; 2.subscriber.id))}}"
+          }
+        }
+      },
+      "metadata": {
+        "designer": {
+          "x": 1200,
+          "y": 375
+        }
+      }
+    },
+    {
+      "id": 10,
+      "module": "builtin:BasicRouter",
+      "version": 1,
+      "mapper": null,
+      "metadata": {
+        "designer": {
+          "x": 1500,
+          "y": 75
+        }
+      },
+      "routes": [
+        {
+          "flow": [
+            {
+              "id": 11,
+              "module": "slack:postMessage",
+              "version": 3,
+              "parameters": {
+                "__IMTCONN__": "TODO: Add Slack connection ID"
+              },
+              "filter": {
+                "name": "VIP Lead Sources",
+                "conditions": [
+                  [
+                    {
+                      "a": "{{ifempty(1.source; first(2.subscriber.tags))}}",
+                      "o": "text:contains",
+                      "b": "consultation"
+                    }
+                  ],
+                  [
+                    {
+                      "a": "{{ifempty(1.source; first(2.subscriber.tags))}}",
+                      "o": "text:contains",
+                      "b": "high-value"
+                    }
+                  ]
+                ]
+              },
+              "mapper": {
+                "channel": "#sales-notifications",
+                "text": "🔥 High-Value Subscriber Alert!\n\n*Email:* {{ifempty(1.email; 2.subscriber.email_address)}}\n*Name:* {{ifempty(1.first_name; 2.subscriber.first_name; 'Not provided')}}\n*Source:* {{ifempty(1.source; first(2.subscriber.tags))}}\n{{if(1.lead_magnet; '*Lead Magnet:* ' + 1.lead_magnet; '')}}\n\n_Consider personal outreach for this lead_",
+                "parse": "full"
+              },
+              "metadata": {
+                "designer": {
+                  "x": 1800,
+                  "y": 0
+                }
+              }
+            }
+          ]
+        },
+        {
+          "flow": [
+            {
+              "id": 12,
+              "module": "builtin:BasicFeeder",
+              "version": 1,
+              "parameters": {},
+              "mapper": {
+                "array": "[1]",
+                "note": "Standard subscribers - no special notification needed"
+              },
+              "metadata": {
+                "designer": {
+                  "x": 1800,
+                  "y": 150
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 13,
+      "module": "datastore:addItem",
+      "version": 1,
+      "parameters": {
+        "__IMTCONN__": "TODO: Configure datastore connection"
+      },
+      "mapper": {
+        "datastore": "subscriber_metrics",
+        "data": {
+          "date": "{{formatDate(now; 'YYYY-MM-DD')}}",
+          "hour": "{{formatDate(now; 'HH')}}",
+          "source": "{{ifempty(1.source; first(2.subscriber.tags))}}",
+          "lead_magnet": "{{ifempty(1.lead_magnet; 'none')}}",
+          "email": "{{ifempty(1.email; 2.subscriber.email_address)}}",
+          "subscriber_count": 1
+        }
+      },
+      "metadata": {
+        "designer": {
+          "x": 1800,
+          "y": 300
+        }
+      }
+    }
+  ],
+  "metadata": {
+    "instant": true,
+    "version": 1,
+    "scenario": {
+      "roundtrips": 1,
+      "maxErrors": 3,
+      "autoCommit": true,
+      "autoCommitTriggerLast": true,
+      "sequential": true,
+      "confidential": false,
+      "dataloss": false,
+      "dlq": false
+    },
+    "designer": {
+      "orphans": []
+    },
+    "zone": "us1.make.com"
+  }
+}

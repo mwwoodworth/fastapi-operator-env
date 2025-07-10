@@ -1,0 +1,433 @@
+{
+  "name": "Automated Proposal & Quote Generation",
+  "flow": [
+    {
+      "id": 1,
+      "module": "clickup:WatchTasks",
+      "version": 1,
+      "parameters": {
+        "__IMTCONN__": "TODO: Add ClickUp connection ID",
+        "listId": "TODO: Add Sales Pipeline list ID",
+        "limit": 10
+      },
+      "filter": {
+        "name": "Proposal Stage",
+        "conditions": [
+          [
+            {
+              "a": "{{status.status}}",
+              "o": "text:equal",
+              "b": "proposal"
+            }
+          ]
+        ]
+      },
+      "metadata": {
+        "designer": {
+          "x": 0,
+          "y": 0
+        }
+      }
+    },
+    {
+      "id": 2,
+      "module": "notion:watchDatabaseItems",
+      "version": 1,
+      "parameters": {
+        "__IMTCONN__": "TODO: Add Notion connection ID",
+        "databaseId": "TODO: Add CRM database ID",
+        "limit": 10
+      },
+      "filter": {
+        "name": "Proposal Status",
+        "conditions": [
+          [
+            {
+              "a": "{{properties.Status.select.name}}",
+              "o": "text:equal",
+              "b": "Proposal"
+            }
+          ]
+        ]
+      },
+      "metadata": {
+        "designer": {
+          "x": 0,
+          "y": 150
+        }
+      }
+    },
+    {
+      "id": 3,
+      "module": "router:Router",
+      "version": 1,
+      "parameters": {},
+      "mapper": null,
+      "metadata": {
+        "designer": {
+          "x": 300,
+          "y": 75
+        }
+      },
+      "routes": [
+        {
+          "flow": [
+            {
+              "id": 4,
+              "module": "google-docs:copyDocument",
+              "version": 1,
+              "parameters": {
+                "__IMTCONN__": "TODO: Add Google Docs connection ID"
+              },
+              "mapper": {
+                "documentId": "TODO: Add proposal template document ID",
+                "title": "Proposal - {{ifempty(1.name; 2.properties.Name.title[0].text.content)}} - {{formatDate(now; 'YYYY-MM-DD')}}",
+                "folderId": "TODO: Add proposals folder ID in Google Drive"
+              },
+              "metadata": {
+                "designer": {
+                  "x": 600,
+                  "y": 0
+                }
+              }
+            },
+            {
+              "id": 5,
+              "module": "openai:createCompletion",
+              "version": 1,
+              "parameters": {
+                "__IMTCONN__": "TODO: Add OpenAI connection ID",
+                "model": "gpt-4",
+                "max_tokens": 1000,
+                "temperature": 0.7,
+                "n": 1
+              },
+              "mapper": {
+                "prompt": "Generate a customized project approach paragraph for a business proposal. The client's details are:\n\nCompany: {{ifempty(1.custom_fields.company; 2.properties.Company.rich_text[0].text.content)}}\nIndustry: {{ifempty(1.custom_fields.industry; 2.properties.Industry.select.name)}}\nProject Requirements: {{ifempty(1.description; 2.properties['Project Details'].rich_text[0].text.content)}}\n\nWrite a professional, specific paragraph (3-5 sentences) explaining our approach to solving their challenges. Focus on concrete benefits and outcomes. Do not use generic language or marketing fluff. The tone should be confident and consultative.\n\nProject Approach:",
+                "system": "You are a senior business consultant specializing in creating compelling, specific proposals. You write in a clear, professional tone that demonstrates deep understanding of client needs."
+              },
+              "metadata": {
+                "designer": {
+                  "x": 600,
+                  "y": 150
+                }
+              }
+            },
+            {
+              "id": 6,
+              "module": "http:makeAPICall",
+              "version": 1,
+              "parameters": {
+                "url": "https://api.anthropic.com/v1/messages",
+                "method": "POST",
+                "headers": [
+                  {
+                    "name": "x-api-key",
+                    "value": "TODO: Add Claude API key"
+                  },
+                  {
+                    "name": "anthropic-version",
+                    "value": "2023-06-01"
+                  },
+                  {
+                    "name": "content-type",
+                    "value": "application/json"
+                  }
+                ],
+                "qs": [],
+                "ca": "",
+                "rejectUnauthorized": true,
+                "followRedirect": true,
+                "useQuerystring": false,
+                "gzip": true,
+                "useMtls": false,
+                "followAllRedirects": false,
+                "note": "TODO: Replace with Claude module when available"
+              },
+              "mapper": {
+                "data": "{\n  \"model\": \"claude-3-opus-20240229\",\n  \"max_tokens\": 1000,\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"Based on the following client information, generate 3-5 specific value propositions for our proposal:\\n\\nCompany: {{ifempty(1.custom_fields.company; 2.properties.Company.rich_text[0].text.content)}}\\nProject: {{ifempty(1.description; 2.properties['Project Details'].rich_text[0].text.content)}}\\nBudget Range: {{ifempty(1.custom_fields.budget; 2.properties.Budget.number)}}\\n\\nFor each value proposition, be specific about the benefit and outcome. Format as bullet points.\"\n    }\n  ]\n}"
+              },
+              "metadata": {
+                "designer": {
+                  "x": 600,
+                  "y": 300
+                }
+              }
+            },
+            {
+              "id": 7,
+              "module": "google-docs:replaceText",
+              "version": 1,
+              "parameters": {
+                "__IMTCONN__": "TODO: Add Google Docs connection ID"
+              },
+              "mapper": {
+                "documentId": "{{4.documentId}}",
+                "requests": [
+                  {
+                    "replaceAllText": {
+                      "containsText": {
+                        "text": "{{CLIENT_NAME}}",
+                        "matchCase": false
+                      },
+                      "replaceText": "{{ifempty(1.name; 2.properties.Name.title[0].text.content)}}"
+                    }
+                  },
+                  {
+                    "replaceAllText": {
+                      "containsText": {
+                        "text": "{{COMPANY_NAME}}",
+                        "matchCase": false
+                      },
+                      "replaceText": "{{ifempty(1.custom_fields.company; 2.properties.Company.rich_text[0].text.content)}}"
+                    }
+                  },
+                  {
+                    "replaceAllText": {
+                      "containsText": {
+                        "text": "{{PROJECT_DESCRIPTION}}",
+                        "matchCase": false
+                      },
+                      "replaceText": "{{ifempty(1.description; 2.properties['Project Details'].rich_text[0].text.content)}}"
+                    }
+                  },
+                  {
+                    "replaceAllText": {
+                      "containsText": {
+                        "text": "{{PROJECT_APPROACH}}",
+                        "matchCase": false
+                      },
+                      "replaceText": "{{5.choices[0].text}}"
+                    }
+                  },
+                  {
+                    "replaceAllText": {
+                      "containsText": {
+                        "text": "{{VALUE_PROPOSITIONS}}",
+                        "matchCase": false
+                      },
+                      "replaceText": "{{parseJson(6.body).content[0].text}}"
+                    }
+                  },
+                  {
+                    "replaceAllText": {
+                      "containsText": {
+                        "text": "{{PROPOSAL_DATE}}",
+                        "matchCase": false
+                      },
+                      "replaceText": "{{formatDate(now; 'MMMM D, YYYY')}}"
+                    }
+                  },
+                  {
+                    "replaceAllText": {
+                      "containsText": {
+                        "text": "{{VALID_UNTIL}}",
+                        "matchCase": false
+                      },
+                      "replaceText": "{{formatDate(addDays(now; 30); 'MMMM D, YYYY')}}"
+                    }
+                  },
+                  {
+                    "replaceAllText": {
+                      "containsText": {
+                        "text": "{{PRICING}}",
+                        "matchCase": false
+                      },
+                      "replaceText": "{{ifempty(1.custom_fields.pricing; 'See attached pricing schedule')}}"
+                    }
+                  }
+                ]
+              },
+              "metadata": {
+                "designer": {
+                  "x": 900,
+                  "y": 0
+                }
+              }
+            },
+            {
+              "id": 8,
+              "module": "google-docs:exportDocument",
+              "version": 1,
+              "parameters": {
+                "__IMTCONN__": "TODO: Add Google Docs connection ID"
+              },
+              "mapper": {
+                "documentId": "{{4.documentId}}",
+                "mimeType": "application/pdf"
+              },
+              "metadata": {
+                "designer": {
+                  "x": 1200,
+                  "y": 0
+                }
+              }
+            },
+            {
+              "id": 9,
+              "module": "gmail:SendAnEmail",
+              "version": 2,
+              "parameters": {
+                "__IMTCONN__": "TODO: Add Gmail connection ID"
+              },
+              "mapper": {
+                "to": ["{{ifempty(1.custom_fields.email; 2.properties.Email.email)}}"],
+                "cc": ["TODO: Add founder email for tracking"],
+                "subject": "Your BrainOps Proposal - {{ifempty(1.custom_fields.company; 2.properties.Company.rich_text[0].text.content)}}",
+                "html": "<p>Dear {{ifempty(1.name; 2.properties.Name.title[0].text.content)}},</p>\n<p>Thank you for considering BrainOps for your project. Please find attached our proposal for your review.</p>\n<p>This proposal includes:</p>\n<ul>\n<li>Detailed project approach tailored to your specific needs</li>\n<li>Clear deliverables and timeline</li>\n<li>Transparent pricing and terms</li>\n<li>Our commitment to your success</li>\n</ul>\n<p>The proposal is valid for 30 days. We're confident in our ability to deliver exceptional results for your organization.</p>\n<p><strong>Next Steps:</strong></p>\n<ol>\n<li>Review the attached proposal</li>\n<li>Let us know if you have any questions or need clarification</li>\n<li>When you're ready to proceed, we can schedule a brief call to finalize details</li>\n</ol>\n<p>We're excited about the opportunity to work with you and look forward to your feedback.</p>\n<p>Best regards,<br>The BrainOps Team</p>\n<p style=\"margin-top: 30px; padding: 15px; background-color: #f5f5f5; border-radius: 5px;\">\n<strong>Quick Actions:</strong><br>\n📅 <a href=\"TODO: Add scheduling link\">Schedule a follow-up call</a><br>\n📧 Reply with questions<br>\n📱 Call us at TODO: Add phone number\n</p>",
+                "attachments": [
+                  {
+                    "fileName": "BrainOps_Proposal_{{ifempty(1.custom_fields.company; 2.properties.Company.rich_text[0].text.content)}}_{{formatDate(now; 'YYYY-MM-DD')}}.pdf",
+                    "data": "{{8.data}}"
+                  }
+                ]
+              },
+              "metadata": {
+                "designer": {
+                  "x": 1200,
+                  "y": 150
+                }
+              }
+            },
+            {
+              "id": 10,
+              "module": "builtin:BasicFeeder",
+              "version": 1,
+              "parameters": {},
+              "mapper": {
+                "array": "[1]"
+              },
+              "metadata": {
+                "designer": {
+                  "x": 1200,
+                  "y": 300
+                }
+              }
+            },
+            {
+              "id": 11,
+              "module": "clickup:updateTask",
+              "version": 1,
+              "parameters": {
+                "__IMTCONN__": "TODO: Add ClickUp connection ID"
+              },
+              "mapper": {
+                "taskId": "{{1.id}}",
+                "status": "proposal sent",
+                "custom_fields": [
+                  {
+                    "id": "TODO: Add custom field ID for Proposal Link",
+                    "value": "{{4.webViewLink}}"
+                  },
+                  {
+                    "id": "TODO: Add custom field ID for Proposal Sent Date",
+                    "value": "{{now}}"
+                  }
+                ]
+              },
+              "metadata": {
+                "designer": {
+                  "x": 1500,
+                  "y": 0
+                }
+              }
+            },
+            {
+              "id": 12,
+              "module": "notion:updateDatabaseItem",
+              "version": 1,
+              "parameters": {
+                "__IMTCONN__": "TODO: Add Notion connection ID"
+              },
+              "mapper": {
+                "databaseItemId": "{{2.id}}",
+                "properties": {
+                  "Status": {
+                    "select": {
+                      "name": "Proposal Sent"
+                    }
+                  },
+                  "Proposal Sent Date": {
+                    "date": {
+                      "start": "{{formatDate(now; 'YYYY-MM-DD')}}"
+                    }
+                  },
+                  "Proposal Link": {
+                    "url": "{{4.webViewLink}}"
+                  }
+                }
+              },
+              "metadata": {
+                "designer": {
+                  "x": 1500,
+                  "y": 150
+                }
+              }
+            },
+            {
+              "id": 13,
+              "module": "clickup:createTask",
+              "version": 1,
+              "parameters": {
+                "__IMTCONN__": "TODO: Add ClickUp connection ID"
+              },
+              "mapper": {
+                "name": "Follow up on proposal - {{ifempty(1.name; 2.properties.Name.title[0].text.content)}}",
+                "description": "Proposal sent on {{formatDate(now; 'MMMM D, YYYY')}}\n\nProposal link: {{4.webViewLink}}\n\nFollow-up actions:\n- [ ] Check if email was opened (if tracking enabled)\n- [ ] Send follow-up email if no response\n- [ ] Call if still no response after email\n- [ ] Update CRM with outcome",
+                "list": "TODO: Add Sales Pipeline list ID",
+                "status": "to do",
+                "priority": 2,
+                "due_date": "{{addDays(now; 7)}}",
+                "assignees": ["TODO: Add assignee user ID"],
+                "tags": ["follow-up", "proposal"]
+              },
+              "metadata": {
+                "designer": {
+                  "x": 1500,
+                  "y": 300
+                }
+              }
+            },
+            {
+              "id": 14,
+              "module": "slack:postMessage",
+              "version": 3,
+              "parameters": {
+                "__IMTCONN__": "TODO: Add Slack connection ID"
+              },
+              "mapper": {
+                "channel": "#sales-notifications",
+                "text": "📄 Proposal Sent!\n\n*Client:* {{ifempty(1.name; 2.properties.Name.title[0].text.content)}}\n*Company:* {{ifempty(1.custom_fields.company; 2.properties.Company.rich_text[0].text.content)}}\n*Value:* {{ifempty(1.custom_fields.budget; 'TBD')}}\n\n*Proposal:* <{{4.webViewLink}}|View in Google Docs>\n\nFollow-up scheduled for {{formatDate(addDays(now; 7); 'MMMM D')}}",
+                "parse": "full"
+              },
+              "metadata": {
+                "designer": {
+                  "x": 1800,
+                  "y": 75
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "metadata": {
+    "instant": false,
+    "version": 1,
+    "scenario": {
+      "roundtrips": 1,
+      "maxErrors": 3,
+      "autoCommit": true,
+      "autoCommitTriggerLast": true,
+      "sequential": true,
+      "confidential": false,
+      "dataloss": false,
+      "dlq": true
+    },
+    "designer": {
+      "orphans": []
+    },
+    "zone": "us1.make.com"
+  }
+}
