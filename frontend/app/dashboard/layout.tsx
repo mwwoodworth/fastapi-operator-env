@@ -15,6 +15,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <nav className="space-y-2">
           <Link href="/dashboard" className="block">Home</Link>
           <Link href="/dashboard/memory" className="block">Memory</Link>
+          <Link href="/dashboard/ops" className="block">Ops</Link>
           <Link href="/dashboard/copilot" className="block">Copilot</Link>
           <Link href="/dashboard/copilot-v2" className="block">Copilot v2</Link>
           <Link href="/dashboard/sync" className="block">Sync</Link>
