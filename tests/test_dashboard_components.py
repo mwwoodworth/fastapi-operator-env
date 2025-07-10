@@ -38,3 +38,19 @@ def test_products_page_exists():
 def test_ops_page_exists():
     path = pathlib.Path('dashboard_ui/app/dashboard/ops/page.tsx')
     assert path.exists()
+
+
+def test_newsletter_api_route_exists():
+    path = pathlib.Path('dashboard_ui/app/api/newsletter/subscribe/route.ts')
+    text = path.read_text()
+    assert 'async function POST' in text
+
+
+def test_product_detail_page_exists():
+    path = pathlib.Path('dashboard_ui/app/products/[id]/page.tsx')
+    assert path.exists()
+
+
+def test_services_page_exists():
+    path = pathlib.Path('dashboard_ui/app/services/page.tsx')
+    assert path.exists()

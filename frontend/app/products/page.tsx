@@ -12,7 +12,12 @@ export default function ProductsPage() {
           <li key={p.id} className="border rounded-lg p-4 flex flex-col">
             <h3 className="text-lg font-semibold mb-2">{p.title}</h3>
             <p className="flex-1">{p.description}</p>
-            <Link href={p.link} className="mt-4 underline text-blue-600">{p.cta || 'Learn more'}</Link>
+            <div className="mt-4 space-x-2">
+              <Link href={`/products/${p.id}`} className="underline text-blue-600">Details</Link>
+              {p.link && (
+                <a href={p.link} target="_blank" rel="noopener noreferrer" className="underline text-blue-600">{p.cta || 'Buy'}</a>
+              )}
+            </div>
           </li>
         ))}
       </ul>
