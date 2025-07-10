@@ -59,6 +59,14 @@ Sample helpers in the `mock/` folder can be used to generate example events or t
 python main.py task run '{"task": "claude_prompt", "context": {"prompt": "demo"}}'
 ```
 
+New automation tasks power BrainStackStudio's publishing workflow:
+
+- `autopublish_content` – publish an article to the site, trigger Make.com marketplace uploads and optionally send a newsletter.
+- `sync_sale` – notify Make.com of a new sale to start onboarding and CRM sync.
+- `generate_product_docs` – create product docs with Claude and push them to your documentation site.
+
+See `docs/production_checklist.md` for a go-live checklist.
+
 ### Secrets Vault
 
 The API exposes endpoints under `/secrets` for storing and retrieving encrypted credentials. Example:
@@ -93,6 +101,7 @@ Additional helpful endpoints:
 - `/agent/strategy/weekly` - run the weekly strategy agent.
 - `/task/dependency-map` - create a dependency map for tasks.
 - `/feedback/report` - submit bug reports or suggestions.
+- `docs/production_checklist.md` - production readiness guide.
 
 ## Deployment
 Use `uvicorn main:app` locally. For cloud deploy, create a Render or Vercel service using the provided `render.yaml` and ensure all environment variables from `.env` are set.
