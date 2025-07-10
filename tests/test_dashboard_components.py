@@ -33,3 +33,8 @@ def test_pipeline_component_exists():
 def test_products_page_exists():
     path = pathlib.Path('dashboard_ui/app/dashboard/products/page.tsx')
     assert path.exists()
+
+
+def test_ops_page_exists():
+    path = pathlib.Path('dashboard_ui/app/dashboard/ops/page.tsx')
+    assert path.exists()

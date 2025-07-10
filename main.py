@@ -931,6 +931,23 @@ async def dashboard_sync() -> Dict[str, Any]:
     }
 
 
+@app.get("/dashboard/ops")
+async def dashboard_ops() -> Dict[str, Any]:
+    """Combined operations metrics including sales and signups."""
+    metrics = await dashboard_metrics()
+    tasks = await dashboard_tasks()
+    status = await dashboard_status()
+    data_file = Path("data/ops_data.json")
+    extra: Dict[str, Any] = {}
+    if data_file.exists():
+        try:
+            extra = json.loads(data_file.read_text())
+        except Exception:  # noqa: BLE001
+            extra = {}
+    result = {**status, **metrics, **tasks, **extra}
+    return result
+
+
 @app.get("/diagnostics/state")
 async def diagnostics_state() -> Dict[str, Any]:
     active_tasks = 0

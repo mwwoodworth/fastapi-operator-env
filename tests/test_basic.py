@@ -147,6 +147,12 @@ def test_dashboard_metrics():
     assert 'tasks_logged' in data
 
 
+def test_dashboard_ops():
+    resp = client.get('/dashboard/ops')
+    assert resp.status_code == 200
+    assert 'sales' in resp.json()
+
+
 def test_search_and_error_logs():
     resp = client.get('/memory/search?q=test')
     assert resp.status_code == 200
