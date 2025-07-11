@@ -42,11 +42,12 @@ Then POST to `/task/run` with JSON body:
 ```
 
 ## Environment
-Copy `.env.example` to `.env` and fill in the required keys. Set `ENVIRONMENT=production`
-when deploying to Render or Vercel so the server fails fast if mandatory secrets
-are missing. Supabase credentials are required in production for persistent
-memory storage.
-Set `SLACK_WEBHOOK_URL` to a Slack incoming webhook to get notified when tasks succeed or fail.
+Copy `.env.example` to `.env` and fill in the required keys. Configuration is
+loaded via `core/settings.py` using Pydantic's `BaseSettings`, which reads the
+`.env` file automatically. Set `ENVIRONMENT=production` when deploying so missing
+required variables raise an error. Supabase credentials are required in
+production for persistent memory storage. Set `SLACK_WEBHOOK_URL` to a Slack
+incoming webhook to get notified when tasks succeed or fail.
 
 ### Database migrations
 Before running the server in production, apply the Alembic migrations to ensure

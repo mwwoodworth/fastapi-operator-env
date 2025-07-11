@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
-import os
+from core.settings import Settings
+
+settings = Settings()
 
 
 def get_ai_model(task: str | None = None) -> str:
     """Return 'claude', 'gemini', or 'chain' based on task name and env var."""
-    mode = os.getenv("AI_ROUTER_MODE", "auto")
+    mode = settings.AI_ROUTER_MODE
     if mode in {"claude", "gemini", "chain"}:
         return mode
 

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import os
 import json
 from datetime import datetime, timezone
 from contextlib import asynccontextmanager
@@ -20,6 +19,9 @@ import secrets as pysecrets
 from pydantic import BaseModel
 from utils.slack import send_slack_message
 from db.session import init_db
+from core.settings import Settings
+
+settings = Settings()
 
 from codex.tasks import (
     secrets as secrets_task,
@@ -50,12 +52,12 @@ security = HTTPBasic(auto_error=False)
 USERS = {}
 ADMIN_USERS: set[str] = set()
 
-if os.getenv("BASIC_AUTH_USERS"):
+if settings.BASIC_AUTH_USERS:
     try:
-        USERS = json.loads(os.getenv("BASIC_AUTH_USERS", "{}"))
+        USERS = json.loads(settings.BASIC_AUTH_USERS)
     except Exception:  # noqa: BLE001
         USERS = {}
-ADMIN_USERS = set((os.getenv("ADMIN_USERS") or "").split(","))
+ADMIN_USERS = set((settings.ADMIN_USERS or "").split(","))
 
 
 def get_current_user(credentials: HTTPBasicCredentials = Depends(security)) -> str:
@@ -68,7 +70,9 @@ def get_current_user(credentials: HTTPBasicCredentials = Depends(security)) -> s
             headers={"WWW-Authenticate": "Basic"},
         )
     correct_password = USERS.get(credentials.username)
-    if not correct_password or not pysecrets.compare_digest(credentials.password, correct_password):
+    if not correct_password or not pysecrets.compare_digest(
+        credentials.password, correct_password
+    ):
         raise HTTPException(
             status_code=401,
             detail="Unauthorized",
@@ -85,22 +89,10 @@ def require_admin(user: str = Depends(get_current_user)) -> str:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    required = [
-        "TANA_API_KEY",
-        "SUPABASE_SERVICE_KEY",
-        "VERCEL_TOKEN",
-        "OPENAI_API_KEY",
-        "STRIPE_SECRET_KEY",
-    ]
-    missing = [var for var in required if not os.getenv(var)]
-    env = os.getenv("ENVIRONMENT", "development").lower()
-    if env == "production" and missing:
-        raise RuntimeError(f"Missing required env vars: {', '.join(missing)}")
-    if missing:
-        logger.warning("Missing env vars: %s", ", ".join(missing))
     tasks = ", ".join(get_registry().keys())
     logger.info("Available tasks: %s", tasks)
     init_db()
+    app.state.settings = settings
     yield
 
 
@@ -112,7 +104,9 @@ app.include_router(chat_task_router)
 
 # Serve dashboard with authentication
 dashboard_app = FastAPI(dependencies=[Depends(get_current_user)])
-dashboard_app.mount("/", StaticFiles(directory="static/dashboard", html=True), name="dashboard")
+dashboard_app.mount(
+    "/", StaticFiles(directory="static/dashboard", html=True), name="dashboard"
+)
 app.mount("/dashboard/ui", dashboard_app)
 
 # Expose static assets like manifest and icons
@@ -204,13 +198,12 @@ async def chat_endpoint(req: ChatRequest) -> Dict[str, Any]:
     model = req.model or get_ai_model(task="chat")
     scope = _resolve_scope(req.memory_scope)
     mem_text = memory_store.load_recent(scope)
-    system_prompt = os.getenv(
-        "CHAT_SYSTEM_PROMPT",
-        "You are BrainOps Operator, a fast, reliable assistant for project execution.",
-    )
+    system_prompt = settings.CHAT_SYSTEM_PROMPT
     prompt = f"{system_prompt}\n\nRecent memory:\n{mem_text}\nUser: {req.message}\nAssistant:"
     ai_result = (
-        claude_prompt.run({"prompt": prompt}) if model == "claude" else gemini_prompt.run({"prompt": prompt})
+        claude_prompt.run({"prompt": prompt})
+        if model == "claude"
+        else gemini_prompt.run({"prompt": prompt})
     )
     completion = ai_result.get("completion", "")
 
@@ -278,10 +271,14 @@ async def webhook_trigger(req: dict) -> Dict[str, Any]:
 
 
 @app.post("/webhook/github")
-async def github_webhook(request: Request, x_hub_signature_256: str | None = Header(default=None)) -> Dict[str, Any]:
+async def github_webhook(
+    request: Request, x_hub_signature_256: str | None = Header(default=None)
+) -> Dict[str, Any]:
     payload = await request.json()
     raw = await request.body()
-    result = github_push_trigger.run({"payload": payload, "signature": x_hub_signature_256, "raw_body": raw})
+    result = github_push_trigger.run(
+        {"payload": payload, "signature": x_hub_signature_256, "raw_body": raw}
+    )
     if result.get("error"):
         raise HTTPException(status_code=400, detail=result["error"])
     return result
@@ -373,6 +370,7 @@ async def memory_search(
 @app.post("/knowledge/index")
 async def knowledge_index() -> Dict[str, Any]:
     from codex.memory import doc_indexer
+
     docs = doc_indexer.index_documents()
     return {"indexed": len(docs)}
 
@@ -390,12 +388,14 @@ async def knowledge_query(req: KnowledgeQueryRequest) -> Dict[str, Any]:
 @app.get("/knowledge/sources")
 async def knowledge_sources() -> Dict[str, Any]:
     from codex.memory import doc_indexer
+
     return {"docs": doc_indexer.list_sources()}
 
 
 @app.get("/logs/rag")
 async def rag_logs(limit: int = 20) -> Dict[str, Any]:
     from utils import rag_logger
+
     return {"entries": rag_logger.load_logs(limit)}
 
 
@@ -418,7 +418,9 @@ class FeedbackReport(BaseModel):
 
 
 @app.post("/feedback/report")
-async def feedback_report(req: FeedbackReport, user: str = Depends(get_current_user)) -> Dict[str, Any]:
+async def feedback_report(
+    req: FeedbackReport, user: str = Depends(get_current_user)
+) -> Dict[str, Any]:
     entry = {
         "task": "user_feedback",
         "input": {"message": req.message, "page": req.page},
@@ -447,7 +449,9 @@ async def memory_trace(task_id: str) -> Dict[str, Any]:
 
 
 @app.get("/chat/history")
-async def chat_history(limit: int = 20, model: str | None = None, tags: str = "") -> Dict[str, Any]:
+async def chat_history(
+    limit: int = 20, model: str | None = None, tags: str = ""
+) -> Dict[str, Any]:
     tag_list = [t.strip() for t in tags.split(",") if t.strip()]
     tag_list.append("chat")
     records = memory_store.query(tag_list, limit=limit)
@@ -459,7 +463,7 @@ async def chat_history(limit: int = 20, model: str | None = None, tags: str = ""
 @app.post("/voice/upload")
 async def voice_upload(file: UploadFile = File(...)) -> Dict[str, Any]:
     """Upload an audio file and process it into tasks."""
-    upload_dir = Path(os.getenv("VOICE_UPLOAD_DIR", "uploads"))
+    upload_dir = Path(settings.VOICE_UPLOAD_DIR)
     upload_dir.mkdir(parents=True, exist_ok=True)
     dest = upload_dir / file.filename
     with dest.open("wb") as f:
@@ -487,7 +491,11 @@ async def voice_upload(file: UploadFile = File(...)) -> Dict[str, Any]:
             "id": entry_id,
             "task": "voice_upload",
             "input": str(dest),
-            "output": {"transcription": text, "tasks": tasks_list, "run_result": run_result},
+            "output": {
+                "transcription": text,
+                "tasks": tasks_list,
+                "run_result": run_result,
+            },
             "tags": ["voice", "transcription", "mobile"],
             "metadata": {"transcript_id": transcript_id, "processed_by": "Claude"},
         },
@@ -530,7 +538,7 @@ async def voice_history(limit: int = 20) -> Dict[str, Any]:
 
 @app.get("/voice/trace/{transcript_id}")
 async def voice_trace(transcript_id: str) -> Dict[str, Any]:
-    limit = int(os.getenv("TRACE_VIEW_LIMIT", 50))
+    limit = settings.TRACE_VIEW_LIMIT
     records = memory_store.fetch_all(limit=1000)
     transcript = ""
     tasks = []
@@ -538,7 +546,10 @@ async def voice_trace(transcript_id: str) -> Dict[str, Any]:
     executed_by = None
     for r in records:
         meta = r.get("metadata") or {}
-        if meta.get("transcript_id") == transcript_id and r.get("task") == "voice_upload":
+        if (
+            meta.get("transcript_id") == transcript_id
+            and r.get("task") == "voice_upload"
+        ):
             transcript = r.get("output", {}).get("transcription", "")
             executed_by = meta.get("processed_by")
         if meta.get("linked_transcript_id") == transcript_id:
@@ -597,10 +608,10 @@ async def status_update(req: StatusUpdate) -> Dict[str, Any]:
     try:
         orig = memory_store.fetch_one(req.task_id)
         node_id = orig.get("metadata", {}).get("node_id") if orig else None
-        if node_id and os.getenv("TANA_NODE_CALLBACK"):
+        if node_id and settings.TANA_NODE_CALLBACK:
             headers = {}
-            if os.getenv("TANA_API_KEY"):
-                headers["Authorization"] = f"Bearer {os.getenv('TANA_API_KEY')}"
+            if settings.TANA_API_KEY:
+                headers["Authorization"] = f"Bearer {settings.TANA_API_KEY}"
             httpx.post(
                 "https://europe-west1.api.tana.inc/update/node",
                 json={"id": node_id, "content": req.message},
@@ -667,9 +678,7 @@ async def agent_inbox_delay(req: DelayRequest) -> Dict[str, Any]:
     item = agent_inbox.get_task(req.task_id)
     if not item:
         raise HTTPException(status_code=404, detail="not_found")
-    task_rescheduler.record_delay(
-        req.task_id, req.delay_until, req.note, req.fallback
-    )
+    task_rescheduler.record_delay(req.task_id, req.delay_until, req.note, req.fallback)
     return {"status": "delayed"}
 
 
@@ -790,8 +799,13 @@ async def mobile_task(req: MobileTask) -> Dict[str, Any]:
     tasks = prompt_result.get("tasks") or []
     queued: List[Dict[str, Any]] = []
     for t in tasks:
-        queued.append(agent_inbox.add_to_inbox(t.get("task"), t.get("context", {}), "mobile"))
-    return {"task_id": [q.get("task_id") for q in queued], "summary": [q.get("summary") for q in queued]}
+        queued.append(
+            agent_inbox.add_to_inbox(t.get("task"), t.get("context", {}), "mobile")
+        )
+    return {
+        "task_id": [q.get("task_id") for q in queued],
+        "summary": [q.get("summary") for q in queued],
+    }
 
 
 @app.get("/agent/recurring")
@@ -814,7 +828,9 @@ async def dashboard_status() -> Dict[str, Any]:
     try:
         from supabase_client import supabase
 
-        res = supabase.table("retry_queue").select("id").eq("status", "pending").execute()
+        res = (
+            supabase.table("retry_queue").select("id").eq("status", "pending").execute()
+        )
         pending = len(res.data or [])
     except Exception:  # noqa: BLE001
         pending = 0
@@ -826,7 +842,9 @@ async def dashboard_status() -> Dict[str, Any]:
         if log_file.exists():
             history = json.loads(log_file.read_text())
             for item in reversed(history):
-                if not isinstance(item.get("result"), dict) or not item["result"].get("error"):
+                if not isinstance(item.get("result"), dict) or not item["result"].get(
+                    "error"
+                ):
                     last_success = item.get("timestamp")
                     break
     except Exception:  # noqa: BLE001
@@ -842,12 +860,16 @@ async def dashboard_status() -> Dict[str, Any]:
 @app.get("/dashboard/tasks")
 async def dashboard_tasks() -> Dict[str, Any]:
     pending = len(agent_inbox.get_pending_tasks(100))
-    recurring_enabled = len([
-        t for t in recurring_task_engine.get_recurring_tasks() if t.get("enabled", True)
-    ])
-    delayed = len([
-        t for t in agent_inbox.get_pending_tasks(100) if t.get("delay_until")
-    ])
+    recurring_enabled = len(
+        [
+            t
+            for t in recurring_task_engine.get_recurring_tasks()
+            if t.get("enabled", True)
+        ]
+    )
+    delayed = len(
+        [t for t in agent_inbox.get_pending_tasks(100) if t.get("delay_until")]
+    )
     last_review = weekly_priority_review.get_last_review_time()
     return {
         "pending": pending,
@@ -861,16 +883,18 @@ async def dashboard_tasks() -> Dict[str, Any]:
 async def dashboard_full() -> Dict[str, Any]:
     base = dashboard_status()
     inbox = agent_inbox.get_summary()
-    supabase_status = bool(os.getenv("SUPABASE_URL"))
+    supabase_status = bool(settings.SUPABASE_URL)
     last_entry = memory_store.fetch_all(limit=1)
     last_model = None
     if last_entry:
         last_model = last_entry[0].get("metadata", {}).get("model")
-    base.update({
-        "inbox": inbox,
-        "last_model": last_model,
-        "supabase": supabase_status,
-    })
+    base.update(
+        {
+            "inbox": inbox,
+            "last_model": last_model,
+            "supabase": supabase_status,
+        }
+    )
     return base
 
 
@@ -915,14 +939,19 @@ async def dashboard_metrics() -> Dict[str, Any]:
 @app.get("/dashboard/sync")
 async def dashboard_sync() -> Dict[str, Any]:
     records = memory_store.fetch_all(limit=200)
-    syncs = len([r for r in records if r.get("task") == "memory_sync_agent"]) 
-    coauthored = len([r for r in records if r.get("task") == "ai_coauthored_composer"]) 
+    syncs = len([r for r in records if r.get("task") == "memory_sync_agent"])
+    coauthored = len([r for r in records if r.get("task") == "ai_coauthored_composer"])
     discrepancy_time = None
     for r in reversed(records):
-        if r.get("task") == "memory_diff_checker" and r.get("output") and isinstance(r.get("output"), dict) and r["output"].get("discrepancy"):
+        if (
+            r.get("task") == "memory_diff_checker"
+            and r.get("output")
+            and isinstance(r.get("output"), dict)
+            and r["output"].get("discrepancy")
+        ):
             discrepancy_time = r.get("timestamp")
             break
-    repairs = len([r for r in records if r.get("task") == "workflow_audit_agent"]) 
+    repairs = len([r for r in records if r.get("task") == "workflow_audit_agent"])
     return {
         "claude_gemini_syncs": syncs,
         "coauthored_tasks": coauthored,
@@ -957,22 +986,31 @@ async def diagnostics_state() -> Dict[str, Any]:
     try:
         from supabase_client import supabase
 
-        res = supabase.table("task_queue").select("id").eq("status", "pending").execute()
+        res = (
+            supabase.table("task_queue").select("id").eq("status", "pending").execute()
+        )
         active_tasks = len(res.data or [])
-        rq = supabase.table("retry_queue").select("id").eq("status", "pending").execute()
+        rq = (
+            supabase.table("retry_queue").select("id").eq("status", "pending").execute()
+        )
         retry_queue = len(rq.data or [])
     except Exception:  # noqa: BLE001
         active_tasks = 0
         retry_queue = 0
     for item in reversed(memory_store.fetch_all(limit=20)):
-        if item.get("task") == "claude_memory_agent" or item.get("task") == "gemini_memory_agent":
+        if (
+            item.get("task") == "claude_memory_agent"
+            or item.get("task") == "gemini_memory_agent"
+        ):
             last_summary = item.get("timestamp")
             break
     for item in reversed(memory_store.fetch_all(limit=50)):
         if item.get("task") == "create_tana_node":
             last_tana_push = item.get("timestamp")
             break
-    secrets_loaded = [s for s in ["CLAUDE_API_KEY", "TANA_API_KEY"] if os.getenv(s)]
+    secrets_loaded = [
+        s for s in ["CLAUDE_API_KEY", "TANA_API_KEY"] if getattr(settings, s, None)
+    ]
     return {
         "active_tasks": active_tasks,
         "last_memory_summary": last_summary,

@@ -5,9 +5,14 @@ from fastapi.testclient import TestClient
 os.environ.setdefault("FERNET_SECRET", "YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXoxMjM0NTY=")
 os.environ.setdefault("SUPABASE_URL", "http://example.com")
 os.environ.setdefault("SUPABASE_SERVICE_KEY", "dummy")
+os.environ.setdefault("OPENAI_API_KEY", "test")
+os.environ.setdefault("STRIPE_SECRET_KEY", "test")
+os.environ.setdefault("TANA_API_KEY", "test")
+os.environ.setdefault("VERCEL_TOKEN", "test")
 os.environ.pop("BASIC_AUTH_USERS", None)
 os.environ.pop("ADMIN_USERS", None)
 import main as main_module
+
 importlib.reload(main_module)
 client = TestClient(main_module.app)
 

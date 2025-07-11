@@ -9,11 +9,18 @@ os.environ.pop("ADMIN_USERS", None)
 os.environ.setdefault("SUPABASE_URL", "http://example.com")
 os.environ.setdefault("SUPABASE_SERVICE_KEY", "dummy")
 os.environ.setdefault("FERNET_SECRET", "YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXoxMjM0NTY=")
+os.environ.setdefault("OPENAI_API_KEY", "test")
+os.environ.setdefault("STRIPE_SECRET_KEY", "test")
+os.environ.setdefault("TANA_API_KEY", "test")
+os.environ.setdefault("VERCEL_TOKEN", "test")
 
 import chat_task_api
+
 importlib.reload(chat_task_api)
 import main as main_module
+
 importlib.reload(main_module)
+
 
 def get_client():
     os.environ.pop("BASIC_AUTH_USERS", None)
@@ -22,8 +29,10 @@ def get_client():
     importlib.reload(chat_task_api)
     importlib.reload(main_module)
     import db.session
+
     db.session.init_db()
     return TestClient(main_module.app)
+
 
 headers = {"X-Agent-Key": "secret"}
 
@@ -75,9 +84,7 @@ def test_task_and_file_endpoints():
     list_resp = client.get(f"/tasks?thread={thread_id}", headers=headers)
     assert any(t["id"] == task_id for t in list_resp.json())
 
-    upd = client.patch(
-        f"/tasks/{task_id}", json={"status": "done"}, headers=headers
-    )
+    upd = client.patch(f"/tasks/{task_id}", json={"status": "done"}, headers=headers)
     assert upd.status_code == 200
 
     file_resp = client.post(
@@ -96,4 +103,3 @@ def test_task_and_file_endpoints():
     assert del_file.status_code == 200
     del_task = client.delete(f"/tasks/{task_id}", headers=headers)
     assert del_task.status_code == 200
-
