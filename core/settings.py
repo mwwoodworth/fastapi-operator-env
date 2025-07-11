@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     SUPABASE_SERVICE_KEY: str
     SUPABASE_URL: str
     STRIPE_SECRET_KEY: str
+    REDIS_URL: str = "redis://localhost:6379/0"
 
     MAKE_WEBHOOK_SECRET: str | None = None
     BRAINSTACK_API_URL: str | None = None
