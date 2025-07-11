@@ -1,0 +1,104 @@
+from __future__ import annotations
+
+from typing import Any, Dict, List, Optional
+
+from pydantic import BaseModel
+
+
+class StatusResponse(BaseModel):
+    """Generic status response."""
+
+    status: str
+
+
+class ValueResponse(BaseModel):
+    value: Any
+
+
+class TanaNodeCreateResponse(StatusResponse):
+    content: str
+
+
+class TaskRunResponse(BaseModel):
+    status: str
+    result: Any
+
+
+class ChatResponse(BaseModel):
+    response: str
+    model: str
+    suggested_tasks: Optional[List[Dict[str, Any]]] = None
+    memory_id: str
+
+
+class VoiceUploadResponse(BaseModel):
+    transcription: str
+    tasks: List[Dict[str, Any]]
+    id: str
+
+
+class MemoryEntry(BaseModel):
+    id: Optional[str] = None
+    task: Optional[str] = None
+    type: Optional[str] = None
+    source: Optional[str] = None
+    model: Optional[str] = None
+    input: Any | None = None
+    output: Any | None = None
+    tags: Optional[List[str]] = None
+    metadata: Optional[Dict[str, Any]] = None
+    timestamp: Optional[str] = None
+
+
+class MemoryEntriesResponse(BaseModel):
+    entries: List[MemoryEntry]
+
+
+class DocumentWriteResponse(BaseModel):
+    document_id: str
+    chunks: int
+
+
+class DocumentUpdateResponse(BaseModel):
+    status: str
+    chunks: int
+
+
+class QueryResultsResponse(BaseModel):
+    results: List[Dict[str, Any]]
+
+
+class VoiceHistoryEntry(BaseModel):
+    id: str
+    filename: str
+    transcript: str
+    timestamp: Optional[str] = None
+
+
+class VoiceHistoryResponse(BaseModel):
+    entries: List[VoiceHistoryEntry]
+
+
+class VoiceTraceResponse(BaseModel):
+    transcript: str
+    tasks_triggered: List[str]
+    memory_outputs: List[Dict[str, Any]]
+    executed_by: Optional[str] = None
+
+
+class VoiceStatusResponse(BaseModel):
+    latest_transcript: str
+    task_executed: bool
+    memory_link: Optional[str]
+    execution_status: str
+    processed_by: Optional[str] = None
+
+
+class MemoryTraceResponse(BaseModel):
+    task: Optional[str] = None
+    triggered_by: Optional[str] = None
+    linked_transcript: Optional[str] = None
+    linked_node: Optional[str] = None
+    executed_by: Optional[str] = None
+    output: Any | None = None
+

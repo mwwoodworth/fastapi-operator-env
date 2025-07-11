@@ -44,6 +44,19 @@ from codex.ai.gemini_webhook import router as gemini_webhook_router
 from chat_task_api import router as chat_task_router
 import codex.ai.claude_sync as claude_sync
 from utils.ai_router import get_ai_model
+from response_models import (
+    ChatResponse,
+    TaskRunResponse,
+    MemoryEntriesResponse,
+    VoiceHistoryResponse,
+    VoiceTraceResponse,
+    VoiceStatusResponse,
+    MemoryTraceResponse,
+    TanaNodeCreateResponse,
+    StatusResponse,
+    ValueResponse,
+    VoiceUploadResponse,
+)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("brainops.api")
@@ -163,18 +176,18 @@ def _resolve_scope(scope: str | int | None) -> int:
         return 5
 
 
-@app.post("/tana/create-node")
-async def create_tana_node(req: TanaRequest) -> Dict[str, Any]:
+@app.post("/tana/create-node", response_model=TanaNodeCreateResponse)
+async def create_tana_node(req: TanaRequest) -> TanaNodeCreateResponse:
     """Create a note in Tana from the provided content."""
     run_task("create_tana_node", {"content": req.content})
-    return {"status": "submitted", "content": req.content}
+    return TanaNodeCreateResponse(status="submitted", content=req.content)
 
 
-@app.post("/task/run")
-async def task_run(req: TaskRunRequest) -> JSONResponse:
+@app.post("/task/run", response_model=TaskRunResponse)
+async def task_run(req: TaskRunRequest) -> TaskRunResponse:
     try:
         result = run_task(req.task, req.context or {})
-        return JSONResponse({"status": "success", "result": result})
+        return TaskRunResponse(status="success", result=result)
     except Exception as exc:  # noqa: BLE001
         logger.exception("Task execution failed")
         raise HTTPException(status_code=500, detail=str(exc)) from exc
@@ -193,8 +206,8 @@ async def nl_design(req: NLDesignRequest) -> Dict[str, Any]:
     return run_task("nl_task_designer", context)
 
 
-@app.post("/chat")
-async def chat_endpoint(req: ChatRequest) -> Dict[str, Any]:
+@app.post("/chat", response_model=ChatResponse)
+async def chat_endpoint(req: ChatRequest) -> ChatResponse:
     model = req.model or get_ai_model(task="chat")
     scope = _resolve_scope(req.memory_scope)
     mem_text = memory_store.load_recent(scope)
@@ -244,12 +257,12 @@ async def chat_endpoint(req: ChatRequest) -> Dict[str, Any]:
     )
     log_path.write_text(json.dumps(history[-200:], indent=2))
 
-    return {
-        "response": completion,
-        "model": model,
-        "suggested_tasks": suggested,
-        "memory_id": entry_id,
-    }
+    return ChatResponse(
+        response=completion,
+        model=model,
+        suggested_tasks=suggested,
+        memory_id=entry_id,
+    )
 
 
 @app.post("/chat/to-task")
@@ -262,12 +275,12 @@ async def chat_to_task(req: ChatToTaskRequest) -> Dict[str, Any]:
     return run_task("chat_to_prompt", context)
 
 
-@app.post("/task/webhook")
-async def webhook_trigger(req: dict) -> Dict[str, Any]:
+@app.post("/task/webhook", response_model=TaskRunResponse)
+async def webhook_trigger(req: dict) -> TaskRunResponse:
     task = req.get("task")
     context = req.get("context", {})
     result = run_task(task, context)
-    return {"status": "success", "result": result}
+    return TaskRunResponse(status="success", result=result)
 
 
 @app.post("/webhook/github")
@@ -318,22 +331,22 @@ async def docs_registry() -> Dict[str, Any]:
     return registry
 
 
-@app.post("/secrets/store")
-async def store_secret_api(req: dict, _: str = Depends(require_admin)):
+@app.post("/secrets/store", response_model=StatusResponse)
+async def store_secret_api(req: dict, _: str = Depends(require_admin)) -> StatusResponse:
     secrets_task.store_secret(req["name"], req["value"])
-    return {"status": "stored"}
+    return StatusResponse(status="stored")
 
 
-@app.get("/secrets/retrieve/{name}")
-async def retrieve_secret_api(name: str, _: str = Depends(require_admin)):
+@app.get("/secrets/retrieve/{name}", response_model=ValueResponse)
+async def retrieve_secret_api(name: str, _: str = Depends(require_admin)) -> ValueResponse:
     val = secrets_task.retrieve_secret(name)
-    return {"value": val}
+    return ValueResponse(value=val)
 
 
-@app.delete("/secrets/delete/{name}")
-async def delete_secret_api(name: str, _: str = Depends(require_admin)):
+@app.delete("/secrets/delete/{name}", response_model=StatusResponse)
+async def delete_secret_api(name: str, _: str = Depends(require_admin)) -> StatusResponse:
     secrets_task.delete_secret(name)
-    return {"status": "deleted"}
+    return StatusResponse(status="deleted")
 
 
 @app.get("/secrets/list")
@@ -346,14 +359,14 @@ async def memory_summary() -> Dict[str, Any]:
     return claude_summarize.run({})
 
 
-@app.get("/memory/query")
-async def memory_query(tags: str = "", limit: int = 10) -> Dict[str, Any]:
+@app.get("/memory/query", response_model=MemoryEntriesResponse)
+async def memory_query(tags: str = "", limit: int = 10) -> MemoryEntriesResponse:
     tag_list = [t.strip() for t in tags.split(",") if t.strip()]
     entries = memory_store.query(tag_list, limit=limit)
-    return {"entries": entries}
+    return MemoryEntriesResponse(entries=entries)
 
 
-@app.get("/memory/search")
+@app.get("/memory/search", response_model=MemoryEntriesResponse)
 async def memory_search(
     q: str = "",
     tags: str = "",
@@ -361,10 +374,10 @@ async def memory_search(
     end: str | None = None,
     user: str | None = None,
     limit: int = 20,
-) -> Dict[str, Any]:
+) -> MemoryEntriesResponse:
     tag_list = [t.strip() for t in tags.split(",") if t.strip()]
     results = memory_store.search(q, tag_list, start, end, user, limit)
-    return {"entries": results}
+    return MemoryEntriesResponse(entries=results)
 
 
 @app.post("/knowledge/index")
@@ -392,15 +405,15 @@ async def knowledge_sources() -> Dict[str, Any]:
     return {"docs": doc_indexer.list_sources()}
 
 
-@app.get("/logs/rag")
-async def rag_logs(limit: int = 20) -> Dict[str, Any]:
+@app.get("/logs/rag", response_model=MemoryEntriesResponse)
+async def rag_logs(limit: int = 20) -> MemoryEntriesResponse:
     from utils import rag_logger
 
-    return {"entries": rag_logger.load_logs(limit)}
+    return MemoryEntriesResponse(entries=rag_logger.load_logs(limit))
 
 
-@app.get("/logs/errors")
-async def error_logs(limit: int = 50) -> Dict[str, Any]:
+@app.get("/logs/errors", response_model=MemoryEntriesResponse)
+async def error_logs(limit: int = 50) -> MemoryEntriesResponse:
     """Return recent error log entries."""
     error_file = Path("logs/error_log.json")
     entries: List[Dict[str, Any]] = []
@@ -409,7 +422,7 @@ async def error_logs(limit: int = 50) -> Dict[str, Any]:
             entries = json.loads(error_file.read_text())[-limit:]
         except Exception:  # noqa: BLE001
             entries = []
-    return {"entries": entries}
+    return MemoryEntriesResponse(entries=entries)
 
 
 class FeedbackReport(BaseModel):
@@ -417,10 +430,10 @@ class FeedbackReport(BaseModel):
     page: str | None = None
 
 
-@app.post("/feedback/report")
+@app.post("/feedback/report", response_model=StatusResponse)
 async def feedback_report(
     req: FeedbackReport, user: str = Depends(get_current_user)
-) -> Dict[str, Any]:
+) -> StatusResponse:
     entry = {
         "task": "user_feedback",
         "input": {"message": req.message, "page": req.page},
@@ -429,39 +442,39 @@ async def feedback_report(
     }
     memory_store.save_memory(entry)
     send_slack_message(f"Feedback from {user}: {req.message}")
-    return {"status": "received"}
+    return StatusResponse(status="received")
 
 
-@app.get("/memory/trace/{task_id}")
-async def memory_trace(task_id: str) -> Dict[str, Any]:
+@app.get("/memory/trace/{task_id}", response_model=MemoryTraceResponse)
+async def memory_trace(task_id: str) -> MemoryTraceResponse:
     entry = memory_store.fetch_one(task_id)
     if not entry:
-        return {"error": "not_found"}
+        return MemoryTraceResponse()
     meta = entry.get("metadata") or {}
-    return {
-        "task": entry.get("task"),
-        "triggered_by": meta.get("source"),
-        "linked_transcript": meta.get("linked_transcript_id"),
-        "linked_node": meta.get("node_id"),
-        "executed_by": meta.get("model") or entry.get("output", {}).get("executed_by"),
-        "output": entry.get("output"),
-    }
+    return MemoryTraceResponse(
+        task=entry.get("task"),
+        triggered_by=meta.get("source"),
+        linked_transcript=meta.get("linked_transcript_id"),
+        linked_node=meta.get("node_id"),
+        executed_by=meta.get("model") or entry.get("output", {}).get("executed_by"),
+        output=entry.get("output"),
+    )
 
 
-@app.get("/chat/history")
+@app.get("/chat/history", response_model=MemoryEntriesResponse)
 async def chat_history(
     limit: int = 20, model: str | None = None, tags: str = ""
-) -> Dict[str, Any]:
+) -> MemoryEntriesResponse:
     tag_list = [t.strip() for t in tags.split(",") if t.strip()]
     tag_list.append("chat")
     records = memory_store.query(tag_list, limit=limit)
     if model:
         records = [r for r in records if r.get("model") == model]
-    return {"entries": records}
+    return MemoryEntriesResponse(entries=records)
 
 
-@app.post("/voice/upload")
-async def voice_upload(file: UploadFile = File(...)) -> Dict[str, Any]:
+@app.post("/voice/upload", response_model=VoiceUploadResponse)
+async def voice_upload(file: UploadFile = File(...)) -> VoiceUploadResponse:
     """Upload an audio file and process it into tasks."""
     upload_dir = Path(settings.VOICE_UPLOAD_DIR)
     upload_dir.mkdir(parents=True, exist_ok=True)
@@ -517,11 +530,11 @@ async def voice_upload(file: UploadFile = File(...)) -> Dict[str, Any]:
     except Exception:  # noqa: BLE001
         logger.exception("Failed to sync to Tana")
 
-    return {"transcription": text, "tasks": tasks_list, "id": entry_id}
+    return VoiceUploadResponse(transcription=text, tasks=tasks_list, id=entry_id)
 
 
-@app.get("/voice/history")
-async def voice_history(limit: int = 20) -> Dict[str, Any]:
+@app.get("/voice/history", response_model=VoiceHistoryResponse)
+async def voice_history(limit: int = 20) -> VoiceHistoryResponse:
     records = memory_store.query(["voice"], limit=limit)
     history = []
     for r in records:
@@ -533,11 +546,11 @@ async def voice_history(limit: int = 20) -> Dict[str, Any]:
                 "timestamp": r.get("timestamp"),
             }
         )
-    return {"entries": history}
+    return VoiceHistoryResponse(entries=history)
 
 
-@app.get("/voice/trace/{transcript_id}")
-async def voice_trace(transcript_id: str) -> Dict[str, Any]:
+@app.get("/voice/trace/{transcript_id}", response_model=VoiceTraceResponse)
+async def voice_trace(transcript_id: str) -> VoiceTraceResponse:
     limit = settings.TRACE_VIEW_LIMIT
     records = memory_store.fetch_all(limit=1000)
     transcript = ""
@@ -556,25 +569,25 @@ async def voice_trace(transcript_id: str) -> Dict[str, Any]:
             tasks.append(r.get("task"))
             outputs.append(r)
     outputs = outputs[:limit]
-    return {
-        "transcript": transcript,
-        "tasks_triggered": tasks,
-        "memory_outputs": outputs,
-        "executed_by": executed_by,
-    }
+    return VoiceTraceResponse(
+        transcript=transcript,
+        tasks_triggered=tasks,
+        memory_outputs=outputs,
+        executed_by=executed_by,
+    )
 
 
-@app.get("/voice/status")
-async def voice_status() -> Dict[str, Any]:
+@app.get("/voice/status", response_model=VoiceStatusResponse)
+async def voice_status() -> VoiceStatusResponse:
     records = memory_store.query(["voice"], limit=1)
     if not records:
-        return {
-            "latest_transcript": "",
-            "task_executed": False,
-            "memory_link": None,
-            "execution_status": "none",
-            "processed_by": None,
-        }
+        return VoiceStatusResponse(
+            latest_transcript="",
+            task_executed=False,
+            memory_link=None,
+            execution_status="none",
+            processed_by=None,
+        )
     r = records[-1]
     transcript = r.get("output", {}).get("transcription", "")
     executed = bool(r.get("output", {}).get("run_result"))
@@ -583,13 +596,13 @@ async def voice_status() -> Dict[str, Any]:
     if isinstance(result, dict) and result.get("error"):
         status = "error"
     processed = r.get("metadata", {}).get("processed_by", "Claude")
-    return {
-        "latest_transcript": transcript,
-        "task_executed": executed,
-        "memory_link": r.get("id"),
-        "execution_status": status,
-        "processed_by": processed,
-    }
+    return VoiceStatusResponse(
+        latest_transcript=transcript,
+        task_executed=executed,
+        memory_link=r.get("id"),
+        execution_status=status,
+        processed_by=processed,
+    )
 
 
 class StatusUpdate(BaseModel):
@@ -599,8 +612,8 @@ class StatusUpdate(BaseModel):
     timestamp: str | None = None
 
 
-@app.post("/webhook/status-update")
-async def status_update(req: StatusUpdate) -> Dict[str, Any]:
+@app.post("/webhook/status-update", response_model=StatusResponse)
+async def status_update(req: StatusUpdate) -> StatusResponse:
     entry = req.dict()
     entry["tags"] = ["status_update"]
     memory_store.save_memory(entry)
@@ -630,7 +643,7 @@ async def status_update(req: StatusUpdate) -> Dict[str, Any]:
     except Exception:  # noqa: BLE001
         logger.exception("Tana callback failed")
 
-    return {"status": "logged"}
+    return StatusResponse(status="logged")
 
 
 class InboxDecision(BaseModel):
@@ -652,8 +665,8 @@ async def agent_inbox_view(limit: int = 10) -> List[Dict[str, Any]]:
     return agent_inbox.get_pending_tasks(limit)
 
 
-@app.post("/agent/inbox/approve")
-async def agent_inbox_approve(req: InboxDecision) -> Dict[str, Any]:
+@app.post("/agent/inbox/approve", response_model=TaskRunResponse)
+async def agent_inbox_approve(req: InboxDecision) -> TaskRunResponse:
     item = agent_inbox.get_task(req.task_id)
     if not item:
         raise HTTPException(status_code=404, detail="not_found")
@@ -661,25 +674,25 @@ async def agent_inbox_approve(req: InboxDecision) -> Dict[str, Any]:
         context = req.edit_context or item.get("context", {})
         result = run_task(item["task_id"], context)
         agent_inbox.mark_as_resolved(req.task_id, "approved", req.notes or "")
-        return {"status": "approved", "result": result}
+        return TaskRunResponse(status="approved", result=result)
     if req.decision == "reject":
         agent_inbox.mark_as_resolved(req.task_id, "rejected", req.notes or "")
-        return {"status": "rejected"}
+        return TaskRunResponse(status="rejected", result=None)
     if req.decision == "edit":
         context = req.edit_context or item.get("context", {})
         result = run_task(item["task_id"], context)
         agent_inbox.mark_as_resolved(req.task_id, "edited", req.notes or "")
-        return {"status": "edited", "result": result}
+        return TaskRunResponse(status="edited", result=result)
     raise HTTPException(status_code=400, detail="invalid_decision")
 
 
-@app.post("/agent/inbox/delay")
-async def agent_inbox_delay(req: DelayRequest) -> Dict[str, Any]:
+@app.post("/agent/inbox/delay", response_model=StatusResponse)
+async def agent_inbox_delay(req: DelayRequest) -> StatusResponse:
     item = agent_inbox.get_task(req.task_id)
     if not item:
         raise HTTPException(status_code=404, detail="not_found")
     task_rescheduler.record_delay(req.task_id, req.delay_until, req.note, req.fallback)
-    return {"status": "delayed"}
+    return StatusResponse(status="delayed")
 
 
 @app.get("/agent/inbox/summary")
