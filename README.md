@@ -11,12 +11,12 @@ This repository contains a lightweight task runner and API server used by the Br
    ```
    Fill in the required API keys inside `.env`.
 
-2. (Optional) Enable HTTP Basic Auth by defining users:
+2. (Optional) Enable JWT auth by defining users:
    ```bash
    export BASIC_AUTH_USERS='{"admin": "secret"}'
    export ADMIN_USERS=admin
    ```
-   All routes will then require authentication.
+   Obtain a token via `/auth/token` and use it as `Bearer <token>` for requests.
 
 3. Launch the server:
    ```bash

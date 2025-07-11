@@ -6,15 +6,19 @@ from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, Form
-from fastapi.security import HTTPBasic, HTTPBasicCredentials
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, Form, Header
+from fastapi.security import OAuth2PasswordBearer
+import jwt
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
+from core.settings import Settings
 
 from db.models import File as DBFile, Message, Task, Thread
 from db.session import SessionLocal
 
-security = HTTPBasic(auto_error=False)
+settings = Settings()
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token", auto_error=False)
 USERS = {}
 if os.getenv("BASIC_AUTH_USERS"):
     try:
@@ -42,15 +46,23 @@ def get_db():
 
 def get_identity(
     request: Request,
-    credentials: HTTPBasicCredentials = Depends(security),
+    token: str = Depends(oauth2_scheme),
 ) -> str:
-    """Authenticate via Basic auth or agent key."""
+    """Authenticate via JWT bearer or agent key."""
     if not USERS and not AGENT_KEYS:
         return "anonymous"
-    if USERS and credentials:
-        pw = USERS.get(credentials.username)
-        if pw and credentials.password == pw:
-            return credentials.username
+    if USERS and token:
+        try:
+            payload = jwt.decode(
+                token,
+                settings.JWT_SECRET,
+                algorithms=[settings.JWT_ALGORITHM],
+            )
+            username = payload.get("sub")
+            if username in USERS:
+                return username
+        except Exception:
+            pass
     key = request.headers.get("X-Agent-Key")
     if AGENT_KEYS and key:
         for name, val in AGENT_KEYS.items():

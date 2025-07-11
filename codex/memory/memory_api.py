@@ -2,7 +2,7 @@ from __future__ import annotations
 
 """REST API for memory operations."""
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Header
 from pydantic import BaseModel
 from typing import Optional, List, Dict
 from response_models import (
@@ -13,6 +13,7 @@ from response_models import (
 )
 
 from core.settings import Settings
+import os
 import uuid
 
 from . import memory_store
@@ -144,7 +145,12 @@ async def relay_handler(payload: RelayInput) -> StatusResponse:
 
 
 @router.post("/memory/gemini-sync", response_model=StatusResponse)
-async def gemini_sync(payload: GeminiRowInput) -> StatusResponse:
+async def gemini_sync(
+    payload: GeminiRowInput, x_webhook_secret: str | None = Header(default=None)
+) -> StatusResponse:
+    secret = os.getenv("GEMINI_WEBHOOK_SECRET")
+    if secret and secret != x_webhook_secret:
+        raise HTTPException(status_code=401, detail="invalid_signature")
     """Handle Google Sheets webhook rows from Gemini."""
     title = payload.values[0] if payload.values else "gemini"
     content = "\n".join(payload.values)

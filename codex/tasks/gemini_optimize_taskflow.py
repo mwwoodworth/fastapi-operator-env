@@ -16,14 +16,14 @@ REQUIRED_FIELDS: list[str] = []
 logger = logging.getLogger(__name__)
 
 
-def _resolve_history(value: str | None) -> str:
+def _resolve_history(value: str | None, session_id: str | None = None) -> str:
     if value:
         return value
-    return memory_store.load_recent(5)
+    return memory_store.load_recent(5, session_id)
 
 
 def run(context: Dict[str, Any]) -> Dict[str, Any]:
-    history = _resolve_history(context.get("history"))
+    history = _resolve_history(context.get("history"), context.get("session_id"))
     prompt = (
         "Analyze the following task history and propose an optimized JSON workflo"
         "w. Respond only with JSON.\n"
