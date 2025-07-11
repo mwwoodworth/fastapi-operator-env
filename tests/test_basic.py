@@ -152,6 +152,15 @@ def test_phase18_knowledge_routes():
     assert resp.status_code == 200
 
 
+def test_knowledge_vector_routes():
+    resp = client.post("/knowledge/doc/upload", json={"content": "hello world"})
+    assert resp.status_code == 200
+
+    resp = client.get("/knowledge/search?q=hello")
+    assert resp.status_code == 200
+    assert "results" in resp.json()
+
+
 def test_dashboard_metrics():
     resp = client.get("/dashboard/metrics")
     assert resp.status_code == 200

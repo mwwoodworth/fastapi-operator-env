@@ -106,6 +106,8 @@ Additional helpful endpoints:
 - `/dashboard/products` - marketplace-ready documents.
 - `/dashboard/export` - export markdown system.
 - `/memory/search` - search memories with filters.
+- `/knowledge/doc/upload` - add a new knowledge document with vector embedding.
+- `/knowledge/search` - semantic search across uploaded documents.
 - `/logs/errors` - recent error entries.
 - `/mobile/task` - quick mobile task capture.
 - `/agent/forecast/weekly` - generate a 7-day forecast plan.

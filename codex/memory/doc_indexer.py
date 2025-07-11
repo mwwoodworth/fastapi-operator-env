@@ -7,6 +7,11 @@ import os
 from pathlib import Path
 from typing import Any, Dict, List
 
+try:
+    from supabase_client import supabase
+except Exception:  # pragma: no cover - missing deps
+    supabase = None
+
 DOC_DIR = Path(os.getenv("KNOWLEDGE_DOC_DIR", "data/docs"))
 INDEX_FILE = DOC_DIR.parent / "doc_index.json"
 
@@ -26,8 +31,18 @@ def index_documents() -> List[Dict[str, Any]]:
     return docs
 
 
-def search(query: str) -> List[Dict[str, Any]]:
-    """Return docs containing the query string."""
+def search(query: str, limit: int = 3) -> List[Dict[str, Any]]:
+    """Semantic search of documents with vector fallback to substring."""
+    if supabase:
+        try:  # pragma: no cover - network
+            res = supabase.rpc(
+                "match_documents",
+                {"query_text": query, "match_count": limit},
+            ).execute()
+            return list(res.data or [])
+        except Exception:  # noqa: BLE001
+            pass
+
     if not INDEX_FILE.exists():
         index_documents()
     try:
@@ -48,6 +63,8 @@ def search(query: str) -> List[Dict[str, Any]]:
                     "source_url": item.get("path"),
                 }
             )
+            if len(results) >= limit:
+                break
     return results
 
 
