@@ -12,7 +12,7 @@ import httpx
 from typing import Any, Dict, List
 
 from fastapi import FastAPI, HTTPException, Request, Header, UploadFile, File, Depends
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 import secrets as pysecrets
@@ -44,6 +44,8 @@ from codex.ai.gemini_webhook import router as gemini_webhook_router
 from chat_task_api import router as chat_task_router
 import codex.ai.claude_sync as claude_sync
 from utils.ai_router import get_ai_model
+from claude_utils import stream_claude
+from gpt_utils import stream_gpt
 from response_models import (
     ChatResponse,
     TaskRunResponse,
@@ -207,12 +209,62 @@ async def nl_design(req: NLDesignRequest) -> Dict[str, Any]:
 
 
 @app.post("/chat", response_model=ChatResponse)
-async def chat_endpoint(req: ChatRequest) -> ChatResponse:
+async def chat_endpoint(req: ChatRequest):
     model = req.model or get_ai_model(task="chat")
     scope = _resolve_scope(req.memory_scope)
     mem_text = memory_store.load_recent(scope)
     system_prompt = settings.CHAT_SYSTEM_PROMPT
     prompt = f"{system_prompt}\n\nRecent memory:\n{mem_text}\nUser: {req.message}\nAssistant:"
+
+    if req.stream:
+        async def event_generator():
+            """Async generator yielding SSE tokens."""
+            full = ""
+            try:
+                gen = stream_claude(prompt) if model == "claude" else stream_gpt(prompt)
+                async for token in gen:
+                    full += token
+                    # Send each token as a SSE data chunk
+                    yield f"data: {token}\n\n"
+            finally:
+                task_suggestions = run_task(
+                    "chat_to_prompt",
+                    {"message": req.message, "model": "claude", "memory_scope": scope},
+                )
+                suggested = task_suggestions.get("tasks") or task_suggestions.get("generated")
+                entry_id = str(uuid.uuid4())
+                memory_entry = {
+                    "id": entry_id,
+                    "type": "chat",
+                    "source": "chat",
+                    "model": model,
+                    "input": req.message,
+                    "output": full,
+                    "tags": ["chat", "interactive"],
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                }
+                memory_store.save_memory(memory_entry)
+
+                log_path = Path(f"logs/chat_{model}.json")
+                history: list[dict[str, Any]] = []
+                if log_path.exists():
+                    try:
+                        history = json.loads(log_path.read_text())
+                    except Exception:  # noqa: BLE001
+                        history = []
+                history.append(
+                    {
+                        "prompt": prompt,
+                        "memory": mem_text,
+                        "result": full,
+                        "timestamp": memory_entry["timestamp"],
+                        "suggested": suggested,
+                    }
+                )
+                log_path.write_text(json.dumps(history[-200:], indent=2))
+
+        return StreamingResponse(event_generator(), media_type="text/event-stream")
+
     ai_result = (
         claude_prompt.run({"prompt": prompt})
         if model == "claude"

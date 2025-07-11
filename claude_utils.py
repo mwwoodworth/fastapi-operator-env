@@ -30,3 +30,19 @@ async def run_claude(prompt: str) -> str:
         response = await client.post(ANTHROPIC_API_URL, headers=HEADERS, json=payload)
         response.raise_for_status()
         return response.json()["content"][0]["text"]
+
+
+async def stream_claude(prompt: str):
+    """Yield Claude tokens using Anthropic streaming API."""
+    import anthropic
+
+    client = anthropic.AsyncAnthropic(api_key=CLAUDE_API_KEY)
+    async with client.messages.stream(
+        model=CLAUDE_MODEL,
+        max_tokens=1024,
+        temperature=0.7,
+        messages=[{"role": "user", "content": prompt}],
+    ) as stream:
+        async for event in stream:
+            if event.type == "content_block_delta":
+                yield event.delta.text
