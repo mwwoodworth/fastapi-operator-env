@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "generate:sdk": "npx openapi-typescript-codegen --input ../openapi.json --output lib/sdk --useOptions --exportSchemas"
   },
   "dependencies": {
     "@radix-ui/react-popover": "^1.0.4",
