@@ -4,7 +4,13 @@ from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional, List, Dict
+from response_models import (
+    DocumentWriteResponse,
+    DocumentUpdateResponse,
+    QueryResultsResponse,
+    StatusResponse,
+)
 
 from core.settings import Settings
 import uuid
@@ -64,8 +70,8 @@ class GeminiRowInput(BaseModel):
     values: List[str]
 
 
-@router.post("/memory/query")
-async def query_memory(payload: QueryInput) -> dict:
+@router.post("/memory/query", response_model=QueryResultsResponse)
+async def query_memory(payload: QueryInput) -> QueryResultsResponse:
     """Vector search fallback to keyword match."""
     results: List[dict] = []
     if supabase:
@@ -82,11 +88,11 @@ async def query_memory(payload: QueryInput) -> dict:
             results = []
     if not results:
         results = memory_store.search(payload.query, limit=payload.top_k)
-    return {"results": results}
+    return QueryResultsResponse(results=results)
 
 
-@router.post("/memory/write")
-async def write_memory(payload: WriteInput) -> dict:
+@router.post("/memory/write", response_model=DocumentWriteResponse)
+async def write_memory(payload: WriteInput) -> DocumentWriteResponse:
     """Create project/agent if needed and store document chunks."""
     project_id = get_or_create_project(payload.project_id)
     agent_id = get_or_create_agent(payload.author_id, "user")
@@ -107,11 +113,11 @@ async def write_memory(payload: WriteInput) -> dict:
                 "title": payload.title,
             }
         )
-    return {"document_id": doc_id, "chunks": len(chunks)}
+    return DocumentWriteResponse(document_id=doc_id, chunks=len(chunks))
 
 
-@router.post("/memory/update")
-async def update_memory(payload: UpdateInput) -> dict:
+@router.post("/memory/update", response_model=DocumentUpdateResponse)
+async def update_memory(payload: UpdateInput) -> DocumentUpdateResponse:
     """Replace document content and re-embed."""
     update_document(payload.document_id, payload.content)
     chunks = chunk_text(payload.content)
@@ -126,19 +132,19 @@ async def update_memory(payload: UpdateInput) -> dict:
                 "embedding": vectors[idx],
             }
         )
-    return {"status": "updated", "chunks": len(chunks)}
+    return DocumentUpdateResponse(status="updated", chunks=len(chunks))
 
 
-@router.post("/memory/relay")
-async def relay_handler(payload: RelayInput) -> dict:
+@router.post("/memory/relay", response_model=StatusResponse)
+async def relay_handler(payload: RelayInput) -> StatusResponse:
     """Generic relay endpoint for external sources."""
     entry = {"task": payload.type, "payload": payload.payload}
     memory_store.save_memory(entry)
-    return {"status": "logged"}
+    return StatusResponse(status="logged")
 
 
-@router.post("/memory/gemini-sync")
-async def gemini_sync(payload: GeminiRowInput) -> dict:
+@router.post("/memory/gemini-sync", response_model=StatusResponse)
+async def gemini_sync(payload: GeminiRowInput) -> StatusResponse:
     """Handle Google Sheets webhook rows from Gemini."""
     title = payload.values[0] if payload.values else "gemini"
     content = "\n".join(payload.values)
@@ -149,4 +155,4 @@ async def gemini_sync(payload: GeminiRowInput) -> dict:
         author_id="gemini",
     )
     await write_memory(data)
-    return {"status": "synced"}
+    return StatusResponse(status="synced")
