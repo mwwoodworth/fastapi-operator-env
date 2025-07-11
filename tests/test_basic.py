@@ -184,7 +184,7 @@ def test_search_and_error_logs():
     assert "entries" in resp.json()
 
 
-def test_basic_auth_enforced():
+def test_jwt_auth_enforced():
     os.environ["BASIC_AUTH_USERS"] = '{"user":"pass"}'
     os.environ["ADMIN_USERS"] = "user"
     import importlib
@@ -194,5 +194,12 @@ def test_basic_auth_enforced():
     auth_client = TestClient(main_module.app)
     resp = auth_client.get("/health")
     assert resp.status_code == 401
-    resp = auth_client.get("/health", auth=("user", "pass"))
+    token_resp = auth_client.post(
+        "/auth/token",
+        data={"username": "user", "password": "pass"},
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+    )
+    assert token_resp.status_code == 200
+    token = token_resp.json()["access_token"]
+    resp = auth_client.get("/health", headers={"Authorization": f"Bearer {token}"})
     assert resp.status_code == 200

@@ -155,9 +155,12 @@ def query(tags: List[str] | None = None, limit: int = 10) -> List[Dict[str, Any]
     return records[-limit:]
 
 
-def load_recent(limit: int = 5) -> str:
+def load_recent(limit: int = 5, session_id: str | None = None) -> str:
     """Return recent memory entries concatenated as text."""
-    records = fetch_all(limit=limit)
+    records = fetch_all(limit=1000)
+    if session_id:
+        records = [r for r in records if r.get("session_id") == session_id]
+    records = records[-limit:]
     return "\n\n".join(str(r.get("output") or r) for r in records)
 
 

@@ -24,7 +24,8 @@ def run(context: Dict[str, Any]) -> Dict[str, Any]:
         return {"error": "missing_message"}
 
     limit = int(context.get("memory_scope", 5))
-    mem_text = memory_store.load_recent(limit)
+    session = context.get("session_id")
+    mem_text = memory_store.load_recent(limit, session)
 
     model = context.get("model") or get_ai_model(task=TASK_ID)
 

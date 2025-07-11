@@ -14,8 +14,11 @@ from typing import Any, Dict, List
 from fastapi import FastAPI, HTTPException, Request, Header, UploadFile, File, Depends
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi.security import HTTPBasic, HTTPBasicCredentials
-import secrets as pysecrets
+from fastapi.security import (
+    OAuth2PasswordBearer,
+    OAuth2PasswordRequestForm,
+)
+import jwt
 from pydantic import BaseModel
 from utils.slack import send_slack_message
 from db.session import init_db
@@ -65,8 +68,8 @@ from response_models import (
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("brainops.api")
 
-security = HTTPBasic(auto_error=False)
-USERS = {}
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token", auto_error=False)
+USERS: dict[str, str] = {}
 ADMIN_USERS: set[str] = set()
 
 if settings.BASIC_AUTH_USERS:
@@ -77,31 +80,40 @@ if settings.BASIC_AUTH_USERS:
 ADMIN_USERS = set((settings.ADMIN_USERS or "").split(","))
 
 
-def get_current_user(credentials: HTTPBasicCredentials = Depends(security)) -> str:
+def _decode_token(token: str) -> dict:
+    try:
+        return jwt.decode(token, settings.JWT_SECRET, algorithms=[settings.JWT_ALGORITHM])
+    except Exception as exc:  # noqa: BLE001
+        logger.error("JWT decode failed: %s", exc)
+        raise HTTPException(status_code=401, detail="invalid_token") from exc
+
+
+def get_current_user(request: Request, token: str | None = Depends(oauth2_scheme)) -> str:
+    if request.url.path == "/auth/token":
+        return "anonymous"
     if not USERS:
         return "anonymous"
-    if credentials is None:
-        raise HTTPException(
-            status_code=401,
-            detail="Unauthorized",
-            headers={"WWW-Authenticate": "Basic"},
-        )
-    correct_password = USERS.get(credentials.username)
-    if not correct_password or not pysecrets.compare_digest(
-        credentials.password, correct_password
-    ):
-        raise HTTPException(
-            status_code=401,
-            detail="Unauthorized",
-            headers={"WWW-Authenticate": "Basic"},
-        )
-    return credentials.username
+    if not token:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    payload = _decode_token(token)
+    username = payload.get("sub")
+    if not username or username not in USERS:
+        raise HTTPException(status_code=401, detail="invalid_user")
+    return username
 
 
-def require_admin(user: str = Depends(get_current_user)) -> str:
-    if USERS and user not in ADMIN_USERS:
+def require_admin(token: str = Depends(oauth2_scheme)) -> str:
+    if not token:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    payload = _decode_token(token)
+    username = payload.get("sub")
+    roles = payload.get("roles") or payload.get("role")
+    if isinstance(roles, str):
+        roles = [roles]
+    roles = roles or []
+    if username not in ADMIN_USERS and "admin" not in roles:
         raise HTTPException(status_code=403, detail="not authorized")
-    return user
+    return username
 
 
 @asynccontextmanager
@@ -130,6 +142,19 @@ app.mount("/dashboard/ui", dashboard_app)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
+@app.post("/auth/token")
+async def auth_token(form: OAuth2PasswordRequestForm = Depends()) -> dict:
+    if not USERS:
+        raise HTTPException(status_code=401, detail="auth_disabled")
+    pw = USERS.get(form.username)
+    if not pw or pw != form.password:
+        raise HTTPException(status_code=401, detail="invalid_credentials")
+    roles = ["admin"] if form.username in ADMIN_USERS else ["user"]
+    payload = {"sub": form.username, "roles": roles}
+    token = jwt.encode(payload, settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM)
+    return {"access_token": token, "token_type": "bearer"}
+
+
 class TanaRequest(BaseModel):
     content: str
 
@@ -149,12 +174,14 @@ class ChatRequest(BaseModel):
     model: str | None = None
     memory_scope: str | int | None = 5
     stream: bool | None = False
+    session_id: str | None = None
 
 
 class ChatToTaskRequest(BaseModel):
     message: str
     model: str | None = None
     memory_scope: str | int | None = 5
+    session_id: str | None = None
 
 
 class KnowledgeQueryRequest(BaseModel):
@@ -219,7 +246,7 @@ async def nl_design(req: NLDesignRequest) -> Dict[str, Any]:
 async def chat_endpoint(req: ChatRequest):
     model = req.model or get_ai_model(task="chat")
     scope = _resolve_scope(req.memory_scope)
-    mem_text = memory_store.load_recent(scope)
+    mem_text = memory_store.load_recent(scope, req.session_id)
     system_prompt = settings.CHAT_SYSTEM_PROMPT
     prompt = f"{system_prompt}\n\nRecent memory:\n{mem_text}\nUser: {req.message}\nAssistant:"
 
@@ -236,7 +263,12 @@ async def chat_endpoint(req: ChatRequest):
             finally:
                 task_suggestions = run_task(
                     "chat_to_prompt",
-                    {"message": req.message, "model": "claude", "memory_scope": scope},
+                    {
+                        "message": req.message,
+                        "model": "claude",
+                        "memory_scope": scope,
+                        "session_id": req.session_id,
+                    },
                 )
                 suggested = task_suggestions.get("tasks") or task_suggestions.get("generated")
                 entry_id = str(uuid.uuid4())
@@ -249,6 +281,7 @@ async def chat_endpoint(req: ChatRequest):
                     "output": full,
                     "tags": ["chat", "interactive"],
                     "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "session_id": req.session_id,
                 }
                 memory_store.save_memory(memory_entry)
 
@@ -281,7 +314,12 @@ async def chat_endpoint(req: ChatRequest):
 
     task_suggestions = run_task(
         "chat_to_prompt",
-        {"message": req.message, "model": "claude", "memory_scope": scope},
+        {
+            "message": req.message,
+            "model": "claude",
+            "memory_scope": scope,
+            "session_id": req.session_id,
+        },
     )
     suggested = task_suggestions.get("tasks") or task_suggestions.get("generated")
 
@@ -295,6 +333,7 @@ async def chat_endpoint(req: ChatRequest):
         "output": completion,
         "tags": ["chat", "interactive"],
         "timestamp": datetime.now(timezone.utc).isoformat(),
+        "session_id": req.session_id,
     }
     memory_store.save_memory(memory_entry)
 
@@ -330,12 +369,18 @@ async def chat_to_task(req: ChatToTaskRequest) -> Dict[str, Any]:
         "message": req.message,
         "model": req.model,
         "memory_scope": req.memory_scope,
+        "session_id": req.session_id,
     }
     return run_task("chat_to_prompt", context)
 
 
 @app.post("/task/webhook", response_model=TaskRunResponse)
-async def webhook_trigger(req: dict) -> TaskRunResponse:
+async def webhook_trigger(
+    req: dict, x_webhook_secret: str | None = Header(default=None)
+) -> TaskRunResponse:
+    secret = settings.TASK_WEBHOOK_SECRET
+    if secret and secret != x_webhook_secret:
+        raise HTTPException(status_code=401, detail="invalid_signature")
     task = req.get("task")
     context = req.get("context", {})
     result = run_task(task, context)
@@ -646,11 +691,14 @@ async def memory_trace(task_id: str) -> MemoryTraceResponse:
 
 @app.get("/chat/history", response_model=MemoryEntriesResponse)
 async def chat_history(
-    limit: int = 20, model: str | None = None, tags: str = ""
+    limit: int = 20, model: str | None = None, tags: str = "", session_id: str | None = None
 ) -> MemoryEntriesResponse:
     tag_list = [t.strip() for t in tags.split(",") if t.strip()]
     tag_list.append("chat")
-    records = memory_store.query(tag_list, limit=limit)
+    records = memory_store.query(tag_list, limit=limit * 5)
+    if session_id:
+        records = [r for r in records if r.get("session_id") == session_id]
+    records = records[-limit:]
     if model:
         records = [r for r in records if r.get("model") == model]
     return MemoryEntriesResponse(entries=records)
@@ -796,7 +844,12 @@ class StatusUpdate(BaseModel):
 
 
 @app.post("/webhook/status-update", response_model=StatusResponse)
-async def status_update(req: StatusUpdate) -> StatusResponse:
+async def status_update(
+    req: StatusUpdate, x_webhook_secret: str | None = Header(default=None)
+) -> StatusResponse:
+    secret = settings.STATUS_UPDATE_SECRET
+    if secret and secret != x_webhook_secret:
+        raise HTTPException(status_code=401, detail="invalid_signature")
     entry = req.dict()
     entry["tags"] = ["status_update"]
     memory_store.save_memory(entry)

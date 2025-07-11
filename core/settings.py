@@ -75,6 +75,11 @@ class Settings(BaseSettings):
 
     BASIC_AUTH_USERS: str | None = None
     ADMIN_USERS: str | None = None
+    JWT_SECRET: str = "change-me"
+    JWT_ALGORITHM: str = "HS256"
+    TASK_WEBHOOK_SECRET: str | None = None
+    STATUS_UPDATE_SECRET: str | None = None
+    GEMINI_WEBHOOK_SECRET: str | None = None
     SLACK_WEBHOOK_URL: str | None = None
     SLACK_SIGNING_SECRET: str | None = None
     STRIPE_WEBHOOK_SECRET: str | None = None
