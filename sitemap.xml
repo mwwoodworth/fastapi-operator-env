@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+    <url>
+         <loc>https://brain-stack-studio.github.io/fastapi-operator-env/</loc>
+         <lastmod>2025-07-11</lastmod>
+    </url>
+    <url>
+         <loc>https://brain-stack-studio.github.io/fastapi-operator-env/api_reference/</loc>
+         <lastmod>2025-07-11</lastmod>
+    </url>
+    <url>
+         <loc>https://brain-stack-studio.github.io/fastapi-operator-env/backlog/</loc>
+         <lastmod>2025-07-11</lastmod>
+    </url>
+    <url>
+         <loc>https://brain-stack-studio.github.io/fastapi-operator-env/master_guide/</loc>
+         <lastmod>2025-07-11</lastmod>
+    </url>
+    <url>
+         <loc>https://brain-stack-studio.github.io/fastapi-operator-env/production_checklist/</loc>
+         <lastmod>2025-07-11</lastmod>
+    </url>
+</urlset>
