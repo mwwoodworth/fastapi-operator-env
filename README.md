@@ -80,6 +80,8 @@ New automation tasks power BrainStackStudio's publishing workflow:
 - `autopublish_content` – publish an article to the site, trigger Make.com marketplace uploads and optionally send a newsletter.
 - `sync_sale` – notify Make.com of a new sale to start onboarding and CRM sync.
 - `generate_product_docs` – create product docs with Claude and push them to your documentation site.
+- `parse_eagleview_report` – convert EagleView JSON into a CSV quantity take‑off.
+- `generate_roof_estimate` – calculate material and labor costs from roof quantities.
 
 See `docs/production_checklist.md` for a go-live checklist.
 
