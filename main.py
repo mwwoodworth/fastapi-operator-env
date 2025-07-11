@@ -58,6 +58,8 @@ from response_models import (
     StatusResponse,
     ValueResponse,
     VoiceUploadResponse,
+    KnowledgeDocUploadResponse,
+    KnowledgeSearchResponse,
 )
 
 logging.basicConfig(level=logging.INFO)
@@ -159,6 +161,11 @@ class KnowledgeQueryRequest(BaseModel):
     query: str
     sources: list[str] | None = None
     model: str | None = None
+
+
+class KnowledgeDocUploadRequest(BaseModel):
+    content: str
+    metadata: Dict[str, Any] | None = None
 
 
 def _resolve_scope(scope: str | int | None) -> int:
@@ -455,6 +462,44 @@ async def knowledge_sources() -> Dict[str, Any]:
     from codex.memory import doc_indexer
 
     return {"docs": doc_indexer.list_sources()}
+
+
+@app.post("/knowledge/doc/upload", response_model=KnowledgeDocUploadResponse)
+async def knowledge_doc_upload(
+    req: KnowledgeDocUploadRequest,
+) -> KnowledgeDocUploadResponse:
+    from codex.memory.memory_utils import embed_chunks
+    try:
+        from supabase_client import supabase
+    except Exception:  # pragma: no cover - missing deps
+        supabase = None
+
+    vector = embed_chunks([req.content])[0]
+    doc_id: int | None = None
+    if supabase:
+        try:  # pragma: no cover - network
+            res = (
+                supabase.table("documents")
+                .insert({
+                    "content": req.content,
+                    "metadata": req.metadata or {},
+                    "embedding": vector,
+                })
+                .execute()
+            )
+            if res.data:
+                doc_id = res.data[0].get("id")
+        except Exception:  # noqa: BLE001
+            doc_id = None
+    return KnowledgeDocUploadResponse(id=doc_id)
+
+
+@app.get("/knowledge/search", response_model=KnowledgeSearchResponse)
+async def knowledge_search(q: str, limit: int = 5) -> KnowledgeSearchResponse:
+    from codex.memory import doc_indexer
+
+    results = doc_indexer.search(q, limit)
+    return KnowledgeSearchResponse(results=results)
 
 
 @app.get("/logs/rag", response_model=MemoryEntriesResponse)

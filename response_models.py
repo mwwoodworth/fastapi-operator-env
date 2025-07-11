@@ -102,3 +102,20 @@ class MemoryTraceResponse(BaseModel):
     executed_by: Optional[str] = None
     output: Any | None = None
 
+
+class KnowledgeDocUploadResponse(BaseModel):
+    """Response for uploaded knowledge documents."""
+
+    id: Optional[int] = None
+
+
+class KnowledgeSearchResult(BaseModel):
+    id: Optional[int] = None
+    content: Optional[str] = None
+    metadata: Optional[Dict[str, Any]] = None
+    score: Optional[float] = None
+
+
+class KnowledgeSearchResponse(BaseModel):
+    results: List[KnowledgeSearchResult]
+
