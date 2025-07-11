@@ -40,6 +40,7 @@ from codex.tasks import (
 )
 
 from codex import get_registry, run_task
+from celery_app import celery_app, long_task
 from codex.memory import memory_store, agent_inbox
 from codex.integrations.make_webhook import router as make_webhook_router
 from codex.memory.memory_api import router as memory_api_router
@@ -240,6 +241,24 @@ async def nl_design(req: NLDesignRequest) -> Dict[str, Any]:
     if req.model:
         context["model"] = req.model
     return run_task("nl_task_designer", context)
+
+
+class LongTaskRequest(BaseModel):
+    duration: int = 5
+
+
+@app.post("/tasks/long")
+async def queue_long_task(req: LongTaskRequest) -> Dict[str, Any]:
+    result = long_task.delay(req.duration)
+    return {"task_id": result.id}
+
+
+@app.get("/tasks/status/{task_id}")
+async def task_status(task_id: str) -> Dict[str, Any]:
+    res = celery_app.AsyncResult(task_id)
+    if res.successful():
+        return {"status": res.state, "result": res.result}
+    return {"status": res.state}
 
 
 @app.post("/chat", response_model=ChatResponse)
