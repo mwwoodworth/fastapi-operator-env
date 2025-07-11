@@ -30,3 +30,21 @@ async def run_gpt(prompt: str) -> str:
         )
         response.raise_for_status()
         return response.json()["choices"][0]["message"]["content"]
+
+
+async def stream_gpt(prompt: str):
+    """Yield GPT tokens using OpenAI streaming API."""
+    import openai
+
+    client = openai.AsyncOpenAI(api_key=OPENAI_API_KEY)
+    stream = await client.chat.completions.create(
+        model=OPENAI_MODEL,
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.7,
+        max_tokens=1024,
+        stream=True,
+    )
+    async for chunk in stream:
+        token = chunk.choices[0].delta.content
+        if token:
+            yield token

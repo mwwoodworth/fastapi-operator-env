@@ -1,5 +1,6 @@
 'use client';
 import React, { useState } from 'react';
+import { readSSE } from '../utils/sse';
 
 interface Msg { role: 'user' | 'assistant'; text: string; }
 
@@ -13,19 +14,42 @@ export default function AssistantChatWidget() {
     if (!input.trim()) return;
     const user = input;
     setInput('');
-    setMsgs(m => [...m, { role: 'user', text: user }]);
+    let aiIndex = 0;
+    setMsgs(prev => {
+      aiIndex = prev.length + 1;
+      return [...prev, { role: 'user', text: user }, { role: 'assistant', text: '' }];
+    });
     setLoading(true);
     try {
       const res = await fetch('/api/assistant/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: user }),
+        body: JSON.stringify({ message: user, stream: true }),
       });
-      const data = await res.json();
-      const text = data.response || data.result || data.completion || '';
-      setMsgs(m => [...m, { role: 'assistant', text }]);
+      if (res.headers.get('content-type')?.includes('text/event-stream')) {
+        // Consume token stream and append chunks in real time
+        await readSSE(res, token => {
+          setMsgs(m => {
+            const copy = [...m];
+            copy[aiIndex].text += token;
+            return copy;
+          });
+        });
+      } else {
+        const data = await res.json();
+        const text = data.response || data.result || data.completion || '';
+        setMsgs(m => {
+          const copy = [...m];
+          copy[aiIndex].text = text;
+          return copy;
+        });
+      }
     } catch (e) {
-      setMsgs(m => [...m, { role: 'assistant', text: 'Error' }]);
+      setMsgs(m => {
+        const copy = [...m];
+        copy[aiIndex].text = 'Error';
+        return copy;
+      });
     } finally {
       setLoading(false);
     }
