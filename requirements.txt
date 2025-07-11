@@ -18,3 +18,5 @@ alembic
 PyJWT
 celery
 redis
+loguru
+prometheus_client

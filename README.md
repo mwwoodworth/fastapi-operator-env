@@ -1,6 +1,10 @@
 # BrainOps Operator Environment
 
+[![CI](https://github.com/brain-stack-studio/fastapi-operator-env/actions/workflows/ci.yml/badge.svg)](https://github.com/brain-stack-studio/fastapi-operator-env/actions/workflows/ci.yml)
+
 This repository contains a lightweight task runner and API server used by the BrainOps automation system. Tasks can be executed via CLI, HTTP API or Make.com webhooks.
+
+Continuous integration runs linting, type checks and tests with coverage to ensure code quality.
 
 ## Getting Started
 
@@ -100,6 +104,7 @@ Additional helpful endpoints:
 - `/agent/inbox/summary` - inbox counts overview.
 - `/dashboard/full` - extended operator metrics.
 - `/dashboard/metrics` - summary counts of tasks and memory logs.
+- `/metrics` - Prometheus metrics for monitoring.
 - `/dashboard/ui` - live dashboard interface.
 - `/dashboard/copilot-v2` - memory-assisted Copilot v2.
 - `/dashboard/pipeline` - Claude category pipelines.
