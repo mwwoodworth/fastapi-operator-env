@@ -76,6 +76,9 @@ class Settings(BaseSettings):
     BASIC_AUTH_USERS: str | None = None
     ADMIN_USERS: str | None = None
     SLACK_WEBHOOK_URL: str | None = None
+    SLACK_SIGNING_SECRET: str | None = None
+    STRIPE_WEBHOOK_SECRET: str | None = None
+    CLICKUP_API_TOKEN: str | None = None
 
     class Config:
         env_file = ".env"

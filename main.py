@@ -356,6 +356,92 @@ async def github_webhook(
     return result
 
 
+def _verify_stripe(payload: bytes, sig_header: str | None) -> bool:
+    secret = settings.STRIPE_WEBHOOK_SECRET
+    if not secret or not sig_header:
+        return True
+    import hmac
+    import hashlib
+
+    try:
+        parts = {s.split("=", 1)[0]: s.split("=", 1)[1] for s in sig_header.split(",")}
+        timestamp = parts.get("t")
+        signature = parts.get("v1")
+        if not timestamp or not signature:
+            return False
+        msg = f"{timestamp}.{payload.decode()}".encode()
+        digest = hmac.new(secret.encode(), msg, hashlib.sha256).hexdigest()
+        expected = digest
+        return hmac.compare_digest(expected, signature)
+    except Exception:
+        return False
+
+
+@app.post("/webhook/stripe")
+async def stripe_webhook(request: Request) -> Dict[str, Any]:
+    """Handle Stripe sale events and enqueue ``sync_sale`` task."""
+    raw = await request.body()
+    sig = request.headers.get("Stripe-Signature")
+    if not _verify_stripe(raw, sig):
+        raise HTTPException(status_code=401, detail="invalid_signature")
+
+    try:
+        payload = json.loads(raw.decode())
+    except Exception:  # noqa: BLE001
+        raise HTTPException(status_code=400, detail="invalid_payload")
+
+    obj = payload.get("data", {}).get("object", {})
+    context = {
+        "email": obj.get("customer_email") or obj.get("receipt_email"),
+        "product": obj.get("description") or payload.get("type"),
+        "amount": obj.get("amount_total") or obj.get("amount"),
+        "metadata": obj.get("metadata"),
+    }
+    run_task("sync_sale", context)
+    return {"status": "processed"}
+
+
+def _verify_slack(timestamp: str | None, sig: str | None, body: bytes) -> bool:
+    secret = settings.SLACK_SIGNING_SECRET
+    if not secret or not sig or not timestamp:
+        return True
+    import hmac
+    import hashlib
+
+    basestring = f"v0:{timestamp}:{body.decode()}".encode()
+    digest = hmac.new(secret.encode(), basestring, hashlib.sha256).hexdigest()
+    expected = f"v0={digest}"
+    return hmac.compare_digest(expected, sig)
+
+
+@app.post("/webhook/slack/command")
+async def slack_command(request: Request) -> Dict[str, Any]:
+    """Process Slack slash-command approvals for inbox tasks."""
+    raw = await request.body()
+    timestamp = request.headers.get("X-Slack-Request-Timestamp")
+    sig = request.headers.get("X-Slack-Signature")
+    if not _verify_slack(timestamp, sig, raw):
+        raise HTTPException(status_code=401, detail="invalid_signature")
+    form = await request.form()
+    text = form.get("text", "")
+    parts = text.split()
+    if len(parts) < 2:
+        return {"response_type": "ephemeral", "text": "Usage: approve|reject <id>"}
+    action, task_id = parts[0], parts[1]
+    item = agent_inbox.get_task(task_id)
+    if not item:
+        return {"response_type": "ephemeral", "text": "Task not found"}
+    if action == "approve":
+        result = run_task(item["task_id"], item.get("context", {}))
+        agent_inbox.mark_as_resolved(task_id, "approved", "via slack")
+        _ = result
+        return {"response_type": "in_channel", "text": f"Task {task_id} approved"}
+    if action == "reject":
+        agent_inbox.mark_as_resolved(task_id, "rejected", "via slack")
+        return {"response_type": "in_channel", "text": f"Task {task_id} rejected"}
+    return {"response_type": "ephemeral", "text": "Unknown command"}
+
+
 @app.get("/task/inspect/{task_id}")
 async def inspect_task(task_id: str) -> Dict[str, Any]:
     entry = memory_store.fetch_one(task_id)
