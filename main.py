@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import logging
+import sys
+from loguru import logger
 import json
 from datetime import datetime, timezone
 from contextlib import asynccontextmanager
@@ -10,9 +12,16 @@ from pathlib import Path
 import uuid
 import httpx
 from typing import Any, Dict, List
+from prometheus_client import (
+    Counter,
+    Gauge,
+    CollectorRegistry,
+    generate_latest,
+    CONTENT_TYPE_LATEST,
+)
 
 from fastapi import FastAPI, HTTPException, Request, Header, UploadFile, File, Depends
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.security import (
     OAuth2PasswordBearer,
@@ -25,6 +34,19 @@ from db.session import init_db
 from core.settings import Settings
 
 settings = Settings()
+
+# Prometheus metrics
+REGISTRY = CollectorRegistry()
+TASKS_EXECUTED = Counter(
+    "tasks_executed_total",
+    "Total tasks executed",
+    registry=REGISTRY,
+)
+MEMORY_ENTRIES = Gauge(
+    "memory_entries_total",
+    "Total memory entries",
+    registry=REGISTRY,
+)
 
 from codex.tasks import (
     secrets as secrets_task,
@@ -66,8 +88,19 @@ from response_models import (
     KnowledgeSearchResponse,
 )
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("brainops.api")
+class InterceptHandler(logging.Handler):
+    def emit(self, record: logging.LogRecord) -> None:
+        level = logger.level(record.levelname).name if record.levelname in logger._core.levels else record.levelno
+        logger.bind(module=record.module).opt(exception=record.exc_info).log(level, record.getMessage())
+
+logger.remove()
+logger.add(sys.stdout, serialize=True)
+
+def _slack_sink(message: "loguru.Message") -> None:
+    send_slack_message(message.record["message"])
+
+logger.add(_slack_sink, level="ERROR")
+logging.basicConfig(handlers=[InterceptHandler()], level=0, force=True)
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token", auto_error=False)
 USERS: dict[str, str] = {}
@@ -224,6 +257,7 @@ async def create_tana_node(req: TanaRequest) -> TanaNodeCreateResponse:
 async def task_run(req: TaskRunRequest) -> TaskRunResponse:
     try:
         result = run_task(req.task, req.context or {})
+        TASKS_EXECUTED.inc()
         return TaskRunResponse(status="success", result=result)
     except Exception as exc:  # noqa: BLE001
         logger.exception("Task execution failed")
@@ -250,6 +284,7 @@ class LongTaskRequest(BaseModel):
 @app.post("/tasks/long")
 async def queue_long_task(req: LongTaskRequest) -> Dict[str, Any]:
     result = long_task.delay(req.duration)
+    TASKS_EXECUTED.inc()
     return {"task_id": result.id}
 
 
@@ -1291,6 +1326,14 @@ async def diagnostics_state() -> Dict[str, Any]:
 @app.get("/tana/scan")
 async def tana_scan() -> Dict[str, Any]:
     return tana_node_executor.run({})
+
+
+@app.get("/metrics")
+async def metrics_endpoint() -> Response:
+    """Prometheus metrics endpoint."""
+    MEMORY_ENTRIES.set(memory_store.count_entries())
+    data = generate_latest(REGISTRY)
+    return Response(data, media_type=CONTENT_TYPE_LATEST)
 
 
 @app.get("/health")
