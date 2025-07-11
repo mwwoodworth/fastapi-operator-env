@@ -1,0 +1,11 @@
+site_name: BrainOps Operator
+site_url: https://brain-stack-studio.github.io/fastapi-operator-env/
+nav:
+  - Home: index.md
+  - Master Guide: master_guide.md
+  - Production Checklist: production_checklist.md
+  - API Reference: api_reference.md
+  - Backlog: backlog.md
+docs_dir: docs
+theme:
+  name: material

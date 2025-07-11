@@ -170,23 +170,6 @@ The same snippet works in Tana, Google Sites or any platform that allows iframes
 The dashboard includes a persistent chat widget that proxies to the FastAPI `/chat` endpoint via `/api/assistant/chat`.
 Use it to summarize memory or trigger tasks. Conversations are saved to Supabase for later review.
 
-## Documentation
-
-The full documentation site is published via [MkDocs](https://brain-stack-studio.github.io/fastapi-operator-env/). To run it locally:
-
-```bash
-pip install mkdocs mkdocs-material
-mkdocs serve
-```
-
-An OpenAPI schema is available at `/openapi.json`. A typed TypeScript SDK can be generated with:
-
-```bash
-curl http://localhost:10000/openapi.json -o openapi.json
-npx openapi-typescript-codegen --input openapi.json --output sdk --useOptions --exportSchemas
-```
-
-If you are working inside `dashboard_ui` simply run `npm run generate:sdk` to update the bundled client library.
 
 ### Icon Assets
 Icon files such as `favicon.svg` are not stored in this repository. After merging any changes, upload the required `.svg` and `.ico` assets manually on GitHub.
