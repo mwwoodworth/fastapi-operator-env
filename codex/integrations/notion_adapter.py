@@ -4,11 +4,6 @@ from __future__ import annotations
 
 from typing import List, Dict
 
+from .notion import search_notion_pages, get_page_snippet
 
-def search_notion_pages(query: str) -> List[Dict[str, str]]:
-    """Search Notion for pages matching the query.
-
-    Returns an empty list during tests or when API keys are missing.
-    """
-    _ = query
-    return []
+__all__ = ["search_notion_pages", "get_page_snippet"]
