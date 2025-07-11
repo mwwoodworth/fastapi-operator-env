@@ -1,7 +1,10 @@
 from cryptography.fernet import Fernet
-import os
 
-FERNET_SECRET = os.getenv("FERNET_SECRET")
+from core.settings import Settings
+
+settings = Settings()
+
+FERNET_SECRET = settings.FERNET_SECRET
 
 if not FERNET_SECRET:
     raise ValueError("FERNET_SECRET environment variable not set")

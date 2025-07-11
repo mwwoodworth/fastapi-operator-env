@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-import os
+from core.settings import Settings
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -11,12 +11,14 @@ from typing import Any, Dict, List, Optional
 
 try:
     from supabase import create_client
+
     SUPABASE_AVAILABLE = True
 except Exception:  # noqa: BLE001
     SUPABASE_AVAILABLE = False
 
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
+settings = Settings()
+SUPABASE_URL = settings.SUPABASE_URL
+SUPABASE_SERVICE_KEY = settings.SUPABASE_SERVICE_KEY
 
 _client = None
 if SUPABASE_AVAILABLE and SUPABASE_URL and SUPABASE_SERVICE_KEY:

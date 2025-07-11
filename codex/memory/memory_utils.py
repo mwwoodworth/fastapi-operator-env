@@ -3,7 +3,6 @@ from __future__ import annotations
 """Helper utilities for memory management and embeddings."""
 
 import json
-import os
 import uuid
 import hashlib
 from pathlib import Path
@@ -11,8 +10,11 @@ from typing import List, Dict
 
 try:
     from supabase import create_client
-    SUPABASE_URL = os.getenv("SUPABASE_URL")
-    SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
+    from core.settings import Settings
+
+    settings = Settings()
+    SUPABASE_URL = settings.SUPABASE_URL
+    SUPABASE_SERVICE_KEY = settings.SUPABASE_SERVICE_KEY
     _client = (
         create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
         if SUPABASE_URL and SUPABASE_SERVICE_KEY
@@ -74,7 +76,9 @@ def get_or_create_agent(name: str, type_: str = "human") -> str:
             if res.data:
                 return res.data[0]["id"]
             new_id = str(uuid.uuid4())
-            _client.table("agents").insert({"id": new_id, "name": name, "type": type_}).execute()
+            _client.table("agents").insert(
+                {"id": new_id, "name": name, "type": type_}
+            ).execute()
             return new_id
         except Exception:  # noqa: BLE001
             pass
@@ -88,7 +92,9 @@ def get_or_create_agent(name: str, type_: str = "human") -> str:
     return new_id
 
 
-def save_document(doc_id: str, project_id: str, title: str, content: str, author_id: str) -> None:
+def save_document(
+    doc_id: str, project_id: str, title: str, content: str, author_id: str
+) -> None:
     """Persist basic document metadata."""
     records = _load(_DOCUMENT_FILE)
     records.append(
@@ -135,8 +141,8 @@ def embed_chunks(chunks: List[str]) -> List[List[float]]:
     try:
         import openai
 
-        if os.getenv("OPENAI_API_KEY"):
-            openai.api_key = os.getenv("OPENAI_API_KEY")
+        if settings.OPENAI_API_KEY:
+            openai.api_key = settings.OPENAI_API_KEY
             res = openai.Embedding.create(model="text-embedding-ada-002", input=chunks)
             for item in res["data"]:
                 vectors.append(item["embedding"])
