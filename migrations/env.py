@@ -3,10 +3,15 @@ from __future__ import annotations
 from logging.config import fileConfig
 from sqlalchemy import engine_from_config, pool
 from alembic import context
+import os
 
 import db.models  # noqa: F401
 
 config = context.config
+database_url = os.getenv("DATABASE_URL")
+if database_url:
+    config.set_main_option("sqlalchemy.url", database_url)
+
 fileConfig(config.config_file_name)
 
 target_metadata = db.models.Base.metadata

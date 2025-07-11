@@ -48,6 +48,17 @@ are missing. Supabase credentials are required in production for persistent
 memory storage.
 Set `SLACK_WEBHOOK_URL` to a Slack incoming webhook to get notified when tasks succeed or fail.
 
+### Database migrations
+Before running the server in production, apply the Alembic migrations to ensure
+the database schema and extensions are up to date:
+
+```bash
+alembic upgrade head
+```
+
+`DATABASE_URL` must point to your Supabase Postgres instance for the migrations
+to run successfully.
+
 ## Tasks
 Tasks live in `codex/tasks/` and each implements a `run(context)` function returning structured results.
 
