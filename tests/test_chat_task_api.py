@@ -3,8 +3,7 @@ import importlib
 from io import BytesIO
 from fastapi.testclient import TestClient
 
-os.environ["AGENT_KEYS"] = '{"agent":"secret"}'
-os.environ.pop("BASIC_AUTH_USERS", None)
+os.environ["AUTH_USERS"] = '{"agent":"secret"}'
 os.environ.pop("ADMIN_USERS", None)
 os.environ.setdefault("SUPABASE_URL", "http://example.com")
 os.environ.setdefault("SUPABASE_SERVICE_KEY", "dummy")
@@ -23,22 +22,25 @@ importlib.reload(main_module)
 
 
 def get_client():
-    os.environ.pop("BASIC_AUTH_USERS", None)
-    os.environ.pop("ADMIN_USERS", None)
-    os.environ["AGENT_KEYS"] = '{"agent":"secret"}'
+    os.environ["AUTH_USERS"] = '{"agent":"secret"}'
     importlib.reload(chat_task_api)
     importlib.reload(main_module)
     import db.session
 
     db.session.init_db()
-    return TestClient(main_module.app)
-
-
-headers = {"X-Agent-Key": "secret"}
+    c = TestClient(main_module.app)
+    resp = c.post(
+        "/auth/token",
+        data={"username": "agent", "password": "secret"},
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+    )
+    assert resp.status_code == 200
+    token = resp.json()["access_token"]
+    return TestClient(main_module.app), {"Authorization": f"Bearer {token}"}
 
 
 def test_thread_and_message_lifecycle():
-    client = get_client()
+    client, headers = get_client()
     t_resp = client.post("/threads", json={"title": "Test"}, headers=headers)
     assert t_resp.status_code == 200
     thread_id = t_resp.json()["id"]
@@ -64,7 +66,7 @@ def test_thread_and_message_lifecycle():
 
 
 def test_task_and_file_endpoints():
-    client = get_client()
+    client, headers = get_client()
     t_resp = client.post("/threads", json={"title": "TaskThread"}, headers=headers)
     thread_id = t_resp.json()["id"]
     task_resp = client.post(

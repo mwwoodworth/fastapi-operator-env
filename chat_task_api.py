@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import json
-import os
 from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
@@ -20,17 +18,11 @@ settings = Settings()
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token", auto_error=False)
 USERS = {}
-if os.getenv("BASIC_AUTH_USERS"):
+if settings.AUTH_USERS:
     try:
-        USERS = json.loads(os.getenv("BASIC_AUTH_USERS", "{}"))
+        USERS = json.loads(settings.AUTH_USERS)
     except Exception:
         USERS = {}
-AGENT_KEYS = {}
-if os.getenv("AGENT_KEYS"):
-    try:
-        AGENT_KEYS = json.loads(os.getenv("AGENT_KEYS", "{}"))
-    except Exception:
-        AGENT_KEYS = {}
 
 
 router = APIRouter()
@@ -48,27 +40,21 @@ def get_identity(
     request: Request,
     token: str = Depends(oauth2_scheme),
 ) -> str:
-    """Authenticate via JWT bearer or agent key."""
-    if not USERS and not AGENT_KEYS:
-        return "anonymous"
-    if USERS and token:
-        try:
-            payload = jwt.decode(
-                token,
-                settings.JWT_SECRET,
-                algorithms=[settings.JWT_ALGORITHM],
-            )
-            username = payload.get("sub")
-            if username in USERS:
-                return username
-        except Exception:
-            pass
-    key = request.headers.get("X-Agent-Key")
-    if AGENT_KEYS and key:
-        for name, val in AGENT_KEYS.items():
-            if val == key:
-                return f"agent:{name}"
-    raise HTTPException(status_code=401, detail="Unauthorized")
+    """Authenticate via JWT bearer token."""
+    if not token:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    try:
+        payload = jwt.decode(
+            token,
+            settings.JWT_SECRET,
+            algorithms=[settings.JWT_ALGORITHM],
+        )
+        username = payload.get("sub")
+        if not username or username not in USERS:
+            raise HTTPException(status_code=401, detail="invalid_user")
+        return username
+    except Exception:
+        raise HTTPException(status_code=401, detail="Unauthorized")
 
 
 class ThreadCreate(BaseModel):
@@ -83,9 +69,15 @@ class ThreadUpdate(BaseModel):
 
 
 @router.post("/threads")
-def create_thread(payload: ThreadCreate, db: Session = Depends(get_db), _: str = Depends(get_identity)):
+def create_thread(
+    payload: ThreadCreate, db: Session = Depends(get_db), _: str = Depends(get_identity)
+):
     """Create a new chat thread."""
-    thread = Thread(title=payload.title, participants=payload.participants, project_id=payload.project_id)
+    thread = Thread(
+        title=payload.title,
+        participants=payload.participants,
+        project_id=payload.project_id,
+    )
     db.add(thread)
     db.commit()
     db.refresh(thread)
@@ -100,7 +92,9 @@ def list_threads(db: Session = Depends(get_db), _: str = Depends(get_identity)):
 
 
 @router.get("/threads/{thread_id}")
-def get_thread(thread_id: int, db: Session = Depends(get_db), _: str = Depends(get_identity)):
+def get_thread(
+    thread_id: int, db: Session = Depends(get_db), _: str = Depends(get_identity)
+):
     """Fetch a single thread by ID."""
     thread = db.query(Thread).get(thread_id)
     if not thread:
@@ -109,7 +103,12 @@ def get_thread(thread_id: int, db: Session = Depends(get_db), _: str = Depends(g
 
 
 @router.patch("/threads/{thread_id}")
-def update_thread(thread_id: int, payload: ThreadUpdate, db: Session = Depends(get_db), _: str = Depends(get_identity)):
+def update_thread(
+    thread_id: int,
+    payload: ThreadUpdate,
+    db: Session = Depends(get_db),
+    _: str = Depends(get_identity),
+):
     """Update thread title or participants."""
     thread = db.query(Thread).get(thread_id)
     if not thread:
@@ -140,7 +139,11 @@ class MessageUpdate(BaseModel):
 
 
 @router.post("/messages")
-def create_message(payload: MessageCreate, db: Session = Depends(get_db), _: str = Depends(get_identity)):
+def create_message(
+    payload: MessageCreate,
+    db: Session = Depends(get_db),
+    _: str = Depends(get_identity),
+):
     """Create a message in a thread."""
     msg = Message(
         thread_id=payload.thread_id,
@@ -173,7 +176,12 @@ def list_messages(
 
 
 @router.patch("/messages/{message_id}")
-def edit_message(message_id: int, payload: MessageUpdate, db: Session = Depends(get_db), _: str = Depends(get_identity)):
+def edit_message(
+    message_id: int,
+    payload: MessageUpdate,
+    db: Session = Depends(get_db),
+    _: str = Depends(get_identity),
+):
     """Edit message content or metadata."""
     msg = db.query(Message).get(message_id)
     if not msg:
@@ -190,7 +198,9 @@ def edit_message(message_id: int, payload: MessageUpdate, db: Session = Depends(
 
 
 @router.delete("/messages/{message_id}")
-def delete_message(message_id: int, db: Session = Depends(get_db), _: str = Depends(get_identity)):
+def delete_message(
+    message_id: int, db: Session = Depends(get_db), _: str = Depends(get_identity)
+):
     """Delete a message."""
     msg = db.query(Message).get(message_id)
     if not msg:
@@ -224,7 +234,9 @@ class TaskUpdate(BaseModel):
 
 
 @router.post("/tasks")
-def create_task(payload: TaskCreate, db: Session = Depends(get_db), _: str = Depends(get_identity)):
+def create_task(
+    payload: TaskCreate, db: Session = Depends(get_db), _: str = Depends(get_identity)
+):
     """Create a task."""
     task = Task(**payload.dict())
     db.add(task)
@@ -253,7 +265,12 @@ def list_tasks(
 
 
 @router.patch("/tasks/{task_id}")
-def update_task(task_id: int, payload: TaskUpdate, db: Session = Depends(get_db), _: str = Depends(get_identity)):
+def update_task(
+    task_id: int,
+    payload: TaskUpdate,
+    db: Session = Depends(get_db),
+    _: str = Depends(get_identity),
+):
     """Update task fields."""
     task = db.query(Task).get(task_id)
     if not task:
@@ -266,7 +283,9 @@ def update_task(task_id: int, payload: TaskUpdate, db: Session = Depends(get_db)
 
 
 @router.delete("/tasks/{task_id}")
-def delete_task(task_id: int, db: Session = Depends(get_db), _: str = Depends(get_identity)):
+def delete_task(
+    task_id: int, db: Session = Depends(get_db), _: str = Depends(get_identity)
+):
     """Delete a task."""
     task = db.query(Task).get(task_id)
     if not task:
@@ -330,7 +349,9 @@ def list_files(
 
 
 @router.delete("/files/{file_id}")
-def delete_file(file_id: int, db: Session = Depends(get_db), _: str = Depends(get_identity)):
+def delete_file(
+    file_id: int, db: Session = Depends(get_db), _: str = Depends(get_identity)
+):
     """Delete a stored file and remove from disk."""
     db_file = db.query(DBFile).get(file_id)
     if not db_file:
@@ -344,4 +365,3 @@ def delete_file(file_id: int, db: Session = Depends(get_db), _: str = Depends(ge
     db.delete(db_file)
     db.commit()
     return {"status": "deleted"}
-

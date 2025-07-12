@@ -18,33 +18,47 @@ os.environ.setdefault("DAILY_PLANNER_MODEL", "claude")
 os.environ.setdefault("ESCALATION_CHECK_INTERVAL", "1800")
 os.environ.setdefault("SLACK_WEBHOOK_URL", "http://example.com/webhook")
 
+os.environ["AUTH_USERS"] = '{"user":"pass"}'
 from fastapi.testclient import TestClient
 from main import app
 
-client = TestClient(app)
+
+def auth_client():
+    c = TestClient(app)
+    resp = c.post(
+        "/auth/token",
+        data={"username": "user", "password": "pass"},
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+    )
+    assert resp.status_code == 200
+    token = resp.json()["access_token"]
+    return TestClient(app), {"Authorization": f"Bearer {token}"}
+
+
+client, headers = auth_client()
 
 
 def test_health():
-    resp = client.get("/health")
+    resp = client.get("/health", headers=headers)
     assert resp.status_code == 200
 
 
 def test_registry():
-    resp = client.get("/docs/registry")
+    resp = client.get("/docs/registry", headers=headers)
     assert resp.status_code == 200
     assert isinstance(resp.json(), dict)
 
 
 def test_diagnostics_state():
-    resp = client.get("/diagnostics/state")
+    resp = client.get("/diagnostics/state", headers=headers)
     assert resp.status_code == 200
     assert "active_tasks" in resp.json()
 
 
 def test_voice_endpoints():
-    resp = client.get("/voice/history")
+    resp = client.get("/voice/history", headers=headers)
     assert resp.status_code == 200
-    resp = client.get("/voice/status")
+    resp = client.get("/voice/status", headers=headers)
     assert resp.status_code == 200
 
 
@@ -52,25 +66,27 @@ def test_inbox_routes():
     from codex.memory import agent_inbox
 
     item = agent_inbox.add_to_inbox("sample_task", {"foo": "bar"}, "test")
-    resp = client.get("/agent/inbox")
+    resp = client.get("/agent/inbox", headers=headers)
     assert resp.status_code == 200
     tasks = resp.json()
     assert isinstance(tasks, list)
     assert any(t["task_id"] == item["task_id"] for t in tasks)
     resp = client.post(
-        "/agent/inbox/approve", json={"task_id": item["task_id"], "decision": "reject"}
+        "/agent/inbox/approve",
+        json={"task_id": item["task_id"], "decision": "reject"},
+        headers=headers,
     )
     assert resp.status_code == 200
-    resp = client.get("/agent/inbox/summary")
+    resp = client.get("/agent/inbox/summary", headers=headers)
     assert resp.status_code == 200
 
 
 def test_new_agent_routes():
-    resp = client.post("/agent/plan/daily")
+    resp = client.post("/agent/plan/daily", headers=headers)
     assert resp.status_code == 200
-    resp = client.post("/agent/inbox/prioritize")
+    resp = client.post("/agent/inbox/prioritize", headers=headers)
     assert resp.status_code == 200
-    resp = client.get("/agent/inbox/mobile")
+    resp = client.get("/agent/inbox/mobile", headers=headers)
     assert resp.status_code == 200
 
 
@@ -83,9 +99,9 @@ def test_recurring_and_delay_routes():
         "day": "Monday",
         "time": "08:00",
     }
-    resp = client.post("/agent/recurring/add", json=payload)
+    resp = client.post("/agent/recurring/add", json=payload, headers=headers)
     assert resp.status_code == 200
-    resp = client.get("/agent/recurring")
+    resp = client.get("/agent/recurring", headers=headers)
     assert resp.status_code == 200
     # delay inbox task
     from codex.memory import agent_inbox
@@ -94,105 +110,112 @@ def test_recurring_and_delay_routes():
     resp = client.post(
         "/agent/inbox/delay",
         json={"task_id": item["task_id"], "delay_until": "2100-01-01T00:00"},
+        headers=headers,
     )
     assert resp.status_code == 200
-    resp = client.get("/dashboard/tasks")
+    resp = client.get("/dashboard/tasks", headers=headers)
     assert resp.status_code == 200
 
 
 def test_new_phase16_routes():
-    resp = client.post("/memory/sync/agents")
+    resp = client.post("/memory/sync/agents", headers=headers)
     assert resp.status_code == 200
 
-    resp = client.post("/task/ai-coauthor", json={"intent": "test"})
+    resp = client.post("/task/ai-coauthor", json={"intent": "test"}, headers=headers)
     assert resp.status_code == 200
 
-    resp = client.post("/agent/workflows/audit")
+    resp = client.post("/agent/workflows/audit", headers=headers)
     assert resp.status_code == 200
 
-    resp = client.post("/memory/audit/diff", json={"task_id": "claude_prompt"})
+    resp = client.post(
+        "/memory/audit/diff", json={"task_id": "claude_prompt"}, headers=headers
+    )
     assert resp.status_code == 200
 
-    resp = client.get("/dashboard/sync")
+    resp = client.get("/dashboard/sync", headers=headers)
     assert resp.status_code == 200
 
 
 def test_new_phase17_routes():
-    resp = client.post("/agent/forecast/weekly")
+    resp = client.post("/agent/forecast/weekly", headers=headers)
     assert resp.status_code == 200
 
-    resp = client.get("/dashboard/forecast")
+    resp = client.get("/dashboard/forecast", headers=headers)
     assert resp.status_code == 200
 
-    resp = client.post("/agent/strategy/weekly")
+    resp = client.post("/agent/strategy/weekly", headers=headers)
     assert resp.status_code == 200
 
     resp = client.post(
         "/task/dependency-map",
         json={"tasks": [{"task": "A"}, {"task": "B", "depends_on": "A"}]},
+        headers=headers,
     )
     assert resp.status_code == 200
 
 
 def test_phase18_knowledge_routes():
-    resp = client.post("/knowledge/index")
+    resp = client.post("/knowledge/index", headers=headers)
     assert resp.status_code == 200
 
     resp = client.post(
         "/knowledge/query",
         json={"query": "Claude recommended", "sources": ["local_docs"]},
+        headers=headers,
     )
     assert resp.status_code == 200
     assert "summary" in resp.json()
 
-    resp = client.get("/knowledge/sources")
+    resp = client.get("/knowledge/sources", headers=headers)
     assert resp.status_code == 200
 
-    resp = client.get("/logs/rag")
+    resp = client.get("/logs/rag", headers=headers)
     assert resp.status_code == 200
 
 
 def test_knowledge_vector_routes():
-    resp = client.post("/knowledge/doc/upload", json={"content": "hello world"})
+    resp = client.post(
+        "/knowledge/doc/upload", json={"content": "hello world"}, headers=headers
+    )
     assert resp.status_code == 200
 
-    resp = client.get("/knowledge/search?q=hello")
+    resp = client.get("/knowledge/search?q=hello", headers=headers)
     assert resp.status_code == 200
     assert "results" in resp.json()
 
 
 def test_dashboard_metrics():
-    resp = client.get("/dashboard/metrics")
+    resp = client.get("/dashboard/metrics", headers=headers)
     assert resp.status_code == 200
     data = resp.json()
     assert "tasks_logged" in data
 
 
 def test_dashboard_ops():
-    resp = client.get("/dashboard/ops")
+    resp = client.get("/dashboard/ops", headers=headers)
     assert resp.status_code == 200
     assert "sales" in resp.json()
 
 
 def test_search_and_error_logs():
-    resp = client.get("/memory/search?q=test")
+    resp = client.get("/memory/search?q=test", headers=headers)
     assert resp.status_code == 200
     assert "entries" in resp.json()
 
-    resp = client.get("/logs/errors")
+    resp = client.get("/logs/errors", headers=headers)
     assert resp.status_code == 200
     assert "entries" in resp.json()
 
 
 def test_jwt_auth_enforced():
-    os.environ["BASIC_AUTH_USERS"] = '{"user":"pass"}'
+    os.environ["AUTH_USERS"] = '{"user":"pass"}'
     os.environ["ADMIN_USERS"] = "user"
     import importlib
     import main as main_module
 
     importlib.reload(main_module)
     auth_client = TestClient(main_module.app)
-    resp = auth_client.get("/health")
+    resp = auth_client.get("/health", headers=headers)
     assert resp.status_code == 401
     token_resp = auth_client.post(
         "/auth/token",

@@ -14,7 +14,7 @@ npm run dev
 Set environment variables in `.env.local` or your hosting platform:
 
 - `NEXT_PUBLIC_API_BASE` – base URL of the FastAPI server (default '')
-- `NEXT_PUBLIC_AUTH_HEADER` – optional `Authorization` header value for HTTP Basic or JWT
+- `NEXT_PUBLIC_AUTH_HEADER` – optional static `Authorization` header. JWT tokens will otherwise be read from `localStorage.token`.
 
 ## Build & Export
 

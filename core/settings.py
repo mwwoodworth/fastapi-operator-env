@@ -74,7 +74,7 @@ class Settings(BaseSettings):
     ESCALATION_CHECK_INTERVAL: int = 1800
     CLAUDE_LOG_FOLDER_ID: str | None = None
 
-    BASIC_AUTH_USERS: str | None = None
+    AUTH_USERS: str | None = None
     ADMIN_USERS: str | None = None
     JWT_SECRET: str = "change-me"
     JWT_ALGORITHM: str = "HS256"
