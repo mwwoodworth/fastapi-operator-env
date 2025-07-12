@@ -20,3 +20,4 @@ celery
 redis
 loguru
 prometheus_client
+pytest-httpx

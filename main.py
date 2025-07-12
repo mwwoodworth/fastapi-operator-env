@@ -65,6 +65,8 @@ from codex import get_registry, run_task
 from celery_app import celery_app, long_task
 from codex.memory import memory_store, agent_inbox
 from codex.integrations.make_webhook import router as make_webhook_router
+from codex.integrations.clickup import router as clickup_router
+from codex.integrations.notion import router as notion_router
 from codex.memory.memory_api import router as memory_api_router
 from codex.ai.gemini_webhook import router as gemini_webhook_router
 from chat_task_api import router as chat_task_router
@@ -161,6 +163,8 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan, dependencies=[Depends(get_current_user)])
 app.include_router(make_webhook_router)
+app.include_router(clickup_router)
+app.include_router(notion_router)
 app.include_router(memory_api_router)
 app.include_router(gemini_webhook_router)
 app.include_router(chat_task_router)
