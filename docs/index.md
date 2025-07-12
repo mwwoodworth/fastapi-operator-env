@@ -44,6 +44,8 @@ Then POST to `/task/run` with JSON body:
 ```json
 {"task": "deploy_vercel", "context": {"project_path": "."}}
 ```
+The response will include a Celery `task_id` which can be polled via
+`/task/status/{id}` to check progress.
 
 ## Environment
 Copy `.env.example` to `.env` and fill in the required keys. Configuration is

@@ -44,7 +44,7 @@ def test_long_task_flow():
     assert resp.status_code == 200
     task_id = resp.json()["task_id"]
 
-    status = client.get(f"/tasks/status/{task_id}", headers=headers)
+    status = client.get(f"/task/status/{task_id}", headers=headers)
     assert status.status_code == 200
     data = status.json()
     assert data["status"] == "SUCCESS"

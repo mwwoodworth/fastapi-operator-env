@@ -44,6 +44,8 @@ Then POST to `/task/run` with JSON body:
 ```json
 {"task": "deploy_vercel", "context": {"project_path": "."}}
 ```
+The endpoint queues the task on Celery and returns a `task_id`. Use
+`/task/status/{id}` to query the result.
 
 ## Environment
 Copy `.env.example` to `.env` and fill in the required keys. Configuration is

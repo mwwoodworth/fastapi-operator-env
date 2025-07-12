@@ -24,6 +24,12 @@ class TaskRunResponse(BaseModel):
     result: Any
 
 
+class CeleryTaskResponse(BaseModel):
+    """Response when a task is queued for Celery execution."""
+
+    task_id: str
+
+
 class ChatResponse(BaseModel):
     response: str
     model: str
