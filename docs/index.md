@@ -20,7 +20,8 @@ Continuous integration runs linting, type checks and tests with coverage to ensu
    export BASIC_AUTH_USERS='{"admin": "secret"}'
    export ADMIN_USERS=admin
    ```
-   Obtain a token via `/auth/token` and use it as `Bearer <token>` for requests.
+   Call `/auth/token` to set login cookies and store the returned `csrf_token`.
+   Include that token as `X-CSRF-Token` for subsequent POST requests.
 
 3. Launch the server:
    ```bash

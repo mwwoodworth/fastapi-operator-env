@@ -1,0 +1,3 @@
+# Threat Model
+
+The API exposes authenticated task execution and data management endpoints. Threats include brute force login, session hijacking and CSRF abuse. Rate limiting with SlowAPI caps requests per IP at 100 per minute to deter brute force attempts. OAuth2 access tokens expire after 15 minutes and refresh tokens rotate via `/auth/refresh`, both stored in `HttpOnly` cookies. CSRF protection uses a double‑submit token from `fastapi-csrf-protect` which is set at login and must be sent in the `X-CSRF-Token` header for state-changing requests. These controls minimize the impact of stolen cookies and cross-site attacks while retaining stateless JWT auth.
