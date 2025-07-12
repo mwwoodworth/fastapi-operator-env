@@ -167,7 +167,7 @@ def _decode_token(token: str) -> dict:
 def get_current_user(
     request: Request, token: str | None = Depends(oauth2_scheme)
 ) -> str:
-    if request.url.path.startswith("/auth/"):
+    if request.url.path.startswith("/auth/") or request.url.path.startswith("/webhook/"):
         return "anonymous"
     cookie_token = request.cookies.get("access_token")
     token = token or cookie_token
@@ -602,8 +602,23 @@ def _verify_stripe(payload: bytes, sig_header: str | None) -> bool:
     except Exception:
         return False
 
+_EVENT_FILE = Path("logs/stripe_events.json")
 
-@app.post("/webhook/stripe")
+def _load_event_ids() -> list[str]:
+    if _EVENT_FILE.exists():
+        try:
+            return json.loads(_EVENT_FILE.read_text())
+        except Exception:  # noqa: BLE001
+            return []
+    return []
+
+
+def _save_event_ids(ids: list[str]) -> None:
+    _EVENT_FILE.parent.mkdir(exist_ok=True)
+    _EVENT_FILE.write_text(json.dumps(ids[-200:], indent=2))
+
+
+@app.post("/webhook/stripe", dependencies=[])
 async def stripe_webhook(request: Request) -> Dict[str, Any]:
     """Handle Stripe sale events and enqueue ``sync_sale`` task."""
     raw = await request.body()
@@ -615,15 +630,34 @@ async def stripe_webhook(request: Request) -> Dict[str, Any]:
         payload = json.loads(raw.decode())
     except Exception:  # noqa: BLE001
         raise HTTPException(status_code=400, detail="invalid_payload")
+    event_id = payload.get("id")
+    if not event_id:
+        raise HTTPException(status_code=400, detail="missing_event_id")
+    processed = _load_event_ids()
+    if event_id in processed:
+        return {"status": "duplicate"}
 
+    event_type = payload.get("type")
     obj = payload.get("data", {}).get("object", {})
-    context = {
-        "email": obj.get("customer_email") or obj.get("receipt_email"),
-        "product": obj.get("description") or payload.get("type"),
-        "amount": obj.get("amount_total") or obj.get("amount"),
-        "metadata": obj.get("metadata"),
-    }
-    run_task("sync_sale", context)
+    relevant = {"checkout.session.completed", "payment_intent.succeeded"}
+    if event_type in relevant:
+        context = {
+            "email": obj.get("customer_email")
+            or obj.get("customer_details", {}).get("email")
+            or obj.get("receipt_email"),
+            "product": obj.get("description")
+            or obj.get("metadata", {}).get("product")
+            or event_type,
+            "amount": obj.get("amount_total")
+            or obj.get("amount_received")
+            or obj.get("amount"),
+            "metadata": obj.get("metadata"),
+            "transaction_id": obj.get("payment_intent") or obj.get("id"),
+        }
+        run_task("sync_sale", context)
+
+    processed.append(event_id)
+    _save_event_ids(processed)
     return {"status": "processed"}
 
 
