@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+from typing import AsyncGenerator
+
 from core.settings import Settings
+from claude_utils import run_claude, stream_claude
+from gpt_utils import run_gpt, stream_gpt
 
 settings = Settings()
 
@@ -22,3 +26,20 @@ def get_ai_model(task: str | None = None) -> str:
     if any(k in name for k in ["code", "inspect", "data", "query", "rag"]):
         return "gemini"
     return "claude"
+
+
+async def stream_completion(prompt: str, model: str) -> AsyncGenerator[str, None]:
+    """Stream completion tokens for the selected model."""
+    if model == "gemini":
+        async for token in stream_gpt(prompt):
+            yield token
+    else:
+        async for token in stream_claude(prompt):
+            yield token
+
+
+async def run_completion(prompt: str, model: str) -> str:
+    """Return full completion string for the selected model."""
+    if model == "gemini":
+        return await run_gpt(prompt)
+    return await run_claude(prompt)

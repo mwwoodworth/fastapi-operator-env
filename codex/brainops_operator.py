@@ -170,3 +170,63 @@ def run_task(task_id: str, context: Dict[str, Any]) -> Any:
 
 # Load tasks on import so startup displays them quickly
 _load_tasks()
+
+
+async def stream_task(task_id: str, context: Dict[str, Any]):
+    """Async generator that streams task output tokens if supported."""
+    registry = get_registry()
+    task_def = registry.get(task_id)
+    if not task_def:
+        raise ValueError(f"Unknown task: {task_id}")
+
+    module = importlib.import_module(f"codex.tasks.{task_id}")
+    stream_func = getattr(module, "stream", None)
+    if not stream_func:
+        # Fall back to normal execution
+        result = run_task(task_id, context)
+        yield str(result)
+        return
+
+    full = ""
+    try:
+        async for token in stream_func(context):
+            full += token
+            yield token
+        result: Any = {"output": full}
+        level = "info"
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("Streaming task %s failed", task_id)
+        tb = traceback.format_exc()
+        result = {"error": str(exc), "stack": tb}
+        level = "error"
+
+    log_entry_id = _log_task(task_id, context, result, level=level)
+    status = "failed" if level == "error" else "success"
+    try:
+        origin_meta = {}
+        for key in [
+            "linked_transcript_id",
+            "model",
+            "source",
+            "node_id",
+            "task_generated_by",
+        ]:
+            if key in context:
+                origin_meta[key] = context[key]
+        memory_store.save_memory(
+            {
+                "id": log_entry_id,
+                "task": task_id,
+                "input": context,
+                "output": result,
+                "user": context.get("user", "default"),
+                "tags": context.get("tags", []),
+                "status": status,
+            },
+            origin=origin_meta or None,
+        )
+    except Exception:  # noqa: BLE001
+        pass
+
+    if status == "success":
+        send_slack_message(f"Task {task_id} completed")
