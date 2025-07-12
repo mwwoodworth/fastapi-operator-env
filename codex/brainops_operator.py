@@ -5,22 +5,17 @@ from __future__ import annotations
 import datetime
 from datetime import timezone
 import importlib
-import json
 import logging
 import traceback
 import pkgutil
 import uuid
 from dataclasses import dataclass, field
-from pathlib import Path
 from typing import Callable, Any, Dict, List
 
 from .memory import memory_store, link_task_to_origin
 from utils.slack import send_slack_message
 
 logger = logging.getLogger(__name__)
-
-_LOG_FILE = Path("logs/task_log.json")
-_ERROR_LOG_FILE = Path("logs/error_log.json")
 
 
 @dataclass
@@ -62,9 +57,9 @@ def _load_tasks() -> None:
         if func is None:
             continue
         task_id = getattr(module, "TASK_ID", module_name)
-        description = getattr(module, "TASK_DESCRIPTION", "") or (
-            module.__doc__ or ""
-        ).strip()
+        description = (
+            getattr(module, "TASK_DESCRIPTION", "") or (module.__doc__ or "").strip()
+        )
         required = getattr(module, "REQUIRED_FIELDS", [])
         register_task(task_id, func, description, required)
 
@@ -77,8 +72,8 @@ def get_registry() -> Dict[str, TaskDefinition]:
     return _TASK_REGISTRY
 
 
-def _log_task(task: str, context: dict, result: Any) -> None:
-    _LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
+def _log_task(task: str, context: dict, result: Any, level: str = "info") -> str:
+    """Persist a task log entry to Supabase."""
     entry_id = str(uuid.uuid4())
     entry = {
         "id": entry_id,
@@ -87,15 +82,14 @@ def _log_task(task: str, context: dict, result: Any) -> None:
         "context": context,
         "result": result,
         "retry": context.get("retry", 0),
+        "level": level,
     }
-    history: List[dict] = []
-    if _LOG_FILE.exists():
-        try:
-            history = json.loads(_LOG_FILE.read_text())
-        except Exception:  # noqa: BLE001
-            history = []
-    history.append(entry)
-    _LOG_FILE.write_text(json.dumps(history[-100:], indent=2))
+    try:
+        from supabase_client import supabase
+
+        supabase.table("task_log").insert(entry).execute()
+    except Exception:  # noqa: BLE001
+        logger.error("Failed to log task entry")
     return entry_id
 
 
@@ -127,29 +121,12 @@ def run_task(task_id: str, context: Dict[str, Any]) -> Any:
                 ).execute()
             except Exception as e:  # noqa: BLE001
                 logger.error("Failed to queue retry: %s", e)
-    log_entry_id = _log_task(task_id, context, result)
-    status = "success"
+    level = "info"
     if isinstance(result, dict) and result.get("error"):
-        status = "failed"
-        _ERROR_LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
-        history = []
-        if _ERROR_LOG_FILE.exists():
-            try:
-                history = json.loads(_ERROR_LOG_FILE.read_text())
-            except Exception:  # noqa: BLE001
-                history = []
-        history.append(
-            {
-                "id": log_entry_id,
-                "timestamp": datetime.datetime.now(timezone.utc).isoformat(),
-                "task": task_id,
-                "context": context,
-                "error": result.get("error"),
-                "stack": result.get("stack"),
-            }
-        )
-        _ERROR_LOG_FILE.write_text(json.dumps(history[-100:], indent=2))
+        level = "error"
         send_slack_message(f"Task {task_id} failed: {result.get('error')}")
+    log_entry_id = _log_task(task_id, context, result, level=level)
+    status = "failed" if level == "error" else "success"
     try:
         origin_meta = {}
         for key in [
