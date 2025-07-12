@@ -6,6 +6,7 @@ import datetime
 from datetime import timezone
 import importlib
 import logging
+import os
 import traceback
 import pkgutil
 import uuid
@@ -14,6 +15,7 @@ from typing import Callable, Any, Dict, List
 
 from .memory import memory_store, link_task_to_origin
 from utils.slack import send_slack_message
+from .integrations.clickup_adapter import create_clickup_task, update_clickup_task
 
 logger = logging.getLogger(__name__)
 
@@ -93,6 +95,29 @@ def _log_task(task: str, context: dict, result: Any, level: str = "info") -> str
     return entry_id
 
 
+def _maybe_sync_clickup(task_id: str, context: Dict[str, Any], result: Any) -> None:
+    """Create or update a mirrored ClickUp task if context specifies one."""
+    list_id = context.get("clickup_list_id")
+    if not list_id:
+        return
+    token = context.get("clickup_token") or os.getenv("CLICKUP_API_TOKEN")
+    if not token:
+        logger.warning("ClickUp sync skipped: missing token")
+        return
+    cu_task_id = context.get("clickup_task_id")
+    title = context.get("title") or task_id
+    description = context.get("description") or ""
+    try:
+        if cu_task_id:
+            update_clickup_task(cu_task_id, {"name": title, "description": description, "token": token})
+        else:
+            res = create_clickup_task({"list_id": list_id, "title": title, "description": description, "token": token})
+            if isinstance(res, dict) and res.get("id"):
+                context["clickup_task_id"] = res["id"]
+    except Exception:  # noqa: BLE001
+        logger.exception("ClickUp sync failed")
+
+
 def run_task(task_id: str, context: Dict[str, Any]) -> Any:
     """Execute a registered task and persist a log entry."""
 
@@ -164,6 +189,10 @@ def run_task(task_id: str, context: Dict[str, Any]) -> Any:
             )
         except Exception:  # noqa: BLE001
             pass
+        try:
+            _maybe_sync_clickup(task_id, context, result)
+        except Exception:  # noqa: BLE001
+            logger.exception("ClickUp sync hook failed")
         send_slack_message(f"Task {task_id} completed")
     return result
 
@@ -229,4 +258,8 @@ async def stream_task(task_id: str, context: Dict[str, Any]):
         pass
 
     if status == "success":
+        try:
+            _maybe_sync_clickup(task_id, context, result)
+        except Exception:  # noqa: BLE001
+            logger.exception("ClickUp sync hook failed")
         send_slack_message(f"Task {task_id} completed")
