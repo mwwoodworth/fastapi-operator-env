@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import sys
 from loguru import logger
+import asyncio
 import json
 from datetime import datetime, timezone, timedelta
 from contextlib import asynccontextmanager
@@ -39,6 +40,7 @@ from db.session import init_db
 from core.settings import Settings
 
 settings = Settings()
+APP_START = datetime.now(timezone.utc)
 
 # Prometheus metrics
 REGISTRY = CollectorRegistry()
@@ -67,6 +69,7 @@ from codex.tasks import (
 )
 
 from codex import get_registry, run_task
+from codex.brainops_operator import stream_task
 from celery_app import celery_app, long_task
 from codex.memory import memory_store, agent_inbox
 from codex.integrations.make_webhook import router as make_webhook_router
@@ -144,8 +147,9 @@ ADMIN_USERS = set((settings.ADMIN_USERS or "").split(","))
 
 
 def _create_token(data: dict, minutes: int) -> str:
-    expire = datetime.now(timezone.utc) + timedelta(minutes=minutes)
-    payload = data | {"exp": expire}
+    now = datetime.now(timezone.utc)
+    expire = now + timedelta(minutes=minutes)
+    payload = data | {"exp": expire, "iat": int(now.timestamp())}
     return jwt.encode(payload, settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM)
 
 
@@ -164,10 +168,13 @@ def get_current_user(
 ) -> str:
     if request.url.path.startswith("/auth/"):
         return "anonymous"
-    token = token or request.cookies.get("access_token")
+    cookie_token = request.cookies.get("access_token")
+    token = token or cookie_token
     if not token:
         raise HTTPException(status_code=401, detail="Unauthorized")
     payload = _decode_token(token)
+    if payload.get("iat") and payload["iat"] < int(APP_START.timestamp()):
+        raise HTTPException(status_code=401, detail="token_expired")
     username = payload.get("sub")
     if not username or username not in USERS:
         raise HTTPException(status_code=401, detail="invalid_user")
@@ -294,6 +301,7 @@ class TanaRequest(BaseModel):
 class TaskRunRequest(BaseModel):
     task: str
     context: Dict[str, Any] | None = {}
+    stream: bool | None = False
 
 
 class NLDesignRequest(BaseModel):
@@ -352,7 +360,23 @@ async def create_tana_node(req: TanaRequest) -> TanaNodeCreateResponse:
 
 
 @app.post("/task/run", response_model=TaskRunResponse)
-async def task_run(req: TaskRunRequest) -> TaskRunResponse:
+async def task_run(req: TaskRunRequest, request: Request):
+    if req.stream:
+
+        async def event_generator():
+            gen = stream_task(req.task, req.context or {})
+            try:
+                async for token in gen:
+                    yield f"data: {token}\n\n"
+                    if await request.is_disconnected():
+                        await gen.aclose()
+                        break
+            except asyncio.CancelledError:
+                await gen.aclose()
+                raise
+
+        return StreamingResponse(event_generator(), media_type="text/event-stream")
+
     try:
         result = run_task(req.task, req.context or {})
         TASKS_EXECUTED.inc()
