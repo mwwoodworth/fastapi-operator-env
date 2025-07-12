@@ -156,7 +156,8 @@ Notion Developers
  ClickUp: create_clickup_task, search_clickup_tasks; secret via vault.
 ClickUp Developer Docs
 
- Slack Inbound: /webhook/slack/command, verify signing secret. 
+ Slack Inbound: /webhook/slack/command, verify signing secret. Events can be
+ sent to /webhook/slack/event to capture channel messages.
 Slack API
 
  Stripe: /webhook/stripe, verify signature, enqueue sync_sale. 
