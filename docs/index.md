@@ -15,13 +15,12 @@ Continuous integration runs linting, type checks and tests with coverage to ensu
    ```
    Fill in the required API keys inside `.env`.
 
-2. (Optional) Enable JWT auth by defining users:
+2. Enable JWT auth by defining users:
    ```bash
-   export BASIC_AUTH_USERS='{"admin": "secret"}'
+   export AUTH_USERS='{"admin": "secret"}'
    export ADMIN_USERS=admin
    ```
-   Call `/auth/token` to set login cookies and store the returned `csrf_token`.
-   Include that token as `X-CSRF-Token` for subsequent POST requests.
+   Obtain tokens via `/auth/token` and include `Authorization: Bearer <token>` on requests.
 
 3. Launch the server:
    ```bash
@@ -159,10 +158,10 @@ Include the dashboard in another site using:
 ```
 The same snippet works in Tana, Google Sites or any platform that allows iframes.
 
-### Customization
+-### Customization
 
 - API endpoint base URL is configured with `NEXT_PUBLIC_API_BASE`.
-- Set `NEXT_PUBLIC_AUTH_HEADER` if your FastAPI server requires HTTP Basic or JWT auth (e.g. `"Basic dXNlcjpwYXNz"` or `"Bearer <token>").
+- JWT tokens are loaded from `localStorage.token` if present. Optionally set `NEXT_PUBLIC_AUTH_HEADER` to force a static header value.
 - Optional `MAKE_WEBHOOK_URL` is used by the contact form to forward submissions.
 - Branding and styling can be tweaked in `dashboard_ui/styles` and React components.
 

@@ -95,16 +95,26 @@ from response_models import (
     KnowledgeSearchResponse,
 )
 
+
 class InterceptHandler(logging.Handler):
     def emit(self, record: logging.LogRecord) -> None:
-        level = logger.level(record.levelname).name if record.levelname in logger._core.levels else record.levelno
-        logger.bind(module=record.module).opt(exception=record.exc_info).log(level, record.getMessage())
+        level = (
+            logger.level(record.levelname).name
+            if record.levelname in logger._core.levels
+            else record.levelno
+        )
+        logger.bind(module=record.module).opt(exception=record.exc_info).log(
+            level, record.getMessage()
+        )
+
 
 logger.remove()
 logger.add(sys.stdout, serialize=True)
 
+
 def _slack_sink(message: "loguru.Message") -> None:
     send_slack_message(message.record["message"])
+
 
 logger.add(_slack_sink, level="ERROR")
 logging.basicConfig(handlers=[InterceptHandler()], level=0, force=True)
@@ -125,9 +135,9 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token", auto_error=False)
 USERS: dict[str, str] = {}
 ADMIN_USERS: set[str] = set()
 
-if settings.BASIC_AUTH_USERS:
+if settings.AUTH_USERS:
     try:
-        USERS = json.loads(settings.BASIC_AUTH_USERS)
+        USERS = json.loads(settings.AUTH_USERS)
     except Exception:  # noqa: BLE001
         USERS = {}
 ADMIN_USERS = set((settings.ADMIN_USERS or "").split(","))
@@ -141,16 +151,18 @@ def _create_token(data: dict, minutes: int) -> str:
 
 def _decode_token(token: str) -> dict:
     try:
-        return jwt.decode(token, settings.JWT_SECRET, algorithms=[settings.JWT_ALGORITHM])
+        return jwt.decode(
+            token, settings.JWT_SECRET, algorithms=[settings.JWT_ALGORITHM]
+        )
     except Exception as exc:  # noqa: BLE001
         logger.error("JWT decode failed: %s", exc)
         raise HTTPException(status_code=401, detail="invalid_token") from exc
 
 
-def get_current_user(request: Request, token: str | None = Depends(oauth2_scheme)) -> str:
+def get_current_user(
+    request: Request, token: str | None = Depends(oauth2_scheme)
+) -> str:
     if request.url.path.startswith("/auth/"):
-        return "anonymous"
-    if not USERS:
         return "anonymous"
     token = token or request.cookies.get("access_token")
     if not token:
@@ -195,7 +207,9 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(lifespan=lifespan, dependencies=[Depends(get_current_user), Depends(verify_csrf)])
+app = FastAPI(
+    lifespan=lifespan, dependencies=[Depends(get_current_user), Depends(verify_csrf)]
+)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(SlowAPIMiddleware)
@@ -218,7 +232,9 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
 @app.post("/auth/token")
-async def auth_token(form: OAuth2PasswordRequestForm = Depends(), csrf_protect: CsrfProtect = Depends()) -> Response:
+async def auth_token(
+    form: OAuth2PasswordRequestForm = Depends(), csrf_protect: CsrfProtect = Depends()
+) -> Response:
     if not USERS:
         raise HTTPException(status_code=401, detail="auth_disabled")
     pw = USERS.get(form.username)
@@ -227,17 +243,23 @@ async def auth_token(form: OAuth2PasswordRequestForm = Depends(), csrf_protect: 
     roles = ["admin"] if form.username in ADMIN_USERS else ["user"]
     payload = {"sub": form.username, "roles": roles}
     access_token = _create_token(payload, 15)
-    refresh_token = _create_token({"sub": form.username, "type": "refresh"}, 60 * 24 * 7)
+    refresh_token = _create_token(
+        {"sub": form.username, "type": "refresh"}, 60 * 24 * 7
+    )
     csrf_token, csrf_signed = csrf_protect.generate_csrf_tokens()
     resp = JSONResponse({"access_token": access_token, "csrf_token": csrf_token})
     resp.set_cookie("access_token", access_token, httponly=True, max_age=15 * 60)
-    resp.set_cookie("refresh_token", refresh_token, httponly=True, max_age=60 * 60 * 24 * 7)
+    resp.set_cookie(
+        "refresh_token", refresh_token, httponly=True, max_age=60 * 60 * 24 * 7
+    )
     csrf_protect.set_csrf_cookie(csrf_signed, resp)
     return resp
 
 
 @app.post("/auth/refresh")
-async def refresh_access_token(request: Request, csrf_protect: CsrfProtect = Depends()) -> Response:
+async def refresh_access_token(
+    request: Request, csrf_protect: CsrfProtect = Depends()
+) -> Response:
     token = request.cookies.get("refresh_token")
     if not token:
         raise HTTPException(status_code=401, detail="missing_refresh")
@@ -381,6 +403,7 @@ async def chat_endpoint(req: ChatRequest):
     prompt = f"{system_prompt}\n\nRecent memory:\n{mem_text}\nUser: {req.message}\nAssistant:"
 
     if req.stream:
+
         async def event_generator():
             """Async generator yielding SSE tokens."""
             full = ""
@@ -400,7 +423,9 @@ async def chat_endpoint(req: ChatRequest):
                         "session_id": req.session_id,
                     },
                 )
-                suggested = task_suggestions.get("tasks") or task_suggestions.get("generated")
+                suggested = task_suggestions.get("tasks") or task_suggestions.get(
+                    "generated"
+                )
                 entry_id = str(uuid.uuid4())
                 memory_entry = {
                     "id": entry_id,
@@ -652,19 +677,25 @@ async def docs_registry() -> Dict[str, Any]:
 
 
 @app.post("/secrets/store", response_model=StatusResponse)
-async def store_secret_api(req: dict, _: str = Depends(require_admin)) -> StatusResponse:
+async def store_secret_api(
+    req: dict, _: str = Depends(require_admin)
+) -> StatusResponse:
     secrets_task.store_secret(req["name"], req["value"])
     return StatusResponse(status="stored")
 
 
 @app.get("/secrets/retrieve/{name}", response_model=ValueResponse)
-async def retrieve_secret_api(name: str, _: str = Depends(require_admin)) -> ValueResponse:
+async def retrieve_secret_api(
+    name: str, _: str = Depends(require_admin)
+) -> ValueResponse:
     val = secrets_task.retrieve_secret(name)
     return ValueResponse(value=val)
 
 
 @app.delete("/secrets/delete/{name}", response_model=StatusResponse)
-async def delete_secret_api(name: str, _: str = Depends(require_admin)) -> StatusResponse:
+async def delete_secret_api(
+    name: str, _: str = Depends(require_admin)
+) -> StatusResponse:
     secrets_task.delete_secret(name)
     return StatusResponse(status="deleted")
 
@@ -730,6 +761,7 @@ async def knowledge_doc_upload(
     req: KnowledgeDocUploadRequest,
 ) -> KnowledgeDocUploadResponse:
     from codex.memory.memory_utils import embed_chunks
+
     try:
         from supabase_client import supabase
     except Exception:  # pragma: no cover - missing deps
@@ -741,11 +773,13 @@ async def knowledge_doc_upload(
         try:  # pragma: no cover - network
             res = (
                 supabase.table("documents")
-                .insert({
-                    "content": req.content,
-                    "metadata": req.metadata or {},
-                    "embedding": vector,
-                })
+                .insert(
+                    {
+                        "content": req.content,
+                        "metadata": req.metadata or {},
+                        "embedding": vector,
+                    }
+                )
                 .execute()
             )
             if res.data:
@@ -821,7 +855,10 @@ async def memory_trace(task_id: str) -> MemoryTraceResponse:
 
 @app.get("/chat/history", response_model=MemoryEntriesResponse)
 async def chat_history(
-    limit: int = 20, model: str | None = None, tags: str = "", session_id: str | None = None
+    limit: int = 20,
+    model: str | None = None,
+    tags: str = "",
+    session_id: str | None = None,
 ) -> MemoryEntriesResponse:
     tag_list = [t.strip() for t in tags.split(",") if t.strip()]
     tag_list.append("chat")

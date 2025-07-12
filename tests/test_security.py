@@ -12,12 +12,13 @@ os.environ.setdefault("OPENAI_API_KEY", "test")
 
 
 import main as main_module
+
 importlib.reload(main_module)
 client = TestClient(main_module.app)
 
 
 def test_csrf_and_refresh_flow():
-    os.environ["BASIC_AUTH_USERS"] = '{"user":"pass"}'
+    os.environ["AUTH_USERS"] = '{"user":"pass"}'
     os.environ["ADMIN_USERS"] = "user"
     importlib.reload(main_module)
     c = TestClient(main_module.app)
@@ -39,15 +40,24 @@ def test_csrf_and_refresh_flow():
     resp3 = c.post("/auth/refresh", cookies=refresh_cookie)
     assert resp3.status_code == 200
     assert "csrf_token" in resp3.json()
-    os.environ.pop("BASIC_AUTH_USERS")
+    os.environ.pop("AUTH_USERS")
     os.environ.pop("ADMIN_USERS")
     importlib.reload(main_module)
 
 
 def test_rate_limit():
+    os.environ["AUTH_USERS"] = '{"user":"pass"}'
+    importlib.reload(main_module)
+    c = TestClient(main_module.app)
+    token_resp = c.post(
+        "/auth/token",
+        data={"username": "user", "password": "pass"},
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+    )
+    token = token_resp.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
     for _ in range(100):
-        r = client.get("/health")
+        r = c.get("/health", headers=headers)
         assert r.status_code == 200
-    r = client.get("/health")
+    r = c.get("/health", headers=headers)
     assert r.status_code == 429
-

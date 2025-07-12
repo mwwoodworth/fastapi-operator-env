@@ -2,6 +2,7 @@ import importlib
 from fastapi.testclient import TestClient
 
 import os
+
 os.environ.setdefault("REDIS_URL", "redis://localhost:6379/0")
 os.environ.setdefault("FERNET_SECRET", "YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXoxMjM0NTY=")
 os.environ.setdefault("SUPABASE_URL", "http://example.com")
@@ -12,6 +13,7 @@ os.environ.setdefault("TANA_API_KEY", "test")
 os.environ.setdefault("VERCEL_TOKEN", "test")
 
 import celery_app
+
 celery_app.celery_app.conf.broker_url = "memory://"
 celery_app.celery_app.conf.result_backend = "cache+memory://"
 celery_app.celery_app.conf.task_store_eager_result = True
@@ -23,19 +25,26 @@ import main as main_module
 
 
 def get_client():
-    os.environ.pop("BASIC_AUTH_USERS", None)
-    os.environ.pop("ADMIN_USERS", None)
+    os.environ["AUTH_USERS"] = '{"user":"pass"}'
     importlib.reload(main_module)
-    return TestClient(main_module.app)
+    c = TestClient(main_module.app)
+    resp = c.post(
+        "/auth/token",
+        data={"username": "user", "password": "pass"},
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+    )
+    assert resp.status_code == 200
+    token = resp.json()["access_token"]
+    return TestClient(main_module.app), {"Authorization": f"Bearer {token}"}
 
 
 def test_long_task_flow():
-    client = get_client()
-    resp = client.post("/tasks/long", json={"duration": 1})
+    client, headers = get_client()
+    resp = client.post("/tasks/long", json={"duration": 1}, headers=headers)
     assert resp.status_code == 200
     task_id = resp.json()["task_id"]
 
-    status = client.get(f"/tasks/status/{task_id}")
+    status = client.get(f"/tasks/status/{task_id}", headers=headers)
     assert status.status_code == 200
     data = status.json()
     assert data["status"] == "SUCCESS"
