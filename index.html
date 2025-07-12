@@ -398,15 +398,6 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#customization" class="md-nav__link">
-    <span class="md-ellipsis">
-      Customization
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#brainops-ai-assistant" class="md-nav__link">
     <span class="md-ellipsis">
       BrainOps AI Assistant
@@ -706,15 +697,6 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#customization" class="md-nav__link">
-    <span class="md-ellipsis">
-      Customization
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#brainops-ai-assistant" class="md-nav__link">
     <span class="md-ellipsis">
       BrainOps AI Assistant
@@ -767,12 +749,11 @@
    Fill in the required API keys inside <code>.env</code>.</p>
 </li>
 <li>
-<p>(Optional) Enable JWT auth by defining users:
+<p>Enable JWT auth by defining users:
    <code>bash
-   export BASIC_AUTH_USERS='{"admin": "secret"}'
+   export AUTH_USERS='{"admin": "secret"}'
    export ADMIN_USERS=admin</code>
-   Call <code>/auth/token</code> to set login cookies and store the returned <code>csrf_token</code>.
-   Include that token as <code>X-CSRF-Token</code> for subsequent POST requests.</p>
+   Obtain tokens via <code>/auth/token</code> and include <code>Authorization: Bearer &lt;token&gt;</code> on requests.</p>
 </li>
 <li>
 <p>Launch the server:
@@ -876,10 +857,10 @@ npm run build &amp;&amp; npm run export
 <pre><code class="language-html">&lt;iframe src=&quot;/dashboard/ui&quot; width=&quot;100%&quot; height=&quot;600&quot; style=&quot;border:0;&quot;&gt;&lt;/iframe&gt;
 </code></pre>
 <p>The same snippet works in Tana, Google Sites or any platform that allows iframes.</p>
-<h3 id="customization">Customization</h3>
+<p>-### Customization</p>
 <ul>
 <li>API endpoint base URL is configured with <code>NEXT_PUBLIC_API_BASE</code>.</li>
-<li>Set <code>NEXT_PUBLIC_AUTH_HEADER</code> if your FastAPI server requires HTTP Basic or JWT auth (e.g. <code>"Basic dXNlcjpwYXNz"</code> or `"Bearer <token>").</li>
+<li>JWT tokens are loaded from <code>localStorage.token</code> if present. Optionally set <code>NEXT_PUBLIC_AUTH_HEADER</code> to force a static header value.</li>
 <li>Optional <code>MAKE_WEBHOOK_URL</code> is used by the contact form to forward submissions.</li>
 <li>Branding and styling can be tweaked in <code>dashboard_ui/styles</code> and React components.</li>
 </ul>
