@@ -22,6 +22,9 @@ class Settings(BaseSettings):
     STRIPE_SECRET_KEY: str
     REDIS_URL: str = "redis://localhost:6379/0"
 
+    # OpenTelemetry OTLP endpoint for trace export
+    OTEL_EXPORTER_OTLP_ENDPOINT: str | None = None
+
     MAKE_WEBHOOK_SECRET: str | None = None
     BRAINSTACK_API_URL: str | None = None
     BRAINSTACK_API_KEY: str | None = None

@@ -13,6 +13,7 @@ os.environ.setdefault("OPENAI_API_KEY", "test")
 os.environ.setdefault("STRIPE_SECRET_KEY", "test")
 os.environ.setdefault("TANA_API_KEY", "test")
 os.environ.setdefault("VERCEL_TOKEN", "test")
+os.environ.setdefault("OTEL_EXPORTER_OTLP_ENDPOINT", "")
 
 import chat_task_api
 

@@ -1,0 +1,17 @@
+{
+  "uid": "fastapi-operator",
+  "title": "Operator Metrics",
+  "schemaVersion": 37,
+  "version": 1,
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "Tasks Executed",
+      "datasource": {"type": "prometheus", "uid": "PROM"},
+      "targets": [
+        {"expr": "tasks_executed_total", "legendFormat": "executed"}
+      ],
+      "id": 1
+    }
+  ]
+}
