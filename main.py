@@ -70,7 +70,7 @@ from codex.tasks import (
 
 from codex import get_registry, run_task
 from codex.brainops_operator import stream_task
-from celery_app import celery_app, long_task
+from celery_app import celery_app, long_task, execute_registered_task
 from codex.memory import memory_store, agent_inbox
 from codex.integrations.make_webhook import router as make_webhook_router
 from codex.integrations.clickup import router as clickup_router
@@ -85,6 +85,7 @@ from gpt_utils import stream_gpt
 from response_models import (
     ChatResponse,
     TaskRunResponse,
+    CeleryTaskResponse,
     MemoryEntriesResponse,
     VoiceHistoryResponse,
     VoiceTraceResponse,
@@ -359,7 +360,7 @@ async def create_tana_node(req: TanaRequest) -> TanaNodeCreateResponse:
     return TanaNodeCreateResponse(status="submitted", content=req.content)
 
 
-@app.post("/task/run", response_model=TaskRunResponse)
+@app.post("/task/run", response_model=CeleryTaskResponse)
 async def task_run(req: TaskRunRequest, request: Request):
     if req.stream:
 
@@ -378,9 +379,9 @@ async def task_run(req: TaskRunRequest, request: Request):
         return StreamingResponse(event_generator(), media_type="text/event-stream")
 
     try:
-        result = run_task(req.task, req.context or {})
+        result = execute_registered_task.delay(req.task, req.context or {})
         TASKS_EXECUTED.inc()
-        return TaskRunResponse(status="success", result=result)
+        return {"task_id": result.id}
     except Exception as exc:  # noqa: BLE001
         logger.exception("Task execution failed")
         raise HTTPException(status_code=500, detail=str(exc)) from exc
@@ -411,6 +412,7 @@ async def queue_long_task(req: LongTaskRequest) -> Dict[str, Any]:
 
 
 @app.get("/tasks/status/{task_id}")
+@app.get("/task/status/{task_id}")
 async def task_status(task_id: str) -> Dict[str, Any]:
     res = celery_app.AsyncResult(task_id)
     if res.successful():
