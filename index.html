@@ -771,7 +771,8 @@
    <code>bash
    export BASIC_AUTH_USERS='{"admin": "secret"}'
    export ADMIN_USERS=admin</code>
-   Obtain a token via <code>/auth/token</code> and use it as <code>Bearer &lt;token&gt;</code> for requests.</p>
+   Call <code>/auth/token</code> to set login cookies and store the returned <code>csrf_token</code>.
+   Include that token as <code>X-CSRF-Token</code> for subsequent POST requests.</p>
 </li>
 <li>
 <p>Launch the server:
