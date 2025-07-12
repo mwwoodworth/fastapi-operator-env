@@ -37,6 +37,7 @@ from pydantic import BaseModel
 from utils.slack import send_slack_message
 from db.session import init_db
 from core.settings import Settings
+from observability import init_tracing
 
 settings = Settings()
 
@@ -215,6 +216,9 @@ app.mount("/dashboard/ui", dashboard_app)
 
 # Expose static assets like manifest and icons
 app.mount("/static", StaticFiles(directory="static"), name="static")
+
+# Initialize OpenTelemetry tracing if OTLP endpoint configured
+init_tracing(app, settings.OTEL_EXPORTER_OTLP_ENDPOINT)
 
 
 @app.post("/auth/token")

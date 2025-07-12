@@ -19,6 +19,10 @@ PyJWT
 celery
 redis
 loguru
+opentelemetry-sdk
+opentelemetry-exporter-otlp
+opentelemetry-instrumentation-fastapi
+aws-xray-sdk
 prometheus_client
 pytest-httpx
 slowapi

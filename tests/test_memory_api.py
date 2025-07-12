@@ -9,6 +9,7 @@ os.environ.setdefault("OPENAI_API_KEY", "test")
 os.environ.setdefault("STRIPE_SECRET_KEY", "test")
 os.environ.setdefault("TANA_API_KEY", "test")
 os.environ.setdefault("VERCEL_TOKEN", "test")
+os.environ.setdefault("OTEL_EXPORTER_OTLP_ENDPOINT", "")
 os.environ.pop("BASIC_AUTH_USERS", None)
 os.environ.pop("ADMIN_USERS", None)
 import main as main_module

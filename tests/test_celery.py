@@ -10,6 +10,7 @@ os.environ.setdefault("OPENAI_API_KEY", "test")
 os.environ.setdefault("STRIPE_SECRET_KEY", "test")
 os.environ.setdefault("TANA_API_KEY", "test")
 os.environ.setdefault("VERCEL_TOKEN", "test")
+os.environ.setdefault("OTEL_EXPORTER_OTLP_ENDPOINT", "")
 
 import celery_app
 celery_app.celery_app.conf.broker_url = "memory://"

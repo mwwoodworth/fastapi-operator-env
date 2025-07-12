@@ -9,6 +9,7 @@ os.environ.setdefault("SUPABASE_SERVICE_KEY", "dummy")
 os.environ.setdefault("TANA_API_KEY", "test")
 os.environ.setdefault("STRIPE_SECRET_KEY", "test")
 os.environ.setdefault("OPENAI_API_KEY", "test")
+os.environ.setdefault("OTEL_EXPORTER_OTLP_ENDPOINT", "")
 
 
 import main as main_module
