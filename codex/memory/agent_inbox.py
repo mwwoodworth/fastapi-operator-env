@@ -1,19 +1,19 @@
+"""Agent inbox queue stored in Supabase."""
+
 from __future__ import annotations
 
-"""Agent inbox queue stored in Supabase or fallback JSON file."""
-
-import json
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from core.settings import Settings
+from codex.tasks import ai_inbox_summarizer
+from codex.integrations import push_notify
+from codex.tasks import claude_prompt
 
 settings = Settings()
 
 try:
-    from supabase import create_client
-
+    from supabase_client import supabase as _supabase
     SUPABASE_AVAILABLE = True
 except Exception:  # noqa: BLE001
     SUPABASE_AVAILABLE = False
@@ -22,21 +22,10 @@ _SUPABASE_URL = settings.SUPABASE_URL
 _SUPABASE_KEY = settings.SUPABASE_SERVICE_KEY
 _TABLE = settings.INBOX_SUPABASE_TABLE
 
-_client = None
-if SUPABASE_AVAILABLE and _SUPABASE_URL and _SUPABASE_KEY:
-    try:  # pragma: no cover - network
-        _client = create_client(_SUPABASE_URL, _SUPABASE_KEY)
-    except Exception:  # noqa: BLE001
-        _client = None
-
-_LOG_FILE = Path("logs/inbox.json")
-
-from codex.tasks import ai_inbox_summarizer
-from codex.integrations import push_notify
-from codex.tasks import claude_prompt
+_client = _supabase if SUPABASE_AVAILABLE else None
 
 _ALERT_THRESHOLD = settings.INBOX_ALERT_THRESHOLD
-_LAST_ALERT_FILE = Path("logs/last_inbox_alert.txt")
+_last_alert_ts: datetime | None = None
 
 
 def _maybe_send_alert() -> None:
@@ -45,13 +34,11 @@ def _maybe_send_alert() -> None:
     pending = len(get_pending_tasks(_ALERT_THRESHOLD + 1))
     if pending < _ALERT_THRESHOLD:
         return
-    last_ts = None
-    if _LAST_ALERT_FILE.exists():
-        try:
-            last_ts = datetime.fromisoformat(_LAST_ALERT_FILE.read_text().strip())
-        except Exception:
-            last_ts = None
-    if last_ts and (datetime.now(timezone.utc) - last_ts).total_seconds() < 3600:
+    global _last_alert_ts
+    if (
+        _last_alert_ts
+        and (datetime.now(timezone.utc) - _last_alert_ts).total_seconds() < 3600
+    ):
         return
     items = get_pending_tasks(5)
     summaries = [i.get("summary", {}).get("summary") for i in items]
@@ -59,19 +46,7 @@ def _maybe_send_alert() -> None:
     res = claude_prompt.run({"prompt": prompt})
     msg = res.get("completion", "") or f"{pending} tasks pending"
     push_notify.send_push("Inbox Pending", msg.strip(), url="/agent/inbox")
-    _LAST_ALERT_FILE.write_text(datetime.now(timezone.utc).isoformat())
-
-
-def _append_file(entry: Dict[str, Any]) -> None:
-    _LOG_FILE.parent.mkdir(exist_ok=True)
-    history: List[Dict[str, Any]] = []
-    if _LOG_FILE.exists():
-        try:
-            history = json.loads(_LOG_FILE.read_text())
-        except Exception:  # noqa: BLE001
-            history = []
-    history.append(entry)
-    _LOG_FILE.write_text(json.dumps(history[-200:], indent=2))
+    _last_alert_ts = datetime.now(timezone.utc)
 
 
 def add_to_inbox(
@@ -89,115 +64,51 @@ def add_to_inbox(
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "summary": summary,
     }
-    if _client:
-        try:  # pragma: no cover - network
-            _client.table(_TABLE).insert(entry).execute()
-        except Exception:  # noqa: BLE001
-            _append_file(entry)
-    else:
-        _append_file(entry)
+    if not _client:
+        raise RuntimeError("Supabase client not configured")
+    _client.table(_TABLE).insert(entry).execute()
     _maybe_send_alert()
     return entry
 
 
 def get_pending_tasks(limit: int = 10) -> List[Dict[str, Any]]:
     """Return pending inbox tasks."""
-    if _client:
-        try:  # pragma: no cover - network
-            res = (
-                _client.table(_TABLE)
-                .select("*")
-                .eq("status", "pending")
-                .order("timestamp", desc=True)
-                .limit(limit)
-                .execute()
-            )
-            return list(res.data or [])
-        except Exception:  # noqa: BLE001
-            pass
-    if _LOG_FILE.exists():
-        try:
-            data = json.loads(_LOG_FILE.read_text())
-            return [d for d in data if d.get("status") == "pending"][-limit:]
-        except Exception:  # noqa: BLE001
-            return []
-    return []
-
-
-def _update_file(task_id: str, status: str, notes: str) -> None:
-    if not _LOG_FILE.exists():
-        return
-    try:
-        data = json.loads(_LOG_FILE.read_text())
-    except Exception:  # noqa: BLE001
-        return
-    for item in data:
-        if item.get("task_id") == task_id:
-            item["status"] = status
-            item["notes"] = notes
-            item["updated"] = datetime.now(timezone.utc).isoformat()
-            break
-    _LOG_FILE.write_text(json.dumps(data, indent=2))
+    if not _client:
+        return []
+    res = (
+        _client.table(_TABLE)
+        .select("*")
+        .eq("status", "pending")
+        .order("timestamp", desc=True)
+        .limit(limit)
+        .execute()
+    )
+    return list(res.data or [])
 
 
 def mark_as_resolved(task_id: str, status: str, notes: str) -> None:
     """Update inbox item status with optional notes."""
-    if _client:
-        try:  # pragma: no cover - network
-            _client.table(_TABLE).update({"status": status, "notes": notes}).eq(
-                "task_id", task_id
-            ).execute()
-        except Exception:  # noqa: BLE001
-            _update_file(task_id, status, notes)
-    else:
-        _update_file(task_id, status, notes)
+    if not _client:
+        raise RuntimeError("Supabase client not configured")
+    _client.table(_TABLE).update({"status": status, "notes": notes}).eq(
+        "task_id", task_id
+    ).execute()
 
 
 def update_task(task_id: str, fields: Dict[str, Any]) -> None:
     """Update fields on an inbox task."""
-    if _client:
-        try:  # pragma: no cover - network
-            _client.table(_TABLE).update(fields).eq("task_id", task_id).execute()
-            return
-        except Exception:  # noqa: BLE001
-            pass
-    if not _LOG_FILE.exists():
-        return
-    try:
-        data = json.loads(_LOG_FILE.read_text())
-    except Exception:  # noqa: BLE001
-        return
-    for item in data:
-        if item.get("task_id") == task_id:
-            item.update(fields)
-            item["updated"] = datetime.now(timezone.utc).isoformat()
-            break
-    _LOG_FILE.write_text(json.dumps(data, indent=2))
+    if not _client:
+        raise RuntimeError("Supabase client not configured")
+    _client.table(_TABLE).update(fields).eq("task_id", task_id).execute()
 
 
 def get_task(task_id: str) -> Optional[Dict[str, Any]]:
     """Retrieve a single inbox item."""
-    if _client:
-        try:  # pragma: no cover - network
-            res = (
-                _client.table(_TABLE)
-                .select("*")
-                .eq("task_id", task_id)
-                .limit(1)
-                .execute()
-            )
-            if res.data:
-                return res.data[0]
-        except Exception:  # noqa: BLE001
-            pass
-    if _LOG_FILE.exists():
-        try:
-            data = json.loads(_LOG_FILE.read_text())
-            for item in data:
-                if item.get("task_id") == task_id:
-                    return item
-        except Exception:  # noqa: BLE001
-            return None
+    if not _client:
+        return None
+    res = _client.table(_TABLE).select("*").eq("task_id", task_id).limit(1).execute()
+    if res.data:
+        return res.data[0]
     return None
 
 
@@ -216,11 +127,6 @@ def get_summary() -> Dict[str, Any]:
                 .execute()
             )
             records = list(all_items.data or [])
-        except Exception:  # noqa: BLE001
-            records = []
-    elif _LOG_FILE.exists():
-        try:
-            records = json.loads(_LOG_FILE.read_text())
         except Exception:  # noqa: BLE001
             records = []
     for item in records:

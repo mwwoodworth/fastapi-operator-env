@@ -6,7 +6,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, Form, Header
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, Form
 from fastapi.security import OAuth2PasswordBearer
 import jwt
 from pydantic import BaseModel
