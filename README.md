@@ -55,6 +55,19 @@ required variables raise an error. Supabase credentials are required in
 production for persistent memory storage. Set `SLACK_WEBHOOK_URL` to a Slack
 incoming webhook to get notified when tasks succeed or fail.
 
+### Slack commands
+Register a `/brainops` slash command in your Slack workspace pointing to
+`/webhook/slack/command`. Set `SLACK_SIGNING_SECRET` so requests can be
+verified. Commands include:
+
+* `approve <id>` – run and mark an inbox task approved
+* `reject <id>` – mark a task rejected
+* `status <id>` – view the stored status
+* `query <text>` – search recent memory for information
+
+Slack Events can be sent to `/webhook/slack/event` if you want to store
+messages from channels.
+
 ### Database migrations
 Before running the server in production, apply the Alembic migrations to ensure
 the database schema and extensions are up to date:

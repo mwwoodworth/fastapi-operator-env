@@ -628,11 +628,20 @@ async def stripe_webhook(request: Request) -> Dict[str, Any]:
 
 
 def _verify_slack(timestamp: str | None, sig: str | None, body: bytes) -> bool:
+    """Validate Slack webhook signature and timestamp."""
     secret = settings.SLACK_SIGNING_SECRET
     if not secret or not sig or not timestamp:
         return True
     import hmac
     import hashlib
+    import time
+
+    try:
+        ts = int(timestamp)
+    except Exception:
+        return False
+    if abs(time.time() - ts) > 60 * 5:
+        return False
 
     basestring = f"v0:{timestamp}:{body.decode()}".encode()
     digest = hmac.new(secret.encode(), basestring, hashlib.sha256).hexdigest()
@@ -665,7 +674,41 @@ async def slack_command(request: Request) -> Dict[str, Any]:
     if action == "reject":
         agent_inbox.mark_as_resolved(task_id, "rejected", "via slack")
         return {"response_type": "in_channel", "text": f"Task {task_id} rejected"}
+    if action == "status":
+        return {
+            "response_type": "ephemeral",
+            "text": f"Task {task_id}: {item.get('status')}",
+        }
+    if action == "query":
+        query = " ".join(parts[1:])
+        results = memory_store.search(query, limit=3)
+        if results:
+            lines = [str(r.get("output") or r)[:80] for r in results]
+            resp = "\n".join(lines)
+        else:
+            resp = "No results"
+        return {"response_type": "in_channel", "text": resp}
     return {"response_type": "ephemeral", "text": "Unknown command"}
+
+
+@app.post("/webhook/slack/event")
+async def slack_event(request: Request) -> Dict[str, Any]:
+    """Handle generic Slack Events API payloads."""
+    raw = await request.body()
+    timestamp = request.headers.get("X-Slack-Request-Timestamp")
+    sig = request.headers.get("X-Slack-Signature")
+    if not _verify_slack(timestamp, sig, raw):
+        raise HTTPException(status_code=401, detail="invalid_signature")
+    payload = await request.json()
+    if payload.get("type") == "url_verification":
+        return {"challenge": payload.get("challenge")}
+    event = payload.get("event", {})
+    if event.get("type") == "message" and event.get("text"):
+        memory_store.save_memory(
+            {"input": event.get("text"), "output": "", "user": event.get("user")},
+            origin={"source": "slack"},
+        )
+    return {"status": "received"}
 
 
 @app.get("/task/inspect/{task_id}")
