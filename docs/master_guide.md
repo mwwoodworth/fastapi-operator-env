@@ -153,7 +153,7 @@ GitHub
  Notion: adapter functions search_notion_pages, get_page_snippet. 
 Notion Developers
 
- ClickUp: create_task, search_tasks; secret via vault. 
+ ClickUp: create_clickup_task, search_clickup_tasks; secret via vault.
 ClickUp Developer Docs
 
  Slack Inbound: /webhook/slack/command, verify signing secret. 
@@ -254,7 +254,7 @@ Notion Developers
  & Python tutorial 
 pynotion.com
 
-ClickUp task endpoints 
+ClickUp adapter & task endpoints
 ClickUp Developer Docs
 ClickUp Developer Docs
 
