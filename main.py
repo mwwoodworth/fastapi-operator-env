@@ -6,7 +6,7 @@ import logging
 import sys
 from loguru import logger
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from contextlib import asynccontextmanager
 from pathlib import Path
 import uuid
@@ -22,6 +22,11 @@ from prometheus_client import (
 
 from fastapi import FastAPI, HTTPException, Request, Header, UploadFile, File, Depends
 from fastapi.responses import JSONResponse, StreamingResponse, Response
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
+from fastapi_csrf_protect import CsrfProtect
 from fastapi.staticfiles import StaticFiles
 from fastapi.security import (
     OAuth2PasswordBearer,
@@ -104,6 +109,18 @@ def _slack_sink(message: "loguru.Message") -> None:
 logger.add(_slack_sink, level="ERROR")
 logging.basicConfig(handlers=[InterceptHandler()], level=0, force=True)
 
+
+class CsrfSettings(BaseModel):
+    secret_key: str = settings.JWT_SECRET
+
+
+@CsrfProtect.load_config
+def get_csrf_config() -> CsrfSettings:
+    return CsrfSettings()
+
+
+limiter = Limiter(key_func=get_remote_address, default_limits=["100/minute"])
+
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token", auto_error=False)
 USERS: dict[str, str] = {}
 ADMIN_USERS: set[str] = set()
@@ -116,6 +133,12 @@ if settings.BASIC_AUTH_USERS:
 ADMIN_USERS = set((settings.ADMIN_USERS or "").split(","))
 
 
+def _create_token(data: dict, minutes: int) -> str:
+    expire = datetime.now(timezone.utc) + timedelta(minutes=minutes)
+    payload = data | {"exp": expire}
+    return jwt.encode(payload, settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM)
+
+
 def _decode_token(token: str) -> dict:
     try:
         return jwt.decode(token, settings.JWT_SECRET, algorithms=[settings.JWT_ALGORITHM])
@@ -125,10 +148,11 @@ def _decode_token(token: str) -> dict:
 
 
 def get_current_user(request: Request, token: str | None = Depends(oauth2_scheme)) -> str:
-    if request.url.path == "/auth/token":
+    if request.url.path.startswith("/auth/"):
         return "anonymous"
     if not USERS:
         return "anonymous"
+    token = token or request.cookies.get("access_token")
     if not token:
         raise HTTPException(status_code=401, detail="Unauthorized")
     payload = _decode_token(token)
@@ -138,7 +162,8 @@ def get_current_user(request: Request, token: str | None = Depends(oauth2_scheme
     return username
 
 
-def require_admin(token: str = Depends(oauth2_scheme)) -> str:
+def require_admin(request: Request, token: str | None = Depends(oauth2_scheme)) -> str:
+    token = token or request.cookies.get("access_token")
     if not token:
         raise HTTPException(status_code=401, detail="Unauthorized")
     payload = _decode_token(token)
@@ -152,6 +177,15 @@ def require_admin(token: str = Depends(oauth2_scheme)) -> str:
     return username
 
 
+async def verify_csrf(request: Request, csrf_protect: CsrfProtect = Depends()) -> None:
+    if request.method in {"GET", "HEAD", "OPTIONS"}:
+        return
+    if request.url.path.startswith("/auth/"):
+        return
+    if "access_token" in request.cookies:
+        await csrf_protect.validate_csrf(request)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     tasks = ", ".join(get_registry().keys())
@@ -161,7 +195,10 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(lifespan=lifespan, dependencies=[Depends(get_current_user)])
+app = FastAPI(lifespan=lifespan, dependencies=[Depends(get_current_user), Depends(verify_csrf)])
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
 app.include_router(make_webhook_router)
 app.include_router(clickup_router)
 app.include_router(notion_router)
@@ -181,7 +218,7 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
 @app.post("/auth/token")
-async def auth_token(form: OAuth2PasswordRequestForm = Depends()) -> dict:
+async def auth_token(form: OAuth2PasswordRequestForm = Depends(), csrf_protect: CsrfProtect = Depends()) -> Response:
     if not USERS:
         raise HTTPException(status_code=401, detail="auth_disabled")
     pw = USERS.get(form.username)
@@ -189,8 +226,43 @@ async def auth_token(form: OAuth2PasswordRequestForm = Depends()) -> dict:
         raise HTTPException(status_code=401, detail="invalid_credentials")
     roles = ["admin"] if form.username in ADMIN_USERS else ["user"]
     payload = {"sub": form.username, "roles": roles}
-    token = jwt.encode(payload, settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM)
-    return {"access_token": token, "token_type": "bearer"}
+    access_token = _create_token(payload, 15)
+    refresh_token = _create_token({"sub": form.username, "type": "refresh"}, 60 * 24 * 7)
+    csrf_token, csrf_signed = csrf_protect.generate_csrf_tokens()
+    resp = JSONResponse({"access_token": access_token, "csrf_token": csrf_token})
+    resp.set_cookie("access_token", access_token, httponly=True, max_age=15 * 60)
+    resp.set_cookie("refresh_token", refresh_token, httponly=True, max_age=60 * 60 * 24 * 7)
+    csrf_protect.set_csrf_cookie(csrf_signed, resp)
+    return resp
+
+
+@app.post("/auth/refresh")
+async def refresh_access_token(request: Request, csrf_protect: CsrfProtect = Depends()) -> Response:
+    token = request.cookies.get("refresh_token")
+    if not token:
+        raise HTTPException(status_code=401, detail="missing_refresh")
+    payload = _decode_token(token)
+    if payload.get("type") != "refresh":
+        raise HTTPException(status_code=401, detail="invalid_token")
+    username = payload.get("sub")
+    if not username or username not in USERS:
+        raise HTTPException(status_code=401, detail="invalid_user")
+    roles = ["admin"] if username in ADMIN_USERS else ["user"]
+    access_token = _create_token({"sub": username, "roles": roles}, 15)
+    csrf_token, csrf_signed = csrf_protect.generate_csrf_tokens()
+    resp = JSONResponse({"access_token": access_token, "csrf_token": csrf_token})
+    resp.set_cookie("access_token", access_token, httponly=True, max_age=15 * 60)
+    csrf_protect.set_csrf_cookie(csrf_signed, resp)
+    return resp
+
+
+@app.post("/auth/logout")
+async def logout(csrf_protect: CsrfProtect = Depends()) -> Response:
+    resp = JSONResponse({"status": "logged_out"})
+    resp.delete_cookie("access_token")
+    resp.delete_cookie("refresh_token")
+    csrf_protect.unset_csrf_cookie(resp)
+    return resp
 
 
 class TanaRequest(BaseModel):
@@ -1344,6 +1416,11 @@ async def metrics_endpoint() -> Response:
 async def health() -> Dict[str, str]:
     """Basic health check endpoint used by monitoring services."""
     return {"status": "ok"}
+
+
+@app.post("/protected-test")
+async def protected_test() -> Dict[str, str]:
+    return {"status": "protected"}
 
 
 def _parse_cli() -> tuple[str, Dict[str, Any]]:
