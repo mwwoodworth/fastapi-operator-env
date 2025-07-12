@@ -773,6 +773,8 @@
 <p>Then POST to <code>/task/run</code> with JSON body:</p>
 <pre><code class="language-json">{&quot;task&quot;: &quot;deploy_vercel&quot;, &quot;context&quot;: {&quot;project_path&quot;: &quot;.&quot;}}
 </code></pre>
+<p>The response will include a Celery <code>task_id</code> which can be polled via
+<code>/task/status/{id}</code> to check progress.</p>
 <h2 id="environment">Environment</h2>
 <p>Copy <code>.env.example</code> to <code>.env</code> and fill in the required keys. Configuration is
 loaded via <code>core/settings.py</code> using Pydantic's <code>BaseSettings</code>, which reads the
