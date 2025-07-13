@@ -506,7 +506,9 @@
    cp .env.example .env</code></li>
 <li>Define at least one user for JWT auth:
    <code>bash
-   export AUTH_USERS='{"admin":"secret"}'
+   export AUTH_USERS='{"admin":"&lt;hashed-password&gt;"}'
+   # generate a hash using:
+   # python -c 'from passlib.hash import pbkdf2_sha256; print(pbkdf2_sha256.hash("secret"))'
    export ADMIN_USERS=admin</code></li>
 <li>Start the API server:
    <code>bash

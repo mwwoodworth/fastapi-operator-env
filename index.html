@@ -905,7 +905,9 @@
 <li>
 <p>Enable JWT auth by defining users:
    <code>bash
-   export AUTH_USERS='{"admin": "secret"}'
+   export AUTH_USERS='{"admin": "&lt;hashed-password&gt;"}'
+   # create a hash with:
+   # python -c 'from passlib.hash import pbkdf2_sha256; print(pbkdf2_sha256.hash("secret"))'
    export ADMIN_USERS=admin</code>
    Obtain tokens via <code>/auth/token</code> and include <code>Authorization: Bearer &lt;token&gt;</code> on requests.</p>
 </li>
