@@ -221,3 +221,7 @@ dashboard_ui/node_modules
 # Icon assets
 *.ico
 *.svg
+
+# Local database and generated index
+app.db
+data/doc_index.json
