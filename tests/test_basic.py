@@ -73,7 +73,8 @@ def test_inbox_routes():
     item = agent_inbox.add_to_inbox("sample_task", {"foo": "bar"}, "test")
     resp = client.get("/agent/inbox", headers=headers)
     assert resp.status_code == 200
-    tasks = resp.json()
+    data = resp.json()
+    tasks = data.get("tasks", [])
     assert isinstance(tasks, list)
     assert any(t["task_id"] == item["task_id"] for t in tasks)
     resp = client.post(

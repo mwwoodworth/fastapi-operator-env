@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import model_validator
 
 
 class Settings(BaseSettings):
@@ -86,7 +87,25 @@ class Settings(BaseSettings):
     STRIPE_WEBHOOK_SECRET: str | None = None
     CLICKUP_API_TOKEN: str | None = None
 
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-        case_sensitive = False
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+    )
+
+    @model_validator(mode="after")
+    def check_required(cls, values: "Settings") -> "Settings":
+        """Ensure required keys exist in production."""
+        if values.ENVIRONMENT == "production":
+            required = [
+                "FERNET_SECRET",
+                "VERCEL_TOKEN",
+                "SUPABASE_SERVICE_KEY",
+                "SUPABASE_URL",
+                "STRIPE_SECRET_KEY",
+                "TANA_API_KEY",
+            ]
+            missing = [k for k in required if not getattr(values, k)]
+            if missing:
+                raise ValueError(f"Missing settings: {', '.join(missing)}")
+        return values

@@ -93,6 +93,7 @@ from response_models import (
     VoiceUploadResponse,
     KnowledgeDocUploadResponse,
     KnowledgeSearchResponse,
+    GenericResponse,
 )
 
 
@@ -413,13 +414,13 @@ async def task_run(req: TaskRunRequest, request: Request):
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
-@app.post("/task/generate")
-async def generate_task(req: dict) -> Dict[str, Any]:
+@app.post("/task/generate", response_model=GenericResponse)
+async def generate_task(req: dict) -> GenericResponse:
     return claude_agent.run(req)
 
 
-@app.post("/task/nl-design")
-async def nl_design(req: NLDesignRequest) -> Dict[str, Any]:
+@app.post("/task/nl-design", response_model=GenericResponse)
+async def nl_design(req: NLDesignRequest) -> GenericResponse:
     context = {"goal": req.goal}
     if req.model:
         context["model"] = req.model
@@ -430,8 +431,8 @@ class LongTaskRequest(BaseModel):
     duration: int = 5
 
 
-@app.post("/tasks/long")
-async def queue_long_task(req: LongTaskRequest) -> Dict[str, Any]:
+@app.post("/tasks/long", response_model=GenericResponse)
+async def queue_long_task(req: LongTaskRequest) -> GenericResponse:
     result = long_task.delay(req.duration)
     TASKS_EXECUTED.inc()
     return {"task_id": result.id}
@@ -571,7 +572,7 @@ async def chat_endpoint(req: ChatRequest):
 
 
 @app.post("/chat/to-task")
-async def chat_to_task(req: ChatToTaskRequest) -> Dict[str, Any]:
+async def chat_to_task(req: ChatToTaskRequest) -> GenericResponse:
     context = {
         "message": req.message,
         "model": req.model,
@@ -594,7 +595,7 @@ async def webhook_trigger(
     return TaskRunResponse(status="success", result=result)
 
 
-@app.post("/webhook/github")
+@app.post("/webhook/github", response_model=GenericResponse)
 async def github_webhook(
     request: Request, x_hub_signature_256: str | None = Header(default=None)
 ) -> Dict[str, Any]:
@@ -646,8 +647,8 @@ def _save_event_ids(ids: list[str]) -> None:
     _EVENT_FILE.write_text(json.dumps(ids[-200:], indent=2))
 
 
-@app.post("/webhook/stripe", dependencies=[])
-async def stripe_webhook(request: Request) -> Dict[str, Any]:
+@app.post("/webhook/stripe", dependencies=[], response_model=GenericResponse)
+async def stripe_webhook(request: Request) -> GenericResponse:
     """Handle Stripe sale events and enqueue ``sync_sale`` task."""
     raw = await request.body()
     sig = request.headers.get("Stripe-Signature")
@@ -711,8 +712,8 @@ def _verify_slack(timestamp: str | None, sig: str | None, body: bytes) -> bool:
     return hmac.compare_digest(expected, sig)
 
 
-@app.post("/webhook/slack/command")
-async def slack_command(request: Request) -> Dict[str, Any]:
+@app.post("/webhook/slack/command", response_model=GenericResponse)
+async def slack_command(request: Request) -> GenericResponse:
     """Process Slack slash-command approvals for inbox tasks."""
     raw = await request.body()
     timestamp = request.headers.get("X-Slack-Request-Timestamp")
@@ -753,8 +754,8 @@ async def slack_command(request: Request) -> Dict[str, Any]:
     return {"response_type": "ephemeral", "text": "Unknown command"}
 
 
-@app.post("/webhook/slack/event")
-async def slack_event(request: Request) -> Dict[str, Any]:
+@app.post("/webhook/slack/event", response_model=GenericResponse)
+async def slack_event(request: Request) -> GenericResponse:
     """Handle generic Slack Events API payloads."""
     raw = await request.body()
     timestamp = request.headers.get("X-Slack-Request-Timestamp")
@@ -773,8 +774,8 @@ async def slack_event(request: Request) -> Dict[str, Any]:
     return {"status": "received"}
 
 
-@app.get("/task/inspect/{task_id}")
-async def inspect_task(task_id: str) -> Dict[str, Any]:
+@app.get("/task/inspect/{task_id}", response_model=GenericResponse)
+async def inspect_task(task_id: str) -> GenericResponse:
     entry = memory_store.fetch_one(task_id)
     log_entry = None
     try:
@@ -795,8 +796,8 @@ async def inspect_task(task_id: str) -> Dict[str, Any]:
     return {"memory": entry, "log": log_entry}
 
 
-@app.get("/docs/registry")
-async def docs_registry() -> Dict[str, Any]:
+@app.get("/docs/registry", response_model=GenericResponse)
+async def docs_registry() -> GenericResponse:
     registry = {
         key: {
             "description": value.description,
@@ -831,13 +832,13 @@ async def delete_secret_api(
     return StatusResponse(status="deleted")
 
 
-@app.get("/secrets/list")
-async def list_secrets_api(_: str = Depends(require_admin)):
+@app.get("/secrets/list", response_model=GenericResponse)
+async def list_secrets_api(_: str = Depends(require_admin)) -> GenericResponse:
     return {"secrets": secrets_task.list_secrets()}
 
 
-@app.get("/memory/summary")
-async def memory_summary() -> Dict[str, Any]:
+@app.get("/memory/summary", response_model=GenericResponse)
+async def memory_summary() -> GenericResponse:
     return claude_summarize.run({})
 
 
@@ -862,16 +863,16 @@ async def memory_search(
     return MemoryEntriesResponse(entries=results)
 
 
-@app.post("/knowledge/index")
-async def knowledge_index() -> Dict[str, Any]:
+@app.post("/knowledge/index", response_model=GenericResponse)
+async def knowledge_index() -> GenericResponse:
     from codex.memory import doc_indexer
 
     docs = doc_indexer.index_documents()
     return {"indexed": len(docs)}
 
 
-@app.post("/knowledge/query")
-async def knowledge_query(req: KnowledgeQueryRequest) -> Dict[str, Any]:
+@app.post("/knowledge/query", response_model=GenericResponse)
+async def knowledge_query(req: KnowledgeQueryRequest) -> GenericResponse:
     context = {
         "query": req.query,
         "sources": req.sources,
@@ -880,8 +881,8 @@ async def knowledge_query(req: KnowledgeQueryRequest) -> Dict[str, Any]:
     return run_task("unified_rag_agent", context)
 
 
-@app.get("/knowledge/sources")
-async def knowledge_sources() -> Dict[str, Any]:
+@app.get("/knowledge/sources", response_model=GenericResponse)
+async def knowledge_sources() -> GenericResponse:
     from codex.memory import doc_indexer
 
     return {"docs": doc_indexer.list_sources()}
@@ -1194,9 +1195,9 @@ class DelayRequest(BaseModel):
     fallback: str | None = "notify"
 
 
-@app.get("/agent/inbox")
-async def agent_inbox_view(limit: int = 10) -> List[Dict[str, Any]]:
-    return agent_inbox.get_pending_tasks(limit)
+@app.get("/agent/inbox", response_model=GenericResponse)
+async def agent_inbox_view(limit: int = 10) -> GenericResponse:
+    return {"tasks": agent_inbox.get_pending_tasks(limit)}
 
 
 @app.post("/agent/inbox/approve", response_model=TaskRunResponse)
@@ -1239,13 +1240,13 @@ async def agent_daily_plan() -> Dict[str, Any]:
     return run_task("claude_calendar_planner", {})
 
 
-@app.post("/agent/inbox/prioritize")
-async def agent_inbox_prioritize() -> Dict[str, Any]:
+@app.post("/agent/inbox/prioritize", response_model=GenericResponse)
+async def agent_inbox_prioritize() -> GenericResponse:
     return run_task("inbox_prioritizer", {})
 
 
-@app.get("/agent/inbox/mobile")
-async def agent_inbox_mobile() -> Dict[str, Any]:
+@app.get("/agent/inbox/mobile", response_model=GenericResponse)
+async def agent_inbox_mobile() -> GenericResponse:
     tasks = agent_inbox.get_pending_tasks(10)
     counts: Dict[str, int] = {}
     for t in tasks:
@@ -1263,15 +1264,15 @@ async def agent_inbox_mobile() -> Dict[str, Any]:
     }
 
 
-@app.post("/optimize/flow")
-async def optimize_flow(req: dict) -> Dict[str, Any]:
+@app.post("/optimize/flow", response_model=GenericResponse)
+async def optimize_flow(req: dict) -> GenericResponse:
     history = req.get("history")
     result = run_task("gemini_optimize_taskflow", {"history": history})
     return result
 
 
-@app.post("/memory/sync/agents")
-async def memory_sync_agents() -> Dict[str, Any]:
+@app.post("/memory/sync/agents", response_model=GenericResponse)
+async def memory_sync_agents() -> GenericResponse:
     return run_task("memory_sync_agent", {})
 
 
@@ -1279,8 +1280,8 @@ class MemoryDiffRequest(BaseModel):
     task_id: str
 
 
-@app.post("/memory/audit/diff")
-async def memory_audit_diff(req: MemoryDiffRequest) -> Dict[str, Any]:
+@app.post("/memory/audit/diff", response_model=GenericResponse)
+async def memory_audit_diff(req: MemoryDiffRequest) -> GenericResponse:
     return run_task("memory_diff_checker", req.dict())
 
 
@@ -1288,29 +1289,29 @@ class CoAuthorRequest(BaseModel):
     intent: str
 
 
-@app.post("/task/ai-coauthor")
-async def task_ai_coauthor(req: CoAuthorRequest) -> Dict[str, Any]:
+@app.post("/task/ai-coauthor", response_model=GenericResponse)
+async def task_ai_coauthor(req: CoAuthorRequest) -> GenericResponse:
     return run_task("ai_coauthored_composer", req.dict())
 
 
-@app.post("/agent/workflows/audit")
-async def workflows_audit() -> Dict[str, Any]:
+@app.post("/agent/workflows/audit", response_model=GenericResponse)
+async def workflows_audit() -> GenericResponse:
     return run_task("workflow_audit_agent", {})
 
 
-@app.post("/agent/forecast/weekly")
-async def agent_forecast_weekly(req: dict | None = None) -> Dict[str, Any]:
+@app.post("/agent/forecast/weekly", response_model=GenericResponse)
+async def agent_forecast_weekly(req: dict | None = None) -> GenericResponse:
     context = req or {"goal": "Optimize AI pipeline delivery over the next 7 days"}
     return run_task("strategy_forecaster", context)
 
 
-@app.get("/dashboard/forecast")
-async def dashboard_forecast() -> Dict[str, Any]:
+@app.get("/dashboard/forecast", response_model=GenericResponse)
+async def dashboard_forecast() -> GenericResponse:
     return run_task("timeline_builder", {})
 
 
-@app.post("/agent/strategy/weekly")
-async def agent_strategy_weekly() -> Dict[str, Any]:
+@app.post("/agent/strategy/weekly", response_model=GenericResponse)
+async def agent_strategy_weekly() -> GenericResponse:
     return run_task("claude_strategy_agent", {})
 
 
@@ -1318,8 +1319,8 @@ class DependencyMapRequest(BaseModel):
     tasks: List[Dict[str, Any]]
 
 
-@app.post("/task/dependency-map")
-async def task_dependency_map(req: DependencyMapRequest) -> Dict[str, Any]:
+@app.post("/task/dependency-map", response_model=GenericResponse)
+async def task_dependency_map(req: DependencyMapRequest) -> GenericResponse:
     return run_task("gemini_dependency_map", {"tasks": req.tasks})
 
 
@@ -1336,8 +1337,8 @@ class RecurringTask(BaseModel):
     enabled: bool | None = True
 
 
-@app.post("/mobile/task")
-async def mobile_task(req: MobileTask) -> Dict[str, Any]:
+@app.post("/mobile/task", response_model=GenericResponse)
+async def mobile_task(req: MobileTask) -> GenericResponse:
     message = req.voice_message
     prompt_result = run_task(
         "chat_to_prompt",
@@ -1355,19 +1356,19 @@ async def mobile_task(req: MobileTask) -> Dict[str, Any]:
     }
 
 
-@app.get("/agent/recurring")
-async def get_recurring() -> List[Dict[str, Any]]:
-    return recurring_task_engine.get_recurring_tasks()
+@app.get("/agent/recurring", response_model=GenericResponse)
+async def get_recurring() -> GenericResponse:
+    return {"tasks": recurring_task_engine.get_recurring_tasks()}
 
 
-@app.post("/agent/recurring/add")
-async def add_recurring(req: RecurringTask) -> Dict[str, Any]:
+@app.post("/agent/recurring/add", response_model=GenericResponse)
+async def add_recurring(req: RecurringTask) -> GenericResponse:
     entry = recurring_task_engine.add_recurring_task(req.dict())
     return {"added": entry}
 
 
-@app.get("/dashboard/status")
-async def dashboard_status() -> Dict[str, Any]:
+@app.get("/dashboard/status", response_model=GenericResponse)
+async def dashboard_status() -> GenericResponse:
     tasks_count = len(get_registry())
     memory_count = memory_store.count_entries()
     pending = 0
@@ -1404,8 +1405,8 @@ async def dashboard_status() -> Dict[str, Any]:
     }
 
 
-@app.get("/dashboard/tasks")
-async def dashboard_tasks() -> Dict[str, Any]:
+@app.get("/dashboard/tasks", response_model=GenericResponse)
+async def dashboard_tasks() -> GenericResponse:
     pending = len(agent_inbox.get_pending_tasks(100))
     recurring_enabled = len(
         [
@@ -1426,8 +1427,8 @@ async def dashboard_tasks() -> Dict[str, Any]:
     }
 
 
-@app.get("/dashboard/full")
-async def dashboard_full() -> Dict[str, Any]:
+@app.get("/dashboard/full", response_model=GenericResponse)
+async def dashboard_full() -> GenericResponse:
     base = dashboard_status()
     inbox = agent_inbox.get_summary()
     supabase_status = bool(settings.SUPABASE_URL)
@@ -1445,8 +1446,8 @@ async def dashboard_full() -> Dict[str, Any]:
     return base
 
 
-@app.get("/dashboard/metrics")
-async def dashboard_metrics() -> Dict[str, Any]:
+@app.get("/dashboard/metrics", response_model=GenericResponse)
+async def dashboard_metrics() -> GenericResponse:
     """Return basic counts from log files."""
     log_file = Path("logs/task_log.json")
     tasks_logged = 0
@@ -1483,8 +1484,8 @@ async def dashboard_metrics() -> Dict[str, Any]:
     }
 
 
-@app.get("/dashboard/sync")
-async def dashboard_sync() -> Dict[str, Any]:
+@app.get("/dashboard/sync", response_model=GenericResponse)
+async def dashboard_sync() -> GenericResponse:
     records = memory_store.fetch_all(limit=200)
     syncs = len([r for r in records if r.get("task") == "memory_sync_agent"])
     coauthored = len([r for r in records if r.get("task") == "ai_coauthored_composer"])
@@ -1507,8 +1508,8 @@ async def dashboard_sync() -> Dict[str, Any]:
     }
 
 
-@app.get("/dashboard/ops")
-async def dashboard_ops() -> Dict[str, Any]:
+@app.get("/dashboard/ops", response_model=GenericResponse)
+async def dashboard_ops() -> GenericResponse:
     """Combined operations metrics including sales and signups."""
     metrics = await dashboard_metrics()
     tasks = await dashboard_tasks()
@@ -1524,8 +1525,8 @@ async def dashboard_ops() -> Dict[str, Any]:
     return result
 
 
-@app.get("/diagnostics/state")
-async def diagnostics_state() -> Dict[str, Any]:
+@app.get("/diagnostics/state", response_model=GenericResponse)
+async def diagnostics_state() -> GenericResponse:
     active_tasks = 0
     retry_queue = 0
     last_summary = None
@@ -1567,8 +1568,8 @@ async def diagnostics_state() -> Dict[str, Any]:
     }
 
 
-@app.get("/tana/scan")
-async def tana_scan() -> Dict[str, Any]:
+@app.get("/tana/scan", response_model=GenericResponse)
+async def tana_scan() -> GenericResponse:
     return tana_node_executor.run({})
 
 
@@ -1580,14 +1581,14 @@ async def metrics_endpoint() -> Response:
     return Response(data, media_type="text/plain; version=0.0.4")
 
 
-@app.get("/health")
-async def health() -> Dict[str, str]:
+@app.get("/health", response_model=StatusResponse)
+async def health() -> StatusResponse:
     """Basic health check endpoint used by monitoring services."""
     return {"status": "ok"}
 
 
-@app.post("/protected-test")
-async def protected_test() -> Dict[str, str]:
+@app.post("/protected-test", response_model=StatusResponse)
+async def protected_test() -> StatusResponse:
     return {"status": "protected"}
 
 
