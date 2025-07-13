@@ -3,7 +3,7 @@ import importlib
 from io import BytesIO
 from fastapi.testclient import TestClient
 
-os.environ["AUTH_USERS"] = '{"agent":"secret"}'
+os.environ["AUTH_USERS"] = '{"user":"pass","agent":"secret"}'
 os.environ.pop("ADMIN_USERS", None)
 os.environ.setdefault("SUPABASE_URL", "http://example.com")
 os.environ.setdefault("SUPABASE_SERVICE_KEY", "dummy")
@@ -22,7 +22,7 @@ importlib.reload(main_module)
 
 
 def get_client():
-    os.environ["AUTH_USERS"] = '{"agent":"secret"}'
+    os.environ["AUTH_USERS"] = '{"user":"pass","agent":"secret"}'
     importlib.reload(chat_task_api)
     importlib.reload(main_module)
     import db.session

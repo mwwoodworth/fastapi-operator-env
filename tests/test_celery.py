@@ -25,7 +25,7 @@ import main as main_module
 
 
 def get_client():
-    os.environ["AUTH_USERS"] = '{"user":"pass"}'
+    os.environ["AUTH_USERS"] = '{"user":"pass","agent":"secret"}'
     importlib.reload(main_module)
     c = TestClient(main_module.app)
     resp = c.post(

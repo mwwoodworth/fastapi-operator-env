@@ -9,7 +9,7 @@ os.environ.setdefault("OPENAI_API_KEY", "test")
 os.environ.setdefault("STRIPE_SECRET_KEY", "test")
 os.environ.setdefault("TANA_API_KEY", "test")
 os.environ.setdefault("VERCEL_TOKEN", "test")
-os.environ["AUTH_USERS"] = '{"user":"pass"}'
+os.environ["AUTH_USERS"] = '{"user":"pass","agent":"secret"}'
 os.environ.pop("ADMIN_USERS", None)
 import main as main_module
 
