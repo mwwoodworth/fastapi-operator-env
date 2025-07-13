@@ -2,13 +2,19 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class StatusResponse(BaseModel):
     """Generic status response."""
 
     status: str
+
+
+class GenericResponse(BaseModel):
+    """Flexible response model allowing arbitrary keys."""
+
+    model_config = ConfigDict(extra="allow")
 
 
 class ValueResponse(BaseModel):
