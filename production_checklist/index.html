@@ -218,6 +218,160 @@
   
   
     <li class="md-nav__item">
+      <a href="../quick_start/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Quick Start
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../authentication/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Authentication
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../dashboard/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Using the Dashboard
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../task_development/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Task Development
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../integrations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Integration Guide
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../security/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Security
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../changelog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Changelog
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../master_guide/" class="md-nav__link">
         
   
@@ -347,6 +501,8 @@
 <p>Use this list before launching BrainStackStudio in production.</p>
 <ul>
 <li>[ ] Set <code>ENVIRONMENT=production</code> and verify all required secrets are present</li>
+<li>[ ] Configure <code>AUTH_USERS</code> and <code>ADMIN_USERS</code></li>
+<li>[ ] Run <code>celery -A celery_app worker</code> for background tasks</li>
 <li>[ ] Configure <code>BRAINSTACK_API_URL</code> and <code>BRAINSTACK_API_KEY</code></li>
 <li>[ ] Configure Make.com webhooks (<code>MAKE_PUBLISH_WEBHOOK</code> and <code>MAKE_SALE_WEBHOOK</code>)</li>
 <li>[ ] Configure <code>NEWSLETTER_API_URL</code> and <code>NEWSLETTER_API_KEY</code></li>
