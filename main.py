@@ -7,6 +7,7 @@ import sys
 from loguru import logger
 import asyncio
 import json
+import time
 from datetime import datetime, timezone, timedelta
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -15,16 +16,10 @@ import httpx
 from typing import Any, Dict, List
 from passlib.hash import pbkdf2_sha256
 from utils.metrics import (
-    REGISTRY,
     TASKS_EXECUTED,
-    TASKS_SUCCEEDED,
-    TASKS_FAILED,
-    TASK_DURATION,
-    OPENAI_API_CALLS,
-    OPENAI_TOKENS,
-    CLAUDE_API_CALLS,
-    CLAUDE_TOKENS,
     MEMORY_ENTRIES,
+    HTTP_EXCEPTIONS,
+    record_http_request,
     latest as metrics_latest,
 )
 
@@ -36,6 +31,7 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from fastapi_csrf_protect import CsrfProtect
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi.security import (
     OAuth2PasswordBearer,
     OAuth2PasswordRequestForm,
@@ -74,7 +70,6 @@ from codex.integrations.notion import router as notion_router
 from codex.memory.memory_api import router as memory_api_router
 from codex.ai.gemini_webhook import router as gemini_webhook_router
 from chat_task_api import router as chat_task_router
-import codex.ai.claude_sync as claude_sync
 from utils.ai_router import get_ai_model
 from claude_utils import stream_claude
 from gpt_utils import stream_gpt
@@ -150,6 +145,27 @@ logger.add(_supabase_sink, level="ERROR")
 logging.basicConfig(handlers=[InterceptHandler()], level=0, force=True)
 
 
+class RequestMetricsMiddleware(BaseHTTPMiddleware):
+    """Log each request and record Prometheus metrics."""
+
+    async def dispatch(self, request: Request, call_next):  # type: ignore[override]
+        start = time.monotonic()
+        status = 500
+        try:
+            response = await call_next(request)
+            status = response.status_code
+            return response
+        finally:
+            duration = time.monotonic() - start
+            record_http_request(request.method, request.url.path, status, duration)
+            logger.bind(
+                method=request.method,
+                path=request.url.path,
+                status=status,
+                duration=f"{duration:.3f}",
+            ).info("request")
+
+
 class CsrfSettings(BaseModel):
     secret_key: str = settings.JWT_SECRET
 
@@ -203,8 +219,10 @@ def _decode_token(token: str) -> dict:
 def get_current_user(
     request: Request, token: str | None = Depends(oauth2_scheme)
 ) -> str:
-    if request.url.path.startswith("/auth/") or request.url.path.startswith(
-        "/webhook/"
+    if (
+        request.url.path.startswith("/auth/")
+        or request.url.path.startswith("/webhook/")
+        or request.url.path == "/metrics"
     ):
         return "anonymous"
     cookie_token = request.cookies.get("access_token")
@@ -240,6 +258,8 @@ async def verify_csrf(request: Request, csrf_protect: CsrfProtect = Depends()) -
         return
     if request.url.path.startswith("/auth/"):
         return
+    if request.url.path == "/metrics":
+        return
     if "access_token" in request.cookies:
         await csrf_protect.validate_csrf(request)
 
@@ -258,6 +278,17 @@ app = FastAPI(
 )
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+
+@app.exception_handler(Exception)
+async def _unhandled_exception(request: Request, exc: Exception) -> JSONResponse:
+    """Catch-all handler that logs exceptions and records metrics."""
+    HTTP_EXCEPTIONS.inc()
+    logger.exception("Unhandled exception: %s", exc)
+    return JSONResponse({"detail": "Internal Server Error"}, status_code=500)
+
+
+app.add_middleware(RequestMetricsMiddleware)
 app.add_middleware(SlowAPIMiddleware)
 app.include_router(make_webhook_router)
 app.include_router(clickup_router)

@@ -36,4 +36,6 @@ if rate < 0.9:
     print(f'Coverage {rate*100:.1f}% below 90%')
     sys.exit(1)
 PY
+      - name: Build Docker image
+        run: docker build -t fastapi-operator-env:ci .
 

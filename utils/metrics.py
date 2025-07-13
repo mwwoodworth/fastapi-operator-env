@@ -61,6 +61,30 @@ MEMORY_ENTRIES = Gauge(
     registry=REGISTRY,
 )
 
+# HTTP server metrics
+HTTP_REQUESTS = Counter(
+    "http_requests_total",
+    "Total HTTP requests",
+    ["method", "path", "status"],
+    registry=REGISTRY,
+)
+HTTP_EXCEPTIONS = Counter(
+    "http_exceptions_total",
+    "Total unhandled exceptions",
+    registry=REGISTRY,
+)
+HTTP_REQUEST_DURATION = Summary(
+    "http_request_duration_seconds",
+    "HTTP request duration in seconds",
+    registry=REGISTRY,
+)
+
+
+def record_http_request(method: str, path: str, status: int, duration: float) -> None:
+    """Record an HTTP request for Prometheus metrics."""
+    HTTP_REQUESTS.labels(method=method, path=path, status=str(status)).inc()
+    HTTP_REQUEST_DURATION.observe(duration)
+
 
 def latest() -> bytes:
     """Return the latest Prometheus metrics payload."""

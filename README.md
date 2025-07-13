@@ -69,6 +69,12 @@ verified. Commands include:
 Slack Events can be sent to `/webhook/slack/event` if you want to store
 messages from channels.
 
+### Observability
+Structured JSON logs are emitted for every request and important event. Logs are
+written to stdout in JSON format and forwarded to Slack and Supabase when
+`SLACK_WEBHOOK_URL` is configured. Prometheus metrics are available from the
+`/metrics` endpoint for monitoring with Grafana.
+
 ### Database migrations
 Before running the server in production, apply the Alembic migrations to ensure
 the database schema and extensions are up to date:
