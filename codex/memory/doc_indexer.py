@@ -7,6 +7,8 @@ import os
 from pathlib import Path
 from typing import Any, Dict, List
 
+from .doc_store import embed_and_store
+
 try:
     from supabase_client import supabase
 except Exception:  # pragma: no cover - missing deps
@@ -26,6 +28,7 @@ def index_documents() -> List[Dict[str, Any]]:
             text = path.read_text(encoding="utf-8")
         except Exception:
             continue
+        embed_and_store(text, {"path": str(path)})
         docs.append({"path": str(path), "text": text})
     INDEX_FILE.write_text(json.dumps(docs, indent=2))
     return docs

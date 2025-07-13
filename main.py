@@ -892,32 +892,10 @@ async def knowledge_sources() -> GenericResponse:
 async def knowledge_doc_upload(
     req: KnowledgeDocUploadRequest,
 ) -> KnowledgeDocUploadResponse:
-    from codex.memory.memory_utils import embed_chunks
+    from codex.memory.doc_store import embed_and_store
 
-    try:
-        from supabase_client import supabase
-    except Exception:  # pragma: no cover - missing deps
-        supabase = None
-
-    vector = embed_chunks([req.content])[0]
-    doc_id: int | None = None
-    if supabase:
-        try:  # pragma: no cover - network
-            res = (
-                supabase.table("documents")
-                .insert(
-                    {
-                        "content": req.content,
-                        "metadata": req.metadata or {},
-                        "embedding": vector,
-                    }
-                )
-                .execute()
-            )
-            if res.data:
-                doc_id = res.data[0].get("id")
-        except Exception:  # noqa: BLE001
-            doc_id = None
+    ids = embed_and_store(req.content, req.metadata)
+    doc_id = ids[0] if ids else None
     return KnowledgeDocUploadResponse(id=doc_id)
 
 
