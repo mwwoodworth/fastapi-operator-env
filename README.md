@@ -17,7 +17,8 @@ Continuous integration runs linting, type checks and tests with coverage to ensu
 
 2. Enable JWT auth by defining users:
    ```bash
-   export AUTH_USERS='{"admin": "secret"}'
+   export AUTH_USERS='{"admin": "<hashed-password>"}'
+   # python -c 'from passlib.hash import pbkdf2_sha256; print(pbkdf2_sha256.hash("secret"))'
    export ADMIN_USERS=admin
    ```
    Obtain a token via `/auth/token` and include `Authorization: Bearer <token>` on requests.

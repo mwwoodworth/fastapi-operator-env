@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/router';
 import { motion } from 'framer-motion';
 import Layout from '../components/Layout';
 import StatusCards from '../components/StatusCards';
@@ -12,6 +13,7 @@ import SearchBar from '../components/SearchBar';
 import { apiFetch } from '../lib/api';
 
 export default function Home({ theme, setTheme }) {
+  const router = useRouter();
   const [metrics, setMetrics] = useState(null);
   const [history, setHistory] = useState([]);
   const [tasks, setTasks] = useState([]);
@@ -42,6 +44,10 @@ export default function Home({ theme, setTheme }) {
   };
 
   useEffect(() => {
+    if (typeof window !== 'undefined' && !localStorage.getItem('token')) {
+      router.push('/login');
+      return;
+    }
     load();
     const id = setInterval(load, 5000);
     return () => clearInterval(id);

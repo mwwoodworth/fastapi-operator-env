@@ -25,7 +25,8 @@ import main as main_module
 
 
 def get_client():
-    os.environ["AUTH_USERS"] = '{"user":"pass","agent":"secret"}'
+    from passlib.hash import pbkdf2_sha256
+    os.environ["AUTH_USERS"] = '{"user":"' + pbkdf2_sha256.hash("pass") + '","agent":"' + pbkdf2_sha256.hash("secret") + '"}'
     importlib.reload(main_module)
     c = TestClient(main_module.app)
     resp = c.post(

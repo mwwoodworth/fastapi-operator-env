@@ -18,14 +18,15 @@ os.environ.setdefault("DAILY_PLANNER_MODEL", "claude")
 os.environ.setdefault("ESCALATION_CHECK_INTERVAL", "1800")
 os.environ.setdefault("SLACK_WEBHOOK_URL", "http://example.com/webhook")
 
-os.environ["AUTH_USERS"] = '{"user":"pass","agent":"secret"}'
+from passlib.hash import pbkdf2_sha256
+os.environ["AUTH_USERS"] = '{"user":"' + pbkdf2_sha256.hash("pass") + '","agent":"' + pbkdf2_sha256.hash("secret") + '"}'
 import importlib
 from fastapi.testclient import TestClient
 import main as main_module
 
 
 def auth_client():
-    os.environ["AUTH_USERS"] = '{"user":"pass","agent":"secret"}'
+    os.environ["AUTH_USERS"] = '{"user":"' + pbkdf2_sha256.hash("pass") + '","agent":"' + pbkdf2_sha256.hash("secret") + '"}'
     importlib.reload(main_module)
     c = TestClient(main_module.app)
     resp = c.post(
@@ -223,7 +224,7 @@ def test_search_and_error_logs():
 
 
 def test_jwt_auth_enforced():
-    os.environ["AUTH_USERS"] = '{"user":"pass"}'
+    os.environ["AUTH_USERS"] = '{"user":"' + pbkdf2_sha256.hash("pass") + '"}'
     os.environ["ADMIN_USERS"] = "user"
     import importlib
     import main as main_module

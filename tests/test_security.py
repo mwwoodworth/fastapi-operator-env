@@ -1,6 +1,7 @@
 import os
 import importlib
 from fastapi.testclient import TestClient
+from passlib.hash import pbkdf2_sha256
 
 os.environ.setdefault("VERCEL_TOKEN", "test")
 os.environ.setdefault("FERNET_SECRET", "YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXoxMjM0NTY=")
@@ -18,7 +19,7 @@ client = TestClient(main_module.app)
 
 
 def test_csrf_and_refresh_flow():
-    os.environ["AUTH_USERS"] = '{"user":"pass"}'
+    os.environ["AUTH_USERS"] = '{"user":"' + pbkdf2_sha256.hash("pass") + '"}'
     os.environ["ADMIN_USERS"] = "user"
     importlib.reload(main_module)
     c = TestClient(main_module.app)
@@ -46,7 +47,7 @@ def test_csrf_and_refresh_flow():
 
 
 def test_rate_limit():
-    os.environ["AUTH_USERS"] = '{"user":"pass"}'
+    os.environ["AUTH_USERS"] = '{"user":"' + pbkdf2_sha256.hash("pass") + '"}'
     importlib.reload(main_module)
     c = TestClient(main_module.app)
     token_resp = c.post(

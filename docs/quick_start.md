@@ -9,7 +9,9 @@ These steps get the Operator running locally.
    ```
 2. Define at least one user for JWT auth:
    ```bash
-   export AUTH_USERS='{"admin":"secret"}'
+   export AUTH_USERS='{"admin":"<hashed-password>"}'
+   # generate a hash using:
+   # python -c 'from passlib.hash import pbkdf2_sha256; print(pbkdf2_sha256.hash("secret"))'
    export ADMIN_USERS=admin
    ```
 3. Start the API server:

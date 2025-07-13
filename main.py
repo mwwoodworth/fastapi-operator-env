@@ -13,6 +13,7 @@ from pathlib import Path
 import uuid
 import httpx
 from typing import Any, Dict, List
+from passlib.hash import pbkdf2_sha256
 from utils.metrics import (
     REGISTRY,
     TASKS_EXECUTED,
@@ -172,6 +173,16 @@ if settings.AUTH_USERS:
 ADMIN_USERS = set((settings.ADMIN_USERS or "").split(","))
 
 
+def verify_password(password: str, stored: str) -> bool:
+    """Verify raw password against pbkdf2 hash."""
+    try:
+        if stored.startswith("$pbkdf2-sha256$"):
+            return pbkdf2_sha256.verify(password, stored)
+        return password == stored
+    except Exception:  # noqa: BLE001
+        return False
+
+
 def _create_token(data: dict, minutes: int) -> str:
     now = datetime.now(timezone.utc)
     expire = now + timedelta(minutes=minutes)
@@ -273,7 +284,7 @@ async def auth_token(
     if not USERS:
         raise HTTPException(status_code=401, detail="auth_disabled")
     pw = USERS.get(form.username)
-    if not pw or pw != form.password:
+    if not pw or not verify_password(form.password, pw):
         raise HTTPException(status_code=401, detail="invalid_credentials")
     roles = ["admin"] if form.username in ADMIN_USERS else ["user"]
     payload = {"sub": form.username, "roles": roles}
