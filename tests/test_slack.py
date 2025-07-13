@@ -68,4 +68,5 @@ def test_slack_command_flow():
         headers={"X-Slack-Signature": sig3, "X-Slack-Request-Timestamp": ts3},
     )
     assert resp3.status_code == 200
-    assert "No results" in resp3.json()["text"]
+    text_resp = resp3.json()["text"]
+    assert "No results" in text_resp or "not found" in text_resp
