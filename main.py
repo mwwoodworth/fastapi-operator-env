@@ -81,6 +81,7 @@ from response_models import (
     ChatResponse,
     TaskRunResponse,
     CeleryTaskResponse,
+    TaskStatusResponse,
     MemoryEntriesResponse,
     VoiceHistoryResponse,
     VoiceTraceResponse,
@@ -436,13 +437,13 @@ async def queue_long_task(req: LongTaskRequest) -> Dict[str, Any]:
     return {"task_id": result.id}
 
 
-@app.get("/tasks/status/{task_id}")
-@app.get("/task/status/{task_id}")
-async def task_status(task_id: str) -> Dict[str, Any]:
+@app.get("/tasks/status/{task_id}", response_model=TaskStatusResponse)
+@app.get("/task/status/{task_id}", response_model=TaskStatusResponse)
+async def task_status(task_id: str) -> TaskStatusResponse:
     res = celery_app.AsyncResult(task_id)
     if res.successful():
-        return {"status": res.state, "result": res.result}
-    return {"status": res.state}
+        return TaskStatusResponse(status=res.state, result=res.result)
+    return TaskStatusResponse(status=res.state, result=None)
 
 
 @app.post("/chat", response_model=ChatResponse)
