@@ -2,7 +2,7 @@ from __future__ import annotations
 
 """ClickUp API helpers for basic task operations."""
 
-import logging
+from loguru import logger
 import os
 import time
 from typing import Dict, Any, List, Optional
@@ -12,7 +12,6 @@ from pydantic import BaseModel
 
 import httpx
 
-logger = logging.getLogger(__name__)
 
 _API_BASE = "https://api.clickup.com/api/v2"
 _TOKEN = os.getenv("CLICKUP_API_TOKEN")

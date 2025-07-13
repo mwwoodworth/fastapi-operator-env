@@ -3,12 +3,10 @@ from __future__ import annotations
 """Simplified ClickUp adapter used by tasks."""
 
 from typing import Any, Dict, List
-import logging
+from loguru import logger
 import os
 
 from . import clickup
-
-logger = logging.getLogger(__name__)
 
 
 def search_clickup_tasks(query: str) -> List[Dict[str, Any]]:

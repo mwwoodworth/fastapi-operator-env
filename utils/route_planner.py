@@ -12,5 +12,5 @@ def assign_routes(tasks: List[Dict[str, str]]) -> List[Dict[str, str]]:
         model = "claude"
         if any(k in name for k in ["code", "dependency", "map"]):
             model = "gemini"
-        routes.append({"task": t.get("task"), "model": model})
+        routes.append({"task": str(t.get("task")), "model": model})
     return routes

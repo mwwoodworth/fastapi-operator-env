@@ -5,7 +5,7 @@ from __future__ import annotations
 import datetime
 from datetime import timezone
 import importlib
-import logging
+from loguru import logger
 import os
 import traceback
 import pkgutil
@@ -16,8 +16,12 @@ from typing import Callable, Any, Dict, List
 from .memory import memory_store, link_task_to_origin
 from utils.slack import send_slack_message
 from .integrations.clickup_adapter import create_clickup_task, update_clickup_task
-
-logger = logging.getLogger(__name__)
+from utils.metrics import (
+    TASKS_EXECUTED,
+    TASKS_SUCCEEDED,
+    TASKS_FAILED,
+    TASK_DURATION,
+)
 
 
 @dataclass
@@ -109,9 +113,18 @@ def _maybe_sync_clickup(task_id: str, context: Dict[str, Any], result: Any) -> N
     description = context.get("description") or ""
     try:
         if cu_task_id:
-            update_clickup_task(cu_task_id, {"name": title, "description": description, "token": token})
+            update_clickup_task(
+                cu_task_id, {"name": title, "description": description, "token": token}
+            )
         else:
-            res = create_clickup_task({"list_id": list_id, "title": title, "description": description, "token": token})
+            res = create_clickup_task(
+                {
+                    "list_id": list_id,
+                    "title": title,
+                    "description": description,
+                    "token": token,
+                }
+            )
             if isinstance(res, dict) and res.get("id"):
                 context["clickup_task_id"] = res["id"]
     except Exception:  # noqa: BLE001
@@ -125,6 +138,8 @@ def run_task(task_id: str, context: Dict[str, Any]) -> Any:
     task_def = registry.get(task_id)
     if not task_def:
         raise ValueError(f"Unknown task: {task_id}")
+    TASKS_EXECUTED.inc()
+    start = datetime.datetime.now(timezone.utc)
     retry = int(context.get("retry", 0))
     try:
         result = task_def.func(context)
@@ -146,12 +161,17 @@ def run_task(task_id: str, context: Dict[str, Any]) -> Any:
                 ).execute()
             except Exception as e:  # noqa: BLE001
                 logger.error("Failed to queue retry: %s", e)
+    duration = (datetime.datetime.now(timezone.utc) - start).total_seconds()
+    TASK_DURATION.observe(duration)
     level = "info"
     if isinstance(result, dict) and result.get("error"):
         level = "error"
+        TASKS_FAILED.inc()
         send_slack_message(f"Task {task_id} failed: {result.get('error')}")
     log_entry_id = _log_task(task_id, context, result, level=level)
     status = "failed" if level == "error" else "success"
+    if status == "success":
+        TASKS_SUCCEEDED.inc()
     try:
         origin_meta = {}
         for key in [
@@ -208,6 +228,9 @@ async def stream_task(task_id: str, context: Dict[str, Any]):
     if not task_def:
         raise ValueError(f"Unknown task: {task_id}")
 
+    TASKS_EXECUTED.inc()
+    start = datetime.datetime.now(timezone.utc)
+
     module = importlib.import_module(f"codex.tasks.{task_id}")
     stream_func = getattr(module, "stream", None)
     if not stream_func:
@@ -229,8 +252,14 @@ async def stream_task(task_id: str, context: Dict[str, Any]):
         result = {"error": str(exc), "stack": tb}
         level = "error"
 
+    duration = (datetime.datetime.now(timezone.utc) - start).total_seconds()
+    TASK_DURATION.observe(duration)
     log_entry_id = _log_task(task_id, context, result, level=level)
     status = "failed" if level == "error" else "success"
+    if status == "success":
+        TASKS_SUCCEEDED.inc()
+    else:
+        TASKS_FAILED.inc()
     try:
         origin_meta = {}
         for key in [

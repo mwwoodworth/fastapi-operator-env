@@ -2,7 +2,7 @@ from __future__ import annotations
 
 """Notion API helpers for search and snippet retrieval."""
 
-import logging
+from loguru import logger
 import os
 import time
 from typing import List, Dict, Any, Optional
@@ -12,13 +12,11 @@ from pydantic import BaseModel
 
 import httpx
 
-logger = logging.getLogger(__name__)
 
 _API_BASE = "https://api.notion.com/v1"
 _VERSION = "2022-06-28"
 
 _TOKEN = os.getenv("NOTION_API_KEY")
-
 
 
 def _request(
@@ -64,7 +62,10 @@ def search_notion_pages(workspace: str, token: str, query: str) -> List[Dict[str
     Returns a list of page ``{"id": str, "title": str}`` dictionaries. If the
     token is missing or the request fails, an empty list is returned.
     """
-    payload = {"query": query, "sort": {"direction": "descending", "timestamp": "last_edited_time"}}
+    payload = {
+        "query": query,
+        "sort": {"direction": "descending", "timestamp": "last_edited_time"},
+    }
     try:  # pragma: no cover - network
         data = _request("POST", f"{_API_BASE}/search", token, json=payload)
     except Exception as exc:  # noqa: BLE001
@@ -111,7 +112,9 @@ def update_page(
     idempotency_key: str | None = None,
 ) -> Dict[str, Any]:
     payload = {"properties": properties}
-    return _request("PATCH", f"{_API_BASE}/pages/{page_id}", token, idempotency_key, json=payload)
+    return _request(
+        "PATCH", f"{_API_BASE}/pages/{page_id}", token, idempotency_key, json=payload
+    )
 
 
 def delete_page(workspace: str, token: str, page_id: str) -> Dict[str, Any]:
@@ -211,7 +214,10 @@ def get_page_snippet(workspace: str, token: str, page_id: str) -> str:
         btype = block.get("type")
         if btype == "paragraph":
             texts.append(
-                "".join(t.get("plain_text", "") for t in block.get("paragraph", {}).get("text", []))
+                "".join(
+                    t.get("plain_text", "")
+                    for t in block.get("paragraph", {}).get("text", [])
+                )
             )
         if len(" ".join(texts)) > 200:
             break

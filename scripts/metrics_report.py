@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from loguru import logger
 
 
 def compute_metrics() -> dict:
@@ -33,4 +34,4 @@ def compute_metrics() -> dict:
 
 
 if __name__ == "__main__":
-    print(json.dumps(compute_metrics(), indent=2))
+    logger.info(json.dumps(compute_metrics(), indent=2))

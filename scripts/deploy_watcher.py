@@ -1,11 +1,13 @@
 import os
 import time
 import httpx
+from loguru import logger
 
 INTERVAL = 900  # 15 minutes
 REPO = os.getenv("GITHUB_REPO", "mwwoodworth/fastapi-operator-env")
 STATE_FILE = os.getenv("DEPLOY_HASH_FILE", "last_deploy_hash.txt")
 WEBHOOK = os.getenv("DEPLOY_WEBHOOK", "http://localhost:10000/webhook/github")
+
 
 def _get_latest_commit() -> str:
     url = f"https://api.github.com/repos/{REPO}/commits/main"
@@ -29,7 +31,7 @@ def _trigger_deploy(sha: str) -> None:
     try:
         httpx.post(WEBHOOK, json={"sha": sha}, timeout=10)
     except Exception as exc:  # noqa: BLE001
-        print(f"deploy webhook failed: {exc}")
+        logger.error(f"deploy webhook failed: {exc}")
 
 
 def main() -> None:
@@ -41,7 +43,7 @@ def main() -> None:
                 _trigger_deploy(latest)
                 _save_last(latest)
         except Exception as exc:  # noqa: BLE001
-            print(f"deploy watcher error: {exc}")
+            logger.error(f"deploy watcher error: {exc}")
         time.sleep(INTERVAL)
 
 
