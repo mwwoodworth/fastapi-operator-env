@@ -3,6 +3,8 @@
 Use this list before launching BrainStackStudio in production.
 
 - [ ] Set `ENVIRONMENT=production` and verify all required secrets are present
+- [ ] Configure `AUTH_USERS` and `ADMIN_USERS`
+- [ ] Run `celery -A celery_app worker` for background tasks
 - [ ] Configure `BRAINSTACK_API_URL` and `BRAINSTACK_API_KEY`
 - [ ] Configure Make.com webhooks (`MAKE_PUBLISH_WEBHOOK` and `MAKE_SALE_WEBHOOK`)
 - [ ] Configure `NEWSLETTER_API_URL` and `NEWSLETTER_API_KEY`

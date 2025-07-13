@@ -196,11 +196,12 @@ pip install mkdocs mkdocs-material
 mkdocs serve
 ```
 
-An OpenAPI schema is available at `/openapi.json`. A typed TypeScript SDK can be generated with:
+An OpenAPI schema is available at `/openapi.json` and the repository includes a pre-generated TypeScript SDK under `sdk/`.
+To regenerate it manually run:
 
 ```bash
 curl http://localhost:10000/openapi.json -o openapi.json
-npx openapi-typescript-codegen --input openapi.json --output sdk --useOptions --exportSchemas
+npx openapi-typescript-codegen --input openapi.json --output sdk --useOptions --exportSchemas true
 ```
 
 If you are working inside `dashboard_ui` simply run `npm run generate:sdk` to update the bundled client library.

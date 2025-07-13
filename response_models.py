@@ -30,6 +30,13 @@ class CeleryTaskResponse(BaseModel):
     task_id: str
 
 
+class TaskStatusResponse(BaseModel):
+    """Current status for an asynchronous task."""
+
+    status: str
+    result: Any | None = None
+
+
 class ChatResponse(BaseModel):
     response: str
     model: str
