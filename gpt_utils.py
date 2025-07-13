@@ -1,4 +1,5 @@
 # gpt_utils.py
+import asyncio
 import httpx
 from loguru import logger
 from utils.metrics import OPENAI_API_CALLS, OPENAI_TOKENS
@@ -39,21 +40,31 @@ async def run_gpt(prompt: str) -> str:
         return data["choices"][0]["message"]["content"]
 
 
-async def stream_gpt(prompt: str):
-    """Yield GPT tokens using OpenAI streaming API."""
+async def stream_gpt(prompt: str, retries: int = 2):
+    """Yield GPT tokens using OpenAI streaming API with retries."""
     import openai
 
-    client = openai.AsyncOpenAI(api_key=OPENAI_API_KEY)
-    OPENAI_API_CALLS.inc()
-    stream = await client.chat.completions.create(
-        model=OPENAI_MODEL,
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0.7,
-        max_tokens=1024,
-        stream=True,
-    )
-    async for chunk in stream:
-        token = chunk.choices[0].delta.content
-        if token:
-            OPENAI_TOKENS.inc(len(token.split()))
-            yield token
+    for attempt in range(retries + 1):
+        try:
+            client = openai.AsyncOpenAI(api_key=OPENAI_API_KEY)
+            OPENAI_API_CALLS.inc()
+            stream = await client.chat.completions.create(
+                model=OPENAI_MODEL,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.7,
+                max_tokens=1024,
+                stream=True,
+            )
+            async for chunk in stream:
+                token = chunk.choices[0].delta.content
+                if token:
+                    OPENAI_TOKENS.inc(len(token.split()))
+                    yield token
+            return
+        except Exception as e:  # pragma: no cover - network
+            logger.warning(f"GPT stream attempt {attempt + 1} failed: {e}")
+            if attempt >= retries:
+                text = await run_gpt(prompt)
+                yield text
+            else:
+                await asyncio.sleep(2 ** attempt)

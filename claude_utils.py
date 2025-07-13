@@ -1,4 +1,5 @@
 # claude_utils.py
+import asyncio
 import httpx
 from loguru import logger
 from utils.metrics import CLAUDE_API_CALLS, CLAUDE_TOKENS
@@ -38,19 +39,29 @@ async def run_claude(prompt: str) -> str:
         return data["content"][0]["text"]
 
 
-async def stream_claude(prompt: str):
-    """Yield Claude tokens using Anthropic streaming API."""
+async def stream_claude(prompt: str, retries: int = 2):
+    """Yield Claude tokens using Anthropic streaming API with retries."""
     import anthropic
 
-    client = anthropic.AsyncAnthropic(api_key=CLAUDE_API_KEY)
-    CLAUDE_API_CALLS.inc()
-    async with client.messages.stream(
-        model=CLAUDE_MODEL,
-        max_tokens=1024,
-        temperature=0.7,
-        messages=[{"role": "user", "content": prompt}],
-    ) as stream:
-        async for event in stream:
-            if event.type == "content_block_delta":
-                CLAUDE_TOKENS.inc(len(event.delta.text.split()))
-                yield event.delta.text
+    for attempt in range(retries + 1):
+        try:
+            client = anthropic.AsyncAnthropic(api_key=CLAUDE_API_KEY)
+            CLAUDE_API_CALLS.inc()
+            async with client.messages.stream(
+                model=CLAUDE_MODEL,
+                max_tokens=1024,
+                temperature=0.7,
+                messages=[{"role": "user", "content": prompt}],
+            ) as stream:
+                async for event in stream:
+                    if event.type == "content_block_delta":
+                        CLAUDE_TOKENS.inc(len(event.delta.text.split()))
+                        yield event.delta.text
+            return
+        except Exception as e:  # pragma: no cover - network
+            logger.warning(f"Claude stream attempt {attempt + 1} failed: {e}")
+            if attempt >= retries:
+                text = await run_claude(prompt)
+                yield text
+            else:
+                await asyncio.sleep(2 ** attempt)

@@ -7,10 +7,11 @@ export async function POST(req: Request) {
   }
   const base = process.env.NEXT_PUBLIC_API_BASE || '';
   try {
-    const res = await fetch(`${base}/chat`, {
+    const url = stream ? `${base}/chat/stream` : `${base}/chat`;
+    const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message, stream }),
+      body: JSON.stringify({ message }),
     });
     if (stream) {
       // Forward SSE stream directly to the client

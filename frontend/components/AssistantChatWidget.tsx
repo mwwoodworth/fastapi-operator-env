@@ -1,5 +1,5 @@
 'use client';
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { readSSE } from '../utils/sse';
 
 interface Msg { role: 'user' | 'assistant'; text: string; }
@@ -9,6 +9,7 @@ export default function AssistantChatWidget() {
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const controllerRef = useRef<AbortController | null>(null);
 
   async function send() {
     if (!input.trim()) return;
@@ -21,10 +22,13 @@ export default function AssistantChatWidget() {
     });
     setLoading(true);
     try {
+      const controller = new AbortController();
+      controllerRef.current = controller;
       const res = await fetch('/api/assistant/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: user, stream: true }),
+        signal: controller.signal,
       });
       if (res.headers.get('content-type')?.includes('text/event-stream')) {
         // Consume token stream and append chunks in real time
@@ -52,7 +56,12 @@ export default function AssistantChatWidget() {
       });
     } finally {
       setLoading(false);
+      controllerRef.current = null;
     }
+  }
+
+  function abort() {
+    controllerRef.current?.abort();
   }
 
   return (
@@ -86,6 +95,11 @@ export default function AssistantChatWidget() {
             <button type="submit" disabled={loading} className="bg-primary text-primary-foreground px-3 py-1 rounded">
               Send
             </button>
+            {loading && (
+              <button type="button" onClick={abort} className="bg-muted px-3 py-1 rounded">
+                Stop
+              </button>
+            )}
           </form>
         </div>
       )}
