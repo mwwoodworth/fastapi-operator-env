@@ -3,22 +3,27 @@
 from __future__ import annotations
 
 import asyncio
-import logging
+import sys
+from loguru import logger
 
 from codex import run_task
 from codex.tasks import secrets
 from supabase_client import supabase
+
+logger.remove()
+logger.add(sys.stdout, serialize=True)
 import json
 from pathlib import Path
 import datetime
 
-logger = logging.getLogger(__name__)
 INTERVAL = 900  # 15 minutes
 
 
 def check_retry_queue() -> None:
     try:
-        res = supabase.table("retry_queue").select("*").eq("status", "pending").execute()
+        res = (
+            supabase.table("retry_queue").select("*").eq("status", "pending").execute()
+        )
         entries = res.data or []
     except Exception as exc:  # noqa: BLE001
         logger.error("Failed to fetch retry queue: %s", exc)
@@ -29,11 +34,15 @@ def check_retry_queue() -> None:
         retry = entry.get("retry", 1)
         try:
             result = run_task(task_id, {**ctx, "retry": retry})
-            supabase.table("retry_queue").update({"status": "complete", "result": json.dumps(result)}).eq("id", entry["id"]).execute()
+            supabase.table("retry_queue").update(
+                {"status": "complete", "result": json.dumps(result)}
+            ).eq("id", entry["id"]).execute()
         except Exception as exc:  # noqa: BLE001
             logger.error("Retry task failed: %s", exc)
             status = "failed" if retry >= 3 else "pending"
-            supabase.table("retry_queue").update({"status": status, "retry": retry + 1, "error": str(exc)}).eq("id", entry["id"]).execute()
+            supabase.table("retry_queue").update(
+                {"status": status, "retry": retry + 1, "error": str(exc)}
+            ).eq("id", entry["id"]).execute()
 
 
 LAST_SUMMARY_FILE = Path("logs/last_memory_summary.txt")
@@ -43,13 +52,20 @@ def auto_memory_summarizer() -> None:
     last = None
     if LAST_SUMMARY_FILE.exists():
         try:
-            last = datetime.datetime.fromisoformat(LAST_SUMMARY_FILE.read_text().strip())
+            last = datetime.datetime.fromisoformat(
+                LAST_SUMMARY_FILE.read_text().strip()
+            )
         except Exception:  # noqa: BLE001
             last = None
-    if not last or (datetime.datetime.now(datetime.timezone.utc) - last).total_seconds() > 86400:
+    if (
+        not last
+        or (datetime.datetime.now(datetime.timezone.utc) - last).total_seconds() > 86400
+    ):
         try:
             run_task("claude_memory_agent", {})
-            LAST_SUMMARY_FILE.write_text(datetime.datetime.now(datetime.timezone.utc).isoformat())
+            LAST_SUMMARY_FILE.write_text(
+                datetime.datetime.now(datetime.timezone.utc).isoformat()
+            )
         except Exception as exc:  # noqa: BLE001
             logger.error("Auto memory summarizer failed: %s", exc)
 

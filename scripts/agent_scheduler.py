@@ -4,13 +4,16 @@ from __future__ import annotations
 
 import asyncio
 from datetime import datetime, timedelta, timezone
-import logging
+import sys
+from loguru import logger
+
+logger.remove()
+logger.add(sys.stdout, serialize=True)
 
 from codex import run_task
 from codex.memory import agent_inbox, memory_store
 from codex.integrations import push_notify
 
-logger = logging.getLogger(__name__)
 CHECK_INTERVAL = 1800  # 30 minutes
 
 

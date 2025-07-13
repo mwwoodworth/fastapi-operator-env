@@ -1,5 +1,4 @@
-import logging
-from logging.handlers import RotatingFileHandler
+from loguru import logger
 import json
 import os
 from pathlib import Path
@@ -15,9 +14,7 @@ from codex.integrations.make_webhook import router as make_webhook_router
 load_dotenv()
 
 LOG_PATH = Path("api.log")
-handler = RotatingFileHandler(LOG_PATH, maxBytes=1000000, backupCount=3)
-logging.basicConfig(level=logging.INFO, handlers=[handler])
-logger = logging.getLogger("brainops.api")
+logger.add(LOG_PATH, rotation=1_000_000, serialize=True)
 
 app = FastAPI()
 app.include_router(make_webhook_router)
@@ -47,6 +44,7 @@ async def tana_from_assistant(req: Request):
     payload = await req.json()
     brainops_operator.run_task("create_tana_node", payload)
     return {"status": "assistant_note_received"}
+
 
 @app.post("/run-task")
 async def run_task_endpoint(payload: dict):
@@ -80,4 +78,3 @@ def _log_history(task: str, context: dict, result: dict):
             history = []
     history.append(entry)
     log_file.write_text(json.dumps(history[-50:], indent=2))
-

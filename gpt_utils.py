@@ -1,5 +1,7 @@
 # gpt_utils.py
 import httpx
+from loguru import logger
+from utils.metrics import OPENAI_API_CALLS, OPENAI_TOKENS
 
 from core.settings import Settings
 
@@ -26,10 +28,15 @@ async def run_gpt(prompt: str) -> str:
     }
     async with httpx.AsyncClient(timeout=30) as client:
         response = await client.post(
-            "https://api.openai.com/v1/chat/completions", headers=HEADERS, json=payload
+            "https://api.openai.com/v1/chat/completions",
+            headers=HEADERS,
+            json=payload,
         )
         response.raise_for_status()
-        return response.json()["choices"][0]["message"]["content"]
+        data = response.json()
+        OPENAI_API_CALLS.inc()
+        OPENAI_TOKENS.inc(data.get("usage", {}).get("total_tokens", 0))
+        return data["choices"][0]["message"]["content"]
 
 
 async def stream_gpt(prompt: str):
@@ -37,6 +44,7 @@ async def stream_gpt(prompt: str):
     import openai
 
     client = openai.AsyncOpenAI(api_key=OPENAI_API_KEY)
+    OPENAI_API_CALLS.inc()
     stream = await client.chat.completions.create(
         model=OPENAI_MODEL,
         messages=[{"role": "user", "content": prompt}],
@@ -47,4 +55,5 @@ async def stream_gpt(prompt: str):
     async for chunk in stream:
         token = chunk.choices[0].delta.content
         if token:
+            OPENAI_TOKENS.inc(len(token.split()))
             yield token

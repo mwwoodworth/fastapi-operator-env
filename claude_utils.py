@@ -1,5 +1,7 @@
 # claude_utils.py
 import httpx
+from loguru import logger
+from utils.metrics import CLAUDE_API_CALLS, CLAUDE_TOKENS
 
 from core.settings import Settings
 
@@ -29,7 +31,11 @@ async def run_claude(prompt: str) -> str:
     async with httpx.AsyncClient(timeout=30) as client:
         response = await client.post(ANTHROPIC_API_URL, headers=HEADERS, json=payload)
         response.raise_for_status()
-        return response.json()["content"][0]["text"]
+        data = response.json()
+        CLAUDE_API_CALLS.inc()
+        usage = data.get("usage", {})
+        CLAUDE_TOKENS.inc(usage.get("output_tokens", 0) + usage.get("input_tokens", 0))
+        return data["content"][0]["text"]
 
 
 async def stream_claude(prompt: str):
@@ -37,6 +43,7 @@ async def stream_claude(prompt: str):
     import anthropic
 
     client = anthropic.AsyncAnthropic(api_key=CLAUDE_API_KEY)
+    CLAUDE_API_CALLS.inc()
     async with client.messages.stream(
         model=CLAUDE_MODEL,
         max_tokens=1024,
@@ -45,4 +52,5 @@ async def stream_claude(prompt: str):
     ) as stream:
         async for event in stream:
             if event.type == "content_block_delta":
+                CLAUDE_TOKENS.inc(len(event.delta.text.split()))
                 yield event.delta.text

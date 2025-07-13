@@ -4,9 +4,7 @@ from __future__ import annotations
 
 import os
 import httpx
-import logging
-
-logger = logging.getLogger(__name__)
+from loguru import logger
 
 
 def send_push(title: str, body: str, url: str = "") -> dict:

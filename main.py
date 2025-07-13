@@ -13,12 +13,18 @@ from pathlib import Path
 import uuid
 import httpx
 from typing import Any, Dict, List
-from prometheus_client import (
-    Counter,
-    Gauge,
-    CollectorRegistry,
-    generate_latest,
-    CONTENT_TYPE_LATEST,
+from utils.metrics import (
+    REGISTRY,
+    TASKS_EXECUTED,
+    TASKS_SUCCEEDED,
+    TASKS_FAILED,
+    TASK_DURATION,
+    OPENAI_API_CALLS,
+    OPENAI_TOKENS,
+    CLAUDE_API_CALLS,
+    CLAUDE_TOKENS,
+    MEMORY_ENTRIES,
+    latest as metrics_latest,
 )
 
 from fastapi import FastAPI, HTTPException, Request, Header, UploadFile, File, Depends
@@ -42,18 +48,7 @@ from core.settings import Settings
 settings = Settings()
 APP_START = datetime.now(timezone.utc)
 
-# Prometheus metrics
-REGISTRY = CollectorRegistry()
-TASKS_EXECUTED = Counter(
-    "tasks_executed_total",
-    "Total tasks executed",
-    registry=REGISTRY,
-)
-MEMORY_ENTRIES = Gauge(
-    "memory_entries_total",
-    "Total memory entries",
-    registry=REGISTRY,
-)
+# Prometheus metrics provided by utils.metrics
 
 from codex.tasks import (
     secrets as secrets_task,
@@ -120,7 +115,35 @@ def _slack_sink(message: "loguru.Message") -> None:
     send_slack_message(message.record["message"])
 
 
+def _supabase_sink(message: "loguru.Message") -> None:
+    async def _send() -> None:
+        try:
+            from supabase_client import supabase
+        except Exception:
+            return
+        record = message.record
+        entry = {
+            "id": str(uuid.uuid4()),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "level": record["level"].name,
+            "message": record["message"],
+            "function": record.get("function"),
+            "module": record.get("module"),
+        }
+        try:
+            supabase.table("logs").insert(entry).execute()
+        except Exception:
+            pass
+
+    try:
+        loop = asyncio.get_running_loop()
+        loop.create_task(_send())
+    except RuntimeError:
+        asyncio.run(_send())
+
+
 logger.add(_slack_sink, level="ERROR")
+logger.add(_supabase_sink, level="ERROR")
 logging.basicConfig(handlers=[InterceptHandler()], level=0, force=True)
 
 
@@ -167,7 +190,9 @@ def _decode_token(token: str) -> dict:
 def get_current_user(
     request: Request, token: str | None = Depends(oauth2_scheme)
 ) -> str:
-    if request.url.path.startswith("/auth/") or request.url.path.startswith("/webhook/"):
+    if request.url.path.startswith("/auth/") or request.url.path.startswith(
+        "/webhook/"
+    ):
         return "anonymous"
     cookie_token = request.cookies.get("access_token")
     token = token or cookie_token
@@ -602,7 +627,9 @@ def _verify_stripe(payload: bytes, sig_header: str | None) -> bool:
     except Exception:
         return False
 
+
 _EVENT_FILE = Path("logs/stripe_events.json")
+
 
 def _load_event_ids() -> list[str]:
     if _EVENT_FILE.exists():
@@ -1548,8 +1575,8 @@ async def tana_scan() -> Dict[str, Any]:
 async def metrics_endpoint() -> Response:
     """Prometheus metrics endpoint."""
     MEMORY_ENTRIES.set(memory_store.count_entries())
-    data = generate_latest(REGISTRY)
-    return Response(data, media_type=CONTENT_TYPE_LATEST)
+    data = metrics_latest()
+    return Response(data, media_type="text/plain; version=0.0.4")
 
 
 @app.get("/health")
@@ -1616,15 +1643,15 @@ if __name__ == "__main__":
         import json
 
         entries = memory_store.fetch_all()
-        print(json.dumps(entries, indent=2))
+        logger.info(json.dumps(entries, indent=2))
     elif cmd:
         if cmd == "retry_queue":
             from scripts.runner import check_retry_queue
 
             check_retry_queue()
-            print("retry queue processed")
+            logger.info("retry queue processed")
         else:
             result = run_task(cmd, ctx)
             import json
 
-            print(json.dumps(result, indent=2))
+            logger.info(json.dumps(result, indent=2))
