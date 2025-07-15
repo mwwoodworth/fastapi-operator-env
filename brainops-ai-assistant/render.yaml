@@ -1,0 +1,46 @@
+services:
+  # AI Assistant Backend
+  - type: web
+    name: brainops-ai-assistant-api
+    runtime: docker
+    plan: free
+    region: oregon
+    branch: master
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    healthCheckPath: /health
+    envVars:
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: DATABASE_URL
+        fromDatabase:
+          type: postgres
+          name: brainops-ai-assistant-db
+          property: connectionString
+    autoDeploy: true
+
+  # AI Assistant Frontend
+  - type: web
+    name: brainops-ai-assistant-frontend
+    runtime: docker
+    plan: free
+    region: oregon
+    branch: master
+    dockerfilePath: ./frontend/Dockerfile
+    dockerContext: ./frontend
+    envVars:
+      - key: NEXT_PUBLIC_API_URL
+        value: https://brainops-ai-assistant-api.onrender.com
+      - key: NEXT_PUBLIC_WS_URL
+        value: wss://brainops-ai-assistant-api.onrender.com
+    autoDeploy: true
+
+databases:
+  - name: brainops-ai-assistant-db
+    databaseName: brainops_ai_assistant
+    user: brainops_user
+    plan: free
+    region: oregon
+    ipAllowList: []
