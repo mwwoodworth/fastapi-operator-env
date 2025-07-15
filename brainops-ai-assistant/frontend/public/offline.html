@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BrainOps Assistant - Offline</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: #0f172a;
+            color: #e2e8f0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .offline-container {
+            text-align: center;
+            padding: 2rem;
+            max-width: 500px;
+        }
+        .offline-icon {
+            width: 100px;
+            height: 100px;
+            margin: 0 auto 2rem;
+            opacity: 0.5;
+        }
+        h1 {
+            font-size: 2rem;
+            margin-bottom: 1rem;
+            color: #f1f5f9;
+        }
+        p {
+            font-size: 1.1rem;
+            line-height: 1.6;
+            color: #cbd5e1;
+            margin-bottom: 2rem;
+        }
+        .status {
+            background-color: #1e293b;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-top: 2rem;
+        }
+        .retry-button {
+            background-color: #3b82f6;
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 6px;
+            font-size: 1rem;
+            cursor: pointer;
+            margin-top: 1rem;
+        }
+        .retry-button:hover {
+            background-color: #2563eb;
+        }
+    </style>
+</head>
+<body>
+    <div class="offline-container">
+        <svg class="offline-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                  d="M18.364 5.636a9 9 0 010 12.728m0 0l-2.829-2.829m2.829 2.829L21 21M15.536 8.464a5 5 0 010 7.072m0 0l-2.829-2.829m2.829 2.829l2.829 2.829M5.636 5.636a9 9 0 000 12.728m0 0l2.829-2.829m-2.829 2.829L3 21m2.464-12.536a5 5 0 000 7.072m0 0l2.829-2.829m-2.829 2.829l-2.829 2.829"></path>
+        </svg>
+        <h1>You're Offline</h1>
+        <p>BrainOps Assistant is currently offline. Your work is being saved locally and will sync automatically when you reconnect.</p>
+        
+        <div class="status">
+            <p><strong>Offline Mode Active</strong></p>
+            <p>✓ Local storage enabled<br>
+               ✓ Voice memos available<br>
+               ✓ File operations cached<br>
+               ✓ Tasks queued for sync</p>
+        </div>
+        
+        <button class="retry-button" onclick="window.location.reload()">
+            Try Again
+        </button>
+    </div>
+    
+    <script>
+        // Check for connection periodically
+        setInterval(() => {
+            fetch('/api/health', { method: 'HEAD' })
+                .then(() => window.location.reload())
+                .catch(() => {});
+        }, 5000);
+    </script>
+</body>
+</html>
