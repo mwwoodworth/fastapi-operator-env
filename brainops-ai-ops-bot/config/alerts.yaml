@@ -1,0 +1,125 @@
+# Alert configuration for BrainOps AI Ops Bot
+# This file defines how alerts are handled for different severities and services
+
+severity_levels:
+  critical:
+    channels: ['slack', 'email']
+    cooldown_minutes: 5
+    escalate_after: 3
+    
+  error:
+    channels: ['slack']
+    cooldown_minutes: 15
+    escalate_after: 5
+    
+  warning:
+    channels: ['slack']
+    cooldown_minutes: 30
+    escalate_after: 10
+    
+  info:
+    channels: ['slack']
+    cooldown_minutes: 60
+    escalate_after: null
+
+# Service-specific alert rules
+service_rules:
+  # Database services
+  supabase:
+    down_severity: 'critical'
+    slow_severity: 'warning'
+    slow_threshold_ms: 5000
+    
+  # Hosting/Deployment services
+  render:
+    down_severity: 'error'
+    slow_severity: 'warning'
+    deploy_failure_severity: 'error'
+    
+  vercel:
+    down_severity: 'error'
+    slow_severity: 'warning'
+    deploy_failure_severity: 'error'
+    
+  # Version control
+  github:
+    down_severity: 'warning'
+    slow_severity: 'info'
+    workflow_failure_severity: 'error'
+    
+  # Project management
+  clickup:
+    down_severity: 'warning'
+    slow_severity: 'info'
+    
+  notion:
+    down_severity: 'warning'
+    slow_severity: 'info'
+    
+  # Communication
+  slack:
+    down_severity: 'error'
+    slow_severity: 'warning'
+    
+  # Payment processing
+  stripe:
+    down_severity: 'critical'
+    slow_severity: 'error'
+    
+  # AI services
+  openai:
+    down_severity: 'warning'
+    slow_severity: 'info'
+    rate_limit_severity: 'warning'
+    
+  claude:
+    down_severity: 'warning'
+    slow_severity: 'info'
+    rate_limit_severity: 'warning'
+    
+  # Data storage
+  airtable:
+    down_severity: 'warning'
+    slow_severity: 'info'
+
+# Alert templates
+templates:
+  service_down:
+    title: "🚨 Service Down: {service}"
+    message: "Service {service} is currently unavailable. Response time: {response_time}ms"
+    
+  service_slow:
+    title: "⚠️ Slow Response: {service}"
+    message: "Service {service} is responding slowly. Response time: {response_time}ms (threshold: {threshold}ms)"
+    
+  deployment_failed:
+    title: "❌ Deployment Failed: {service}"
+    message: "Deployment failed for {service}. Error: {error}"
+    
+  health_check_failed:
+    title: "🔍 Health Check Failed: {service}"
+    message: "Health check failed for {service}. {details}"
+
+# Escalation rules
+escalation:
+  levels:
+    - name: 'primary'
+      channels: ['slack']
+      
+    - name: 'secondary'
+      channels: ['slack', 'email']
+      delay_minutes: 10
+      
+    - name: 'emergency'
+      channels: ['slack', 'email', 'sms']
+      delay_minutes: 30
+      
+  triggers:
+    - service_down_for_minutes: 15
+      escalate_to: 'secondary'
+      
+    - service_down_for_minutes: 60
+      escalate_to: 'emergency'
+      
+    - multiple_services_down: 3
+      escalate_to: 'emergency'

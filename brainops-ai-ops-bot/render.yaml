@@ -1,0 +1,59 @@
+services:
+  # BrainOps AI Ops Bot API
+  - type: web
+    name: brainops-ai-ops-bot
+    runtime: python
+    plan: free
+    region: oregon
+    branch: main
+    rootDir: .
+    buildCommand: pip install -r requirements.txt
+    startCommand: python bot.py serve --port 10000 --host 0.0.0.0
+    healthCheckPath: /health
+    envVars:
+      - key: GITHUB_TOKEN
+        sync: false
+      - key: RENDER_API_KEY
+        sync: false
+      - key: VERCEL_TOKEN
+        sync: false
+      - key: SLACK_BOT_TOKEN
+        sync: false
+      - key: SLACK_WEBHOOK_URL
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: CLAUDE_API_KEY
+        sync: false
+      - key: NOTION_API_TOKEN
+        sync: false
+      - key: CLICKUP_API_TOKEN
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: STRIPE_API_KEY_LIVE
+        sync: false
+      - key: AIRTABLE_API_KEY
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: DATABASE_URL
+        fromDatabase:
+          type: postgres
+          name: ops-bot-db
+          property: connectionString
+    autoDeploy: true
+    env: python
+    pythonVersion: 3.11
+
+databases:
+  - name: ops-bot-db
+    databaseName: ops_bot
+    user: ops_bot_user
+    plan: free
+    region: oregon
+    ipAllowList: []
