@@ -1,0 +1,131 @@
+# LangGraph Agent Configuration
+# Defines the multi-agent system graph for BrainOps automation
+
+nodes:
+  # Entry point for all agent workflows
+  - id: coordinator
+    type: coordinator
+    description: "Routes requests to appropriate specialized agents"
+    config:
+      max_retries: 3
+      timeout: 120
+    
+  # Content generation agent (Claude)
+  - id: claude_content
+    type: claude
+    description: "Handles all content generation, documentation, and copywriting"
+    config:
+      model: claude-3-opus-20240229
+      temperature: 0.7
+      max_tokens: 4096
+      
+  # Code generation agent (GPT-4/Codex)
+  - id: codex_code
+    type: codex
+    description: "Generates code, technical implementations, and automations"
+    config:
+      model: gpt-4-turbo-preview
+      temperature: 0.3
+      max_tokens: 8192
+      
+  # SEO and marketing agent (Gemini)
+  - id: gemini_seo
+    type: gemini
+    description: "Optimizes content for SEO, generates marketing materials"
+    config:
+      model: gemini-pro
+      temperature: 0.5
+      
+  # Research and fact-checking agent (Perplexity/Search)
+  - id: search_research
+    type: search
+    description: "Performs web searches, fact-checking, and competitive research"
+    config:
+      provider: perplexity
+      max_results: 10
+
+edges:
+  # Coordinator can route to any specialized agent
+  - from: coordinator
+    to: claude_content
+    condition: "task_type in ['content', 'documentation', 'copywriting']"
+    
+  - from: coordinator
+    to: codex_code
+    condition: "task_type in ['code', 'automation', 'technical']"
+    
+  - from: coordinator
+    to: gemini_seo
+    condition: "task_type in ['seo', 'marketing', 'optimization']"
+    
+  - from: coordinator
+    to: search_research
+    condition: "task_type in ['research', 'search', 'fact_check']"
+    
+  # Agents can call each other for collaborative tasks
+  - from: claude_content
+    to: search_research
+    condition: "needs_research == true"
+    
+  - from: claude_content
+    to: gemini_seo
+    condition: "needs_seo_optimization == true"
+    
+  - from: codex_code
+    to: claude_content
+    condition: "needs_documentation == true"
+    
+  - from: gemini_seo
+    to: search_research
+    condition: "needs_competitor_analysis == true"
+
+routing_rules:
+  # Default routing based on task metadata
+  - name: content_tasks
+    pattern: "autopublish_*|generate_*_content|write_*"
+    target: claude_content
+    
+  - name: code_tasks
+    pattern: "generate_*_code|automate_*|create_*_integration"
+    target: codex_code
+    
+  - name: seo_tasks
+    pattern: "optimize_*|analyze_keywords|generate_meta_*"
+    target: gemini_seo
+    
+  - name: research_tasks
+    pattern: "research_*|find_*|verify_*"
+    target: search_research
+
+execution_modes:
+  # Sequential execution for dependent tasks
+  sequential:
+    - enabled: true
+    - max_chain_length: 5
+    
+  # Parallel execution for independent subtasks
+  parallel:
+    - enabled: true
+    - max_concurrent: 3
+    
+  # Human-in-the-loop for approval workflows
+  approval_required:
+    - enabled: true
+    - approval_nodes: ["coordinator"]
+    - timeout: 3600  # 1 hour
+
+context_management:
+  # Shared context between agents
+  shared_memory:
+    - type: redis
+    - ttl: 3600
+    
+  # Task-specific context
+  task_context:
+    - persist: true
+    - storage: supabase
+    
+  # Memory retrieval for relevant past executions
+  memory_rag:
+    - enabled: true
+    - similarity_threshold: 0.8

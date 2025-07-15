@@ -1,0 +1,76 @@
+# BrainOps Backend Dependencies
+# Python 3.11+ required
+
+# Core Framework
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+pydantic==2.5.3
+pydantic-settings==2.1.0
+python-multipart==0.0.6
+
+# Async Support
+asyncio==3.4.3
+aiohttp==3.9.1
+aiofiles==23.2.1
+
+# Database & ORM
+sqlalchemy==2.0.25
+alembic==1.13.1
+asyncpg==0.29.0
+psycopg2-binary==2.9.9
+supabase==2.3.4
+
+# Vector Database & Embeddings
+pgvector==0.2.4
+openai==1.9.0  # For embeddings
+
+# AI/LLM Integrations
+anthropic==0.12.0  # Claude
+google-generativeai==0.3.2  # Gemini
+langchain==0.1.1
+langchain-community==0.0.13
+langgraph==0.0.22
+
+# Authentication & Security
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+bcrypt==4.1.2
+cryptography==41.0.7
+
+# Task Scheduling
+apscheduler==3.10.4
+celery==5.3.4
+redis==5.0.1
+
+# External Integrations
+stripe==7.8.0
+slack-sdk==3.26.2
+notion-client==2.2.0
+requests==2.31.0
+
+# Utilities
+python-dotenv==1.0.0
+pyyaml==6.0.1
+orjson==3.9.10  # Fast JSON parsing
+httpx==0.26.0
+tenacity==8.2.3  # Retry logic
+
+# Monitoring & Logging
+structlog==24.1.0
+python-json-logger==2.0.7
+sentry-sdk[fastapi]==1.39.2
+
+# Development & Testing
+pytest==7.4.4
+pytest-asyncio==0.23.3
+pytest-mock==3.12.0
+pytest-cov==4.1.0
+black==23.12.1
+flake8==7.0.0
+mypy==1.8.0
+pre-commit==3.6.0
+
+# Documentation
+mkdocs==1.5.3
+mkdocs-material==9.5.4
+pydoc-markdown==4.8.2

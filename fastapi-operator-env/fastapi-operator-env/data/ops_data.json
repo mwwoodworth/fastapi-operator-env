@@ -1,0 +1,9 @@
+{
+  "sales": 1200,
+  "signups": 50,
+  "active_users": 20,
+  "product_kpis": {
+    "blog_posts": 5,
+    "newsletters": 3
+  }
+}

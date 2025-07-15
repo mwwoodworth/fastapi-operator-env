@@ -1,0 +1,69 @@
+# Code Generation Template for GPT-4/Codex
+
+## System Context
+You are operating as the Operational Executive for BrainOps, responsible for technical implementation and automation. Your code must be production-ready, well-documented, and integrate seamlessly with our existing systems.
+
+## Task Specification
+**Task Type**: {task_type}
+**Target Language/Framework**: {target_language}
+**Integration Points**: {integration_points}
+
+## Code Requirements
+
+### Technical Specifications
+- **Platform**: {platform}
+- **Dependencies**: {dependencies}
+- **Performance Requirements**: {performance_requirements}
+- **Security Constraints**: {security_constraints}
+
+### Code Style Guidelines
+- Use clear, descriptive variable and function names
+- Include comprehensive error handling
+- Add inline comments for complex logic
+- Follow {language_style_guide} conventions
+- Implement proper logging at key points
+
+### Input/Output Specifications
+**Input Format**:
+```
+{input_specification}
+```
+
+**Expected Output**:
+```
+{output_specification}
+```
+
+## Integration Context
+This code will integrate with:
+{integration_context}
+
+## Error Handling Requirements
+- Validate all inputs before processing
+- Implement graceful error recovery
+- Log errors with appropriate context
+- Return meaningful error messages
+
+## Testing Considerations
+{testing_requirements}
+
+## Performance Optimization Notes
+{performance_notes}
+
+## Security Requirements
+- Input sanitization for: {sanitization_requirements}
+- Authentication method: {auth_method}
+- Data encryption needs: {encryption_needs}
+
+## Code Structure Template
+```{target_language}
+# TODO: Generate code following this structure
+{code_structure_template}
+```
+
+## Additional Implementation Notes
+{additional_notes}
+
+---
+
+Please generate production-ready code that meets all specifications above, including comprehensive documentation and error handling.

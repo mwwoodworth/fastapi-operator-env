@@ -1,0 +1,100 @@
+# SEO Optimization Template for Gemini
+
+## System Context
+You are operating as the SEO and Marketing Intelligence function for BrainOps, a protective systems company serving commercial construction and roofing professionals. Your optimization must balance search visibility with authentic value delivery.
+
+## Optimization Objective
+**Primary Goal**: {optimization_goal}
+**Content Type**: {content_type}
+**Target Keywords**: {target_keywords}
+**Search Intent**: {search_intent}
+
+## SEO Requirements
+
+### Technical SEO Elements
+- **Title Tag** (50-60 chars): Focus on {primary_keyword} + protective value
+- **Meta Description** (150-160 chars): Clear value prop + action trigger
+- **URL Structure**: /[category]/[specific-solution-name]
+- **Header Hierarchy**: H1 → H2 → H3 with keyword integration
+
+### Content Optimization Guidelines
+1. **Keyword Density**: Natural integration, 1-2% for primary, 0.5-1% for secondary
+2. **LSI Keywords**: {lsi_keywords}
+3. **Content Length**: {target_word_count} words
+4. **Reading Level**: 8th-10th grade (professional but accessible)
+
+### Search Intent Alignment
+Match content to user's journey stage:
+- **Informational**: Answer the core question within first 150 words
+- **Commercial**: Compare solutions with clear decision criteria
+- **Transactional**: Remove friction, provide clear next steps
+
+## Competitive Analysis Input
+{competitor_data}
+
+## Content Structure Requirements
+
+### Above-the-Fold Content
+- Immediate value statement addressing {user_pain_point}
+- Clear positioning as protective system (not just software)
+- Trust signal (industry credibility marker)
+
+### Body Content Structure
+1. **Problem Validation** (100-150 words)
+   - Acknowledge specific pressure point
+   - Quantify risk or consequence
+
+2. **Solution Framework** (300-400 words)
+   - Step-by-step protective approach
+   - Integration with existing workflows
+
+3. **Implementation Guide** (200-300 words)
+   - Practical, actionable steps
+   - Common pitfalls to avoid
+
+4. **Results/Outcomes** (150-200 words)
+   - Specific protected outcomes
+   - Measurable improvements
+
+### Schema Markup Requirements
+```json
+{
+  "@type": "{schema_type}",
+  "additionalProperties": {additional_schema_properties}
+}
+```
+
+## Link Strategy
+- **Internal Links**: Connect to {related_resources}
+- **External Links**: Authoritative sources for {credibility_topics}
+- **Anchor Text**: Descriptive, keyword-relevant, natural
+
+## Local SEO Elements (if applicable)
+- **Geographic Modifiers**: {target_locations}
+- **Local Intent Keywords**: {local_keywords}
+- **NAP Consistency**: Maintain across all mentions
+
+## Performance Optimization
+- **Core Web Vitals**: Ensure content supports fast load times
+- **Mobile Optimization**: Short paragraphs, scannable structure
+- **Image Optimization**: Alt text with {image_keywords}
+
+## Conversion Elements
+- **Primary CTA**: {primary_cta}
+- **Secondary CTA**: {secondary_cta}
+- **Trust Builders**: {trust_elements}
+
+## Monitoring Metrics
+Track these KPIs post-publication:
+- Organic CTR
+- Dwell time
+- Bounce rate
+- Conversion rate
+- SERP position movement
+
+## Additional SEO Context
+{additional_seo_context}
+
+---
+
+Please optimize the content following these SEO guidelines while maintaining BrainOps' protective, professional voice. The content must serve real user needs while achieving search visibility.

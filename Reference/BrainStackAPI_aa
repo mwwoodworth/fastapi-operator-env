@@ -1,0 +1,2000 @@
+BrainStackStudio System Blueprint
+Executive Summary
+BrainStackStudio is building an AI-native automation platform to streamline business operations across
+multiple product lines (e.g. MyRoofGenius for roofing estimates, TemplateForge for content templates). The
+target solution is a persistent, modular backend powered by FastAPI and multiple AI agents (Claude,
+GPT-4 Codex, Google Gemini, etc.), combined with responsive frontends for both operators and end-users.
+The platform orchestrates complex workflows – from generating documents and code to updating project
+boards – using large language models (LLMs) as the “brain” for decision-making and content creation. All
+actions and outputs are stored as persistent memory (via Supabase) for learning and retrieval, ensuring that
+the system becomes smarter and more context-aware over time
+
+1
+
+.
+
+In the target state, BrainStackStudio’s automation system acts as an AI co-pilot for the business: it can
+generate standard operating procedures, write and deploy code for new features, respond to user inquiries
+with up-to-date information, and coordinate tasks on external services. Each brand (MyRoofGenius,
+TemplateForge, etc.) will leverage the same core backend with brand-specific configurations and prompt
+templates, enabling reuse of automation capabilities across domains. The architecture emphasizes
+modularity (clear separation of concerns for routes, agents, memory, tasks, and UI), scalability
+(containerized deployment, task queues, and vector databases), and retrieval augmented generation
+(RAG) (integrating the company’s knowledge base into AI prompts for accurate, context-rich outputs). By
+combining multiple specialized AI agents in a controlled workflow, the system can handle end-to-end
+processes with minimal human intervention while still allowing human oversight through an operator
+dashboard. In summary, this blueprint outlines a full-stack solution where Claude excels at planning and
+documentation, Codex/GPT-4 at code generation, Gemini at content optimization, and Perplexity at
+research – all coordinated through a unified FastAPI backend that logs every step for continuous learning.
+
+Repository & Architecture Audit
+Current State: The existing repository ( mwwoodworth/fastapi-operator-env ) provides a foundation: a
+FastAPI server ( main.py ) with endpoints for running tasks, a lightweight task execution framework, and a
+Next.js dashboard for monitoring
+
+2
+
+3
+
+. Tasks are defined in a codex/tasks/ module and executed via
+
+a central dispatcher ( brainops_operator.py ) that registers each task by scanning the folder
+
+4
+
+5
+
+.
+
+Completed tasks and outputs are logged to both a Supabase database (for persistent memory) and local
+files 6 7 . The system integrates with external services through webhook endpoints (e.g. Slack
+commands, Stripe events, Make.com triggers) 8 and uses Celery for asynchronous job queuing (returning
+a task_id and allowing status checks) 9 10 . A Next.js front-end (located in dashboard_ui/ , with
+static export served at /dashboard/ui ) provides real-time charts and a basic chat interface 11 . This
+dashboard shows metrics like task throughput and allows simple interactions (e.g. a Slack-like chat to
+trigger tasks). The groundwork for RAG is present: a Supabase-backed memory table stores conversation
+history and task outputs, and vector search is enabled via a Postgres function ( match_documents ) for
+
+1
+
+semantic lookup 12 13 . Additionally, environment-configured API keys enable connections to LLMs
+(Claude, OpenAI, Gemini) and services (Slack, ClickUp, Notion, etc.) 14 15 .
+Gaps and Improvement Areas: The current codebase, while functional, has some architectural gaps that
+this blueprint addresses:
+• Separation of Concerns: Many API routes are defined in the monolithic main.py , and the codex
+module mixes various domains (AI calls, tasks, integrations, memory) under one namespace. We will
+refactor into a clearer structure with dedicated sub-packages for routes, tasks, agents, memory,
+and webhooks for better maintainability.
+• Multi-Agent Orchestration: The system currently routes prompts to models in code (via simple logic in
+utils/ai_router.py ) – e.g. tasks containing "code" use Gemini vs. "summary" use Claude
+However, complex multi-step workflows (Claude → Codex → Gemini) are not declaratively
+defined. We introduce a LangGraph configuration to explicitly map out agent workflows as a
+directed graph, instead of hard-coding sequences. This will make it easier to add new pipelines and
+adjust routing logic without modifying code.
+16 .
+
+• Folder Structure: The repository needs to be organized as a monorepo supporting both backend and
+frontend, following Turborepo conventions. Currently, the Next.js dashboard lives in
+dashboard_ui and some UI code is in frontend/ , which is confusing. We propose a
+consolidated structure (see below) that clearly delineates the front-end app(s) and back-end app, as
+well as shared libraries (e.g. an SDK for API calls).
+• Extensibility: Additional integration points (e.g. Notion sync, advanced calendar or Kanban views from
+the backlog 17 ) are only partially implemented or still ideas. The new architecture will allocate
+proper modules/placeholders for these (e.g. a integrations/notion.py route, a scheduler for
+recurring tasks) to facilitate development.
+• Testing & CI: We will strengthen the continuous integration pipeline to cover the new multi-agent
+flows and front-end build, ensuring that Claude-generated docs and Codex-generated code can be
+safely verified (linting, unit tests) before deployment.
+Proposed Monorepo Structure: Below is an updated folder layout for the project, grouping related
+components and following a monorepo approach using Turborepo (for managing builds and dependencies
+across multiple apps). The backend and frontend will reside in a single repository, enabling atomic changes
+across the stack and easier sharing of model schemas and types.
+
+brainstackstudio/
+├── apps/
+│
+
+├── backend/
+
+# FastAPI application (BrainOps Operator Service)
+
+│
+│
+├── main.py
+events, etc.)
+
+# Application entry (mounts routers, startup
+
+│
+│
+├── routes/
+feature area)
+
+# FastAPI route modules (each corresponds to a
+
+│
+
+│
+
+│
+
+├── tasks.py
+
+# Endpoints for task operations (run, status,
+
+2
+
+design, etc.)
+│
+│
+│
+logout)
+
+├── auth.py
+
+# Authentication endpoints (token, refresh,
+
+│
+│
+│
+update)
+
+├── memory.py
+
+# Endpoints for memory RAG (query, write,
+
+│
+│
+│
+├── webhooks.py
+ClickUp, Stripe, etc.)
+
+# Endpoints for external webhooks (Slack,
+
+│
+│
+│
+└── agents.py
+approvals, pipelines)
+
+# Endpoints for agent coordination (inbox
+
+│
+
+│
+
+├── agents/
+
+# Multi-agent system logic
+
+│
+│
+│
+├── langgraph.yaml
+routing rules)
+
+# YAML definition of agent graph (nodes, edges,
+
+│
+│
+│
+├── base.py
+execution, context management
+
+# Core classes for agent nodes, graph
+
+│
+│
+│
+├── claude_agent.py
+standardized interface
+
+# Wrapper for calling Claude (Anthropic) with
+
+│
+│
+│
+├── codex_agent.py
+code generation
+
+# Wrapper for calling GPT-4 (OpenAI Codex) for
+
+│
+│
+│
+├── gemini_agent.py
+content/SEO tasks
+
+# Wrapper for calling Google Gemini for
+
+│
+│
+│
+└── search_agent.py
+for research
+
+# Wrapper for calling Perplexity or web search
+
+│
+│
+├── tasks/
+agents)
+│
+│
+tasks)
+
+│
+
+# Task implementations (business logic, uses
+
+├── __init__.py
+
+# Task registry initialization (auto-register
+
+│
+│
+│
+├── autopublish_content.py
+Claude + integration)
+│
+│
+│
+via Claude
+
+# Example task: publish article (calls
+
+├── generate_product_docs.py # Example task: generate product docs
+
+│
+│
+│
+├── generate_roof_estimate.py# Example task: roof estimate
+calculation (mix of AI + logic)
+│
+│
+│
+├── ... other task files ... # (each defines TASK_ID, run() and
+optional stream() method)
+│
+│
+│
+└── prompt_templates/
+Prompt Architecture)
+
+# Prompt text templates for tasks (see
+
+│
+│
+│
+├── claude/ ... (.md)
+blueprint, etc.)
+
+# Claude prompt templates (SOP,
+
+│
+│
+│
+├── codex/ ... (.md)
+generation instructions)
+
+# Codex prompt templates (code
+
+│
+│
+│
+├── gemini/ ... (.md)
+optimization, summaries)
+
+# Gemini prompt templates (SEO
+
+│
+│
+│
+└── research/ ... (.md)
+results into prompts
+
+# Templates for injecting search
+
+│
+
+│
+
+├── memory/
+
+│
+│
+│
+├── models.py
+records, docs, sessions
+
+# Memory and knowledge management
+# Pydantic models and schema for memory
+
+3
+
+│
+│
+│
+├── memory_store.py
+Supabase 18 19
+
+# Functions to save/query memory entries in
+
+│
+│
+│
+├── knowledge.py
+and retrieval
+
+# Functions for document chunking, embedding,
+
+│
+│
+│
+├── supabase_client.py# Supabase connection initialization (pgvector
+setup, etc.)
+│
+│
+│
+└── vector_utils.py
+OpenAI embeddings)
+
+# Helpers for embedding generation (calls
+
+│
+│
+├── integrations/
+handlers
+
+# External service integrations and webhook
+
+│
+│
+│
+├── slack.py
+(approval, queries)
+
+# Slack slash-command and event handling
+
+│
+│
+│
+syncing)
+
+# ClickUp webhook and API client (for task
+
+├── clickup.py
+
+│
+│
+│
+├── notion.py
+if applicable)
+
+# Notion API integration (import/export tasks,
+
+│
+│
+│
+secret)
+
+# Make.com webhook handler (trigger tasks via
+
+├── make.py
+
+│
+│
+│
+└── stripe.py
+trigger onboarding)
+│
+
+│
+
+# Stripe webhook handler (e.g. on new sale ->
+
+├── core/
+
+# Core configuration and app setup
+
+│
+│
+│
+├── settings.py
+keys, URLs) 20 15
+
+# Pydantic BaseSettings for env variables (API
+
+│
+│
+│
+├── scheduler.py
+delayed tasks)
+
+# Background scheduler (for recurring tasks,
+
+│
+│
+│
+├── security.py
+JWT handling)
+
+# Auth/security utilities (password hashing,
+
+│
+│
+│
+└── logging.py
+alerts, Supabase sinks)
+
+# Logging configuration (JSON logging, Slack
+
+│
+
+│
+
+├── db/
+
+# Database (Supabase/Postgres) related files
+
+│
+│
+│
+├── schema.sql
+(tasks, memory, etc.)
+│
+
+│
+
+│
+
+│
+
+│
+
+├── tests/
+
+│
+
+│
+
+└── Dockerfile
+
+│
+
+└── frontend/
+
+│
+
+# SQL schema or Alembic migrations for tables
+
+└── migrations/
+
+# Alembic migration scripts
+# Backend tests (unit and integration)
+# Docker image for FastAPI app
+# Next.js application(s) for UI
+
+├── brainops-admin/
+
+│
+│
+Next 13+)
+
+# Admin Operator Dashboard (BrainStackStudio)
+
+├── pages/
+
+│
+│
+│
+├── index.tsx
+Studio public info)
+
+# Next.js pages (or app/ directory if using
+# Marketing site homepage (BrainStack
+
+│
+│
+│
+├── dashboard/[…].tsx # Dashboard UI pages (protected routes for
+operator, PWA capable)
+│
+│
+│
+└── api/contact.ts
+forwarding to backend)
+│
+
+│
+
+├── components/
+
+│
+
+│
+
+│
+
+├── TaskList.tsx
+
+# Example API route (for contact form
+# Shared React components for the dashboard
+# Admin task inbox list & approval buttons
+
+4
+
+│
+│
+│
+input prompt)
+
+├── PromptPanel.tsx
+
+# Panel to submit AI tasks (choose model,
+
+│
+│
+│
+├── OutputStream.tsx
+Events handling)
+│
+│
+│
+docs, SOPs)
+
+├── MarkdownViewer.tsx# Render markdown with formatting (for
+
+│
+│
+│
+└── Charts.tsx
+websockets or polling)
+│
+
+│
+
+# Live charts for task metrics (through
+
+├── utils/
+
+│
+│
+│
+auth, etc.)
+
+# Streaming output viewer (Server-Sent
+
+# Frontend utilities
+
+├── apiClient.ts
+
+│
+│
+│
+├── auth.ts
+localStorage, CSRF)
+
+# Helper to call backend API (fetch with
+# Auth token storage & management (JWT in
+
+│
+
+│
+
+│
+
+│
+
+│
+
+├── public/
+
+└── …
+# Static assets (icons, manifest.json for PWA)
+
+│
+
+│
+
+└── package.json
+
+# Dependencies for admin dashboard
+
+│
+└── myroofgenius-copilot/ # User-facing Copilot UI for MyRoofGenius
+(similar structure to admin)
+│
+├── pages/…
+interface, report viewer)
+
+# Pages for user interactions (e.g. chat
+
+│
+├── components/…
+# Possibly a subset of components
+(PromptPanel, OutputStream reused)
+│
+└── package.json
+with admin as one app)
+├── packages/
+│
+
+# Dependencies for user app (could be combined
+# (Optional) Shared packages for Turborepo
+
+├── sdk/
+
+# TypeScript SDK for the backend API
+
+│
+│
+├── index.ts
+memory, etc.
+│
+│
+calls
+
+# Exports API client, types for tasks,
+
+└── services/DefaultService.ts # Example service wrapper for default API
+
+│
+└── ui-components/
+across admin/user apps)
+
+# Shared React UI components (if any shared
+
+├── docs/
+blueprints, etc.)
+
+# Documentation (markdown files for SOPs,
+
+│
+
+├── README.md
+
+# High-level README for repository
+
+│
+
+├── architecture.md
+
+# (This document or an evolved form of it)
+
+│
+├── prompts/…
+guidelines
+
+# Documentation on prompt templates and usage
+
+│
+
+# Deployment checklist 21
+
+└── production_checklist.md
+
+├── turborepo.json
+build, lint, dev, etc.)
+
+22
+
+# Turborepo configuration (tasks pipeline for
+
+└── .github/
+├── workflows/ci-cd.yml
+
+# GitHub Actions for CI tests and CD deployment
+
+└── issue_templates/…
+
+# Issue/PR templates (if needed)
+
+5
+
+Highlights of the New Structure: We separate the FastAPI routes by domain ( tasks.py , memory.py ,
+webhooks.py , etc.), which will make the API easier to navigate and maintain. The agents directory
+contains the logic for each AI agent and the orchestrator ( langgraph.yaml plus helper code) – this
+cleanly encapsulates multi-agent workflows away from business logic. The tasks directory holds individual
+automation tasks (each as a self-contained module with run() function, analogous to the current
+codex/tasks/* files). Prompt templates are stored under tasks/prompt_templates/ organized by
+use-case, making it easy to edit prompts without touching code. The memory package manages all
+interactions with the Supabase database (storing and querying memory and documents) and vector
+embedding operations. External service hooks (Slack, ClickUp, etc.) live under integrations, decoupling
+them from core logic. The frontend is split into potentially two Next.js apps: one for the BrainStackStudio
+operator admin dashboard and one for the MyRoofGenius end-user UI (they could alternatively be a single
+Next.js project with runtime switches, but separate apps allow independent deployment and branding).
+Both apps share common components and API client logic, which can be abstracted in a shared
+packages/sdk or packages/ui-components if needed.
+We recommend using Docker for deployment consistency: one image for the FastAPI backend (with
+Uvicorn, Celery, etc.) and separate build output for the Next.js frontend (exported as static or served via
+Vercel). The monorepo with Turborepo will allow parallel building of backend and frontend, caching, and
+easier dependency management. In production, the FastAPI app will serve the static dashboard for the
+admin UI at /dashboard/ui (as currently done) 3 , and the user-facing frontends can be deployed to
+Vercel or a separate static host (or even served similarly if desired). This structure sets the stage for a
+scalable, multi-application ecosystem that still shares one source of truth for tasks and memory.
+
+Automation Pipelines
+A core feature of BrainStackStudio’s platform is the ability to run multi-step automation pipelines that
+involve different AI agents and tools. Below we define the key automation pipelines the system will support,
+replacing what used to be manual processes or external scripts (like Make.com scenarios) with AI-driven
+workflows. Each pipeline is orchestrated via the LangGraph multi-agent system (defined in the next section),
+ensuring a clear and flexible execution order. Key pipelines include:
+• Claude Markdown Doc Generation: Use case: Generate structured documents (e.g. SOPs,
+blueprints, changelogs, content drafts) in Markdown format using Anthropic Claude. Pipeline: The
+trigger could be a Slack command or an HTTP request carrying parameters (e.g. “create SOP for
+onboarding process”). The system routes this request to Claude (with the appropriate prompt
+template selected for the document type). Claude produces a well-structured Markdown document,
+following our templates for headings, formatting, and embedded metadata. This Markdown might
+represent a Standard Operating Procedure, a weekly report, or a design blueprint. The result is
+stored in memory and optionally in the knowledge base (as a doc entry), and can be sent onward
+(e.g. posted to a Notion page or saved as a PDF). This pipeline replaces manual doc writing or
+Make.com templating with an AI that writes the initial draft, which can then be reviewed by a
+human. All generated docs will adhere to consistent formatting rules (like including titles, dates, and
+appropriate section headings) so they are immediately usable.
+• Claude → Codex Dev Handoff (Spec to Code): Use case: Accelerate development by having AI write
+code from high-level specs. In this pipeline, Claude first produces a detailed technical specification
+
+6
+
+or code blueprint in Markdown (for example, a description of new API endpoints, data models, and
+even pseudo-code for functions). This spec will include code sections or structured instructions that a
+coding agent can follow exactly. The pipeline then feeds Claude’s output to Codex (GPT-4), which
+acts as the code generator. Codex reads the Markdown spec and writes actual source code files
+(Python, TypeScript, etc.) as outlined. We enforce a strict format for this handoff – e.g. the Claudegenerated markdown uses fenced code blocks annotated with file names and content, so that Codex
+can unambiguously create each file. For example, Claude’s doc might contain:
+
+**File: tasks/forecast_agent.py**
+```python
+# Code for weekly forecast agent
+import datetime
+...
+```
+Codex will parse this and produce forecast_agent.py with the given content. The system can automate
+this flow via a special endpoint or CLI command: the developer (or an automated trigger) provides a request
+for a new feature, Claude’s Blueprint is created, then Codex writes the code. The new code can be
+automatically inserted into the repository or staged for review. This pipeline turns natural language design
+into working code, dramatically reducing implementation time. We replace the old Makefile or manual
+coding steps with an AI pair-programming loop. A safety check is included: after Codex generates code,
+the CI pipeline runs tests and linting to ensure nothing is broken (see CI/CD section). Only if tests pass will
+the changes be deployed, closing the loop from specification to production.
+• Perplexity Research Inject → Claude Rewrite: Use case: Answer questions or create content with
+up-to-date external information. Pipeline: When a task requires knowledge beyond the internal
+memory (e.g. “Write a market analysis of solar panel adoption in 2025”), the system first invokes a
+Research agent (using Perplexity or a similar search engine API) to gather relevant facts, figures, or
+references from the web. For example, a research_agent node takes the user’s query and
+returns a summary or a set of key points with citations. This research result is then injected into a
+Claude prompt – we have a template that might say: “Using the following research findings, write a
+comprehensive answer/report: [insert findings].” Claude then produces a final document or answer that
+is grounded in the retrieved information. The benefit of this pipeline is that Claude’s output will be
+both up-to-date and cite its sources (we can prompt it to include the references provided). This
+automation replaces having a human do manual Google searches and then asking AI – instead it’s
+one seamless loop. The Perplexity agent’s output can also be stored as a special memory record
+(tagged as research ) so that the context is logged for future reference or audits. This pipeline is
+crucial for knowledge work like generating blog posts, reports, or answers that require real-time or
+factual accuracy.
+• Gemini SEO Optimizer Loop: Use case: Refine and enhance content for SEO or other quality metrics
+using iterative AI feedback. Pipeline: After content is generated (by Claude or a human), we use
+Google Gemini (an LLM from Google’s PaLM API) to analyze the content for improvements. For
+instance, if Claude drafts a blog article, the Gemini agent can take that draft and provide an “SEO
+optimization” pass – suggesting keyword additions, clearer headings, meta descriptions, or
+
+7
+
+restructuring for better engagement. In practice, the pipeline might: (1) call Gemini with a prompt
+like “Here is an article draft and its target audience/keywords – suggest improvements or rewrite
+sections where necessary to maximize SEO.” (2) Gemini returns an improved version or a list of
+suggestions. We could either have Gemini directly rewrite the content (single-step) or enter a loop
+where Claude and Gemini refine in turn: e.g. Gemini flags issues, Claude (or GPT-4) fixes them, and
+repeat if needed. This feedback loop continues until a certain quality threshold is met or a set number
+of iterations is done. The final optimized content is then ready for publishing. Automating the SEO
+polishing step ensures that content produced by the platform is high-quality and saves human
+editors time. This pipeline leverages Gemini’s strengths (which might include nuanced
+understanding of language and Google’s ranking criteria) to complement Claude’s initial creative
+generation, resulting in a more effective output.
+• File Output & Publishing Workflows (SOPs, Reports, Bundles): Use case: Take final AI outputs and
+distribute or archive them appropriately. Pipeline: Many tasks culminate in producing files – e.g. a
+PDF report for a client, a bundle of markdown files for documentation, or a CSV of processed data.
+The system automates these post-processing steps. For example, an SOP generation task after
+producing markdown might trigger a conversion to PDF (using a service or library) and then upload
+that PDF to a designated storage or email it to stakeholders. A reporting workflow (like weekly
+metrics report) might compile multiple AI outputs: perhaps run several sub-tasks (data fetch,
+summary generation, chart image generation) and then bundle these into one package (markdown
++ images zipped or a nicely formatted PDF). Bundles refer to grouping outputs – e.g. a “launch
+bundle” could include a blog post, a newsletter draft, and social media posts, all generated by
+respective tasks and then packaged together for review. The pipeline coordinating this would use
+the agent graph to run each required generation in sequence and then a final step to collect the
+results. For instance, Claude could produce a blog article and a Twitter thread (different templates) in
+parallel, then a final agent combines them into a single deliverable (like a ZIP or a Notion update).
+The platform’s role is to ensure each file is named, formatted, and stored properly – using internal
+APIs like /knowledge/doc/upload to save in the knowledge base or sending via webhook to
+external systems (e.g. uploading to a CMS via Make.com). Essentially, the system is an end-to-end
+publishing pipeline: generate content -> optimize it -> format it -> deliver it, replacing what might
+previously have been many manual steps across different tools.
+Each of these pipelines is defined in the LangGraph (see below) so that the sequence of agents and actions
+is declarative. Operators can trigger these pipelines manually (via the dashboard UI or Slack commands) or
+they can be triggered automatically by events (e.g. a Stripe sale triggers the sync_sale task, which might run
+a bundle pipeline to onboard a customer). All pipelines are designed to be retryable and traceable: if any
+step fails, the error is logged and a retry or human review can be initiated (the Task Engine will handle
+retries and escalation as described later). By using LLMs as the building blocks, these automation pipelines
+remain flexible – we can easily change a prompt to adjust the outcome or insert an extra verification step
+(for example, have GPT-4 double-check Gemini’s SEO suggestions, etc.) without rewriting complex code. This
+is a key advantage of an AI-native architecture for automation.
+
+LangGraph Multi-Agent Routing
+To coordinate the above pipelines, we introduce LangGraph, a YAML-defined graph of agents and decision
+nodes that routes tasks to the appropriate AI model or tool in sequence. LangGraph provides a high-level
+workflow schema for multi-agent interactions, making the orchestration declarative. Rather than
+
+8
+
+hardcoding chains of calls, we define a graph where each node represents an action (an AI agent invocation
+or a function) and edges dictate the flow from one node to the next.
+YAML Structure: The agents/langgraph.yaml file will define the nodes, edges, and any conditional
+routing. Below is an illustrative snippet of how this could look:
+
+agents:
+- id: claude_max
+type: llm
+model: claude-2-100k
+role: "DocumentationGenerator"
+prompt_template: "claude/blueprint.md"
+# reference to prompt template
+input_keys: ["specification"]
+# expects a 'specification' text
+input
+output_keys: ["blueprint_markdown"]
+# produces a markdown doc
+- id: gpt4_codex
+type: llm
+model: gpt-4-code
+role: "CodeWriter"
+prompt_template: "codex/implement_code.md"
+input_keys: ["blueprint_markdown"]
+output_keys: ["code_files"]
+# could be a list of files with
+content
+- id: gemini
+type: llm
+model: gemini-2.5-pro
+role: "ContentOptimizer"
+prompt_template: "gemini/seo_optimize.md"
+input_keys: ["draft_content"]
+output_keys: ["optimized_content"]
+- id: perplexity
+type: tool
+tool: "web_search"
+# denotes an external search tool
+usage
+input_keys: ["query"]
+output_keys: ["research_summary", "sources"]
+- id: combiner
+type: function
+function: "combine_outputs"
+# a custom function to merge results
+input_keys: ["part1", "part2"]
+output_keys: ["combined"]
+flows:
+- name: "spec_to_code"
+# pipeline definition
+start: claude_max
+steps:
+claude_max:
+next: gpt4_codex
+# after Claude produces spec, go to
+
+9
+
+Codex
+gpt4_codex:
+next: null
+- name: "research_and_answer"
+start: perplexity
+
+# end of pipeline (code files ready)
+
+steps:
+perplexity:
+next: claude_max
+claude_max:
+params:
+# override prompt for answer
+generation
+prompt_template: "claude/research_answer.md"
+next: null
+- name: "seo_loop"
+start: gemini
+steps:
+gemini:
+next: claude_max
+claude_max:
+params:
+prompt_template: "claude/revise_with_feedback.md"
+next: gemini
+# loop back to gemini for another
+evaluation
+gemini:
+condition: "${iterations} < 2 and needs_improvement" # pseudoconditional
+next: claude_max
+(Note: The above is a conceptual example to illustrate structure. Actual implementation may differ in syntax.)
+In this YAML, agents defines each node: Claude (id claude_max ) is configured as a large-context model
+for documentation, GPT-4 Codex for coding, Gemini for content refinement, Perplexity as a search tool,
+and a custom combiner function. Each agent node has specified input keys and output keys, which
+describe what data it expects and produces. This ensures that the output of one node can be passed as
+input to the next. The flows section then strings these nodes together for specific named pipelines. For
+example, the spec_to_code flow routes from Claude to Codex, whereas research_and_answer first
+does a web search via Perplexity, then passes the results to Claude (with a special prompt template tuned
+for Q&A using provided sources). The seo_loop demonstrates how we can even encode a loop: after
+Gemini provides feedback, Claude revises, and if conditions meet (like if the content still needs
+improvement and we haven’t looped too many times), it goes back to Gemini. This conditional or iterative
+logic can be supported either by YAML (with a condition field as shown) or handled in code by the
+orchestrator reading the graph definition.
+Agent Schemas & Roles: Each agent node can have a schema for its inputs/outputs. For LLMs, the input is
+typically a text prompt (constructed from one or more context pieces) and the output is typically text (which
+might represent code, or a document, or a list, etc.). We define agents’ roles to clarify their responsibility in
+the workflow. For instance, DocumentationGenerator Claude will always output a full Markdown
+
+10
+
+document given some spec context, whereas CodeWriter GPT-4 will output structured code (perhaps in
+JSON like {"filename": "content"} pairs for multiple files, or just text with separators). Defining these
+roles and formats explicitly means each agent’s output can be programmatically parsed and fed forward.
+We will maintain a mapping of agent id to a small Python class or function that knows how to call that
+agent: e.g. claude_agent.py will have something like def run(prompt: str) -> str (and possibly
+a streaming version), similarly codex_agent.py and gemini_agent.py will call their respective APIs
+(Anthropic, OpenAI, Google) with the given prompt and return the result.
+Routing Logic: The LangGraph orchestrator ( agents/base.py or similar) will read the YAML graph and
+handle the execution logic. When a request comes in to run a pipeline (for example, the /task/generate
+endpoint might correspond to a flow name in the YAML), the orchestrator starts at the start node and
+calls the associated agent or function. Each node’s output is stored in a context dictionary, and then passed
+to the next node as per the next pointer. The orchestrator can also evaluate conditions for branching: e.g.
+a decision node could examine the content or some flag to choose a different next node (we can extend
+YAML to allow a node to have multiple next options with conditions, or have a special “router” node type).
+For instance, we might have a classifier agent at the start that decides which pipeline to follow (“chain
+selection”); however, in our design we usually know which flow we want from the start, so that might not be
+needed.
+One important aspect is memory context integration: before an agent prompt is constructed, we often
+need to inject relevant memory or knowledge. Rather than clutter the YAML with that, the orchestrator
+could automatically handle it based on agent type or a flag. For example, if an agent node has
+use_memory: true , the orchestrator will fetch recent memory or do a vector search (if a query key is
+present) and append the results to the prompt (likely via a template). This way, something like the chat
+agent or Claude answering a question will always include a “Recent memory” section or relevant docs
+section in its prompt 23 24 . In practice, we have endpoints like /chat already doing this memory
+injection 25 – those will be refactored to use the unified LangGraph approach, so that if we ever change
+how we retrieve memory (say, increase the number of past messages or include semantic matches), we do
+it consistently for all agents that need it.
+FastAPI Integration: Each flow can be exposed via the API for ease of use. For example, we might have
+POST /pipeline/run that accepts a JSON like {"flow": "spec_to_code", "inputs": { ... } }
+to trigger a specific flow by name. However, more friendly is to have dedicated endpoints for common use
+cases: e.g. /task/dev-handoff could internally call the spec_to_code flow, /task/answer calls the
+research_and_answer
+
+flow, etc. The agents.py route can define these and simply delegate to a
+
+LangGraph executor. This keeps the external API simple while the internal logic is governed by the YAML.
+Furthermore, we can have a routing logic auto-mode: the AI_ROUTER_MODE in settings was previously
+“auto/claude/gemini” to choose a model 26 . In the new design, if mode is “auto”, we could dynamically pick
+a flow or agent based on input. For instance, a general /chat endpoint could check the query: if it
+contains a programming-related request, route to a “coding assistant” flow (maybe GPT-4 only); if it’s a
+planning request, route to Claude, etc. This essentially extends the current simple router to a more complex
+decision graph – potentially a classifier LLM could be used to decide (we could have a node that outputs a
+route). But to keep things deterministic, initial routing can be done with rules/keywords (like before) or via
+specifying which UI button was clicked (e.g. user explicitly chooses “Ask Brain (Claude)” vs “Ask Data
+(Gemini)” in the UI). The YAML will allow defining composite flows too – e.g. a chain that actually runs
+multiple agents concurrently or sequentially (like get both Claude and GPT-4 answers then combine). The
+orchestrator needs to support parallel branches (maybe executed as async tasks) if we want to do things
+
+11
+
+like get answers from two models at once. That can be an extension where a node can have multiple next
+targets without waiting, and a subsequent node that gathers results (the combiner function node in the
+example).
+In summary, LangGraph gives us a flexible, configurable brain for the system. We can update
+langgraph.yaml to tweak our automation pipelines (add a new step, change which model is used for a
+role, etc.) without altering the Python code – the orchestrator will adapt. It also provides a clear map for
+debugging: an operator can see a visualization of a flow (we could even build a UI component in the
+dashboard to display the graph of a run) and pinpoint where things went wrong or which agent produced
+what output. Each agent’s outputs will be logged with a node_id in the memory, so we preserve the trace
+of multi-step reasoning for each task. The end result is a robust multi-agent routing system where Claude,
+GPT-4/Codex, Gemini, and other specialized tools work in concert, each focusing on what they do best,
+guided by a centrally defined playbook (the LangGraph).
+
+Supabase Memory & RAG Layer
+A cornerstone of this AI platform is its memory and knowledge retrieval system, backed by a Supabase
+(Postgres) database with vector search capabilities. This layer enables long-term memory of past tasks and
+conversations, and efficient retrieval of relevant information (documents, prior outputs, etc.) to augment AI
+prompts (Retrieval-Augmented Generation). We will design several database tables in Supabase to support
+this:
+Database Schema: The main entities we need to store are Tasks, Prompts, Sessions, Docs, and
+Embeddings. Below is a summary of each table schema and its purpose:
+
+12
+
+Table Name
+
+Key Columns & Types
+
+id UUID (primary key);
+name VARCHAR; status
+VARCHAR; context JSONB;
+result JSONB;
+tasks
+
+created_at TIMESTAMP;
+completed_at TIMESTAMP;
+user VARCHAR; tags
+TEXT[]; error TEXT
+(optional)
+
+Description
+Stores every task execution or queued task. Each
+entry corresponds to a task run or pending task,
+capturing input context and outputs. Status can be
+“pending”, “running”, “success”, “error”, “delayed”,
+etc. The context field holds the task inputs
+(parameters), and result holds the output or
+outcome (could be a result object or error info). We
+also record which user or agent initiated it and
+arbitrary tags (for categorization, e.g.
+["chat","interactive"] as seen in memory
+logs 27 ). This table functions as both a task log and
+a live queue: tasks that need approval or retry
+remain in “pending” status. (In the current system,
+parts of this are split between an in-memory Celery
+queue, the agent_inbox table, and local logs; here
+we unify them). Whenever a task finishes, its row is
+updated with status and timestamps. This table
+enables querying task history, monitoring currently
+running tasks, and implementing retry/approval
+logic via status changes.
+
+13
+
+Table Name
+
+Key Columns & Types
+
+Description
+Contains prompt templates or records of prompts.
+This table serves dual purpose: (a) store reusable
+prompt templates for various agents (each with a
+name/key, the text template, target model, and
+placeholders defined), and (b) optionally log actual
+prompt-completion pairs for analysis (in which case
+template would be the prompt content filled, and
+
+id UUID; name VARCHAR;
+template TEXT; model
+VARCHAR; variables
+prompts
+
+JSONB; created_at
+TIMESTAMP; last_used_at
+TIMESTAMP; description
+TEXT
+
+we might have another field for the completion).
+Primarily, it will be used for the former: to allow
+dynamic updates to prompts without code changes.
+For example, a row might have
+name="CLAUDE_SOP_TEMPLATE" and the template
+text with placeholders like {company_name} , and a
+short description like "Claude prompt for generating
+SOP documents." The variables field can list
+expected variables (keys) for this template. When
+tasks run, they can fetch the template by name from
+this table (or from the file system in
+prompt_templates/ ) – we’ll likely sync the two or
+use one source of truth (for now, file-based
+templates are primary for version control, but
+syncing critical ones to DB allows on-the-fly tweaking
+via UI). If logging usage, we can update
+last_used_at each time a prompt is employed,
+which might help identify popular prompts or stale
+ones.
+Tracks chat sessions or ongoing conversations. Each
+session can be associated with a user (or system if
+it's an agent-only session), and we record when it
+started and last active time. The session id will be
+
+id UUID; user VARCHAR;
+started_at TIMESTAMP;
+sessions
+
+last_active_at
+TIMESTAMP;
+conversation_summary
+TEXT
+
+attached to memory entries to link them to a
+particular conversation thread 27 . The optional
+conversation_summary can store a running
+summary or important facts of the session,
+periodically generated by an agent (to help compress
+context for very long conversations). This table helps
+implement multi-turn chats that persist across
+interactions – the frontend can start a new session or
+continue an existing one by passing the session ID to
+/chat endpoints, and the backend can then filter
+memory to that session. It also allows listing past
+chat sessions in the UI, resuming them, or cleaning
+up old ones.
+
+14
+
+Table Name
+
+Key Columns & Types
+
+doc_id UUID (primary key);
+project_id UUID; title
+TEXT; content TEXT;
+docs
+
+author_id VARCHAR;
+created_at TIMESTAMP;
+updated_at TIMESTAMP;
+source_url TEXT
+
+Description
+Stores knowledge documents or knowledge base
+entries at a document level. This is for persistent
+knowledge that can be used in RAG. For example, if
+we upload a Markdown file or if Claude generates a
+product spec that we want to keep, it becomes a doc
+entry. The content might be the full text of the doc
+(for smaller docs), or this table might just store
+metadata (if docs are large, we might not store full
+content here but rather in chunks table). However, it’s
+useful to have the full content for reference and
+maybe to re-embed if needed. project_id links to
+a project or category (there could be a separate
+projects table mapping project names to IDs, as
+seen in memory_utils where projects table was
+anticipated 28 ). For example, project could be a
+brand or a topic area. author_id can indicate who
+created the doc (user, or which agent). source_url
+can store where the doc came from (if it was fetched
+from web or from an internal system). This table
+allows the UI to list all stored knowledge docs,
+display titles, authors, etc. It's essentially a document
+index.
+
+15
+
+Table Name
+
+Key Columns & Types
+
+Description
+This table stores the embeddings for document
+chunks. When a document is added or updated, we
+split it into chunks (e.g. ~200 words each) and
+generate a high-dimensional vector for each chunk
+using OpenAI’s embedding model (text-embeddingada-002) 29 . Each row here represents a chunk with
+its vector, and references which document it came
+from. We use Postgres’s pgvector extension for the
+VECTOR type and have an index on it to enable
+
+id BIGSERIAL (PK);
+embeddings
+(or
+doc_chunks)
+
+doc_id UUID (FK to docs);
+chunk_index INT;
+content_chunk TEXT;
+embedding VECTOR(1536);
+metadata JSONB
+
+similarity search. We can also store some metadata
+per chunk (for instance, metadata might include
+the section or heading it came from, or any tags
+assigned). The vector search RPC
+( match_documents ) will likely operate on this table
+– e.g. find the top K chunks whose embeddings are
+closest to the query embedding, possibly filtering by
+project or doc if needed 30 . By separating this from
+the main docs table, we keep potentially large
+content and performance-heavy vector indexes
+separate from metadata. The system’s RAG
+functionality queries this table when the AI needs
+context: given a user query or a task, we convert the
+query to a vector and find similar content chunks,
+then include those chunks (with maybe their doc title
+as context) in the prompt.
+
+Additionally, the system already uses a memory table to log miscellaneous events and short-term memory;
+in this design, the tasks table largely covers task-related memory, and the chat transcripts would be
+covered by sessions + entries in memory or prompts (depending on how we log chat messages). We
+may still maintain a generic memory table for unstructured logs (as currently implemented 31
+
+32 ), or we
+
+integrate it into the tasks / prompts tables by treating each user message or AI reply as a special task
+(type “chat_message”) with input=message and output=response. However, to avoid confusion, we can keep
+a memory table just like now for quick logging of any event (with fields id, timestamp, type, content, etc.),
+and use tags to classify them (the existing system tags entries as “chat”, “summary”, etc. 27 33 ). This raw
+memory log can feed into summarizers or be pruned over time. In practice, we will have both: a structured
+tasks/prompts store and a raw memory log (we can implement memory as a view or simply continue using
+the existing approach but now with more structure).
+Chunking & Embedding Workflow: When a new document is ingested (via an API endpoint or internally by
+a task), the system will: (1) create a doc entry in docs (assign a UUID, store title, etc.), (2) call the text splitter
+to break the content into chunks ~200 tokens (configurable) 34 , (3) call the OpenAI Embedding API (using
+OPENAI_API_KEY ) to get vector embeddings for each chunk 29 , and (4) insert each chunk with its
+embedding into embeddings table. This process is already outlined in the current
+memory_api.write_memory
+and
+doc_store.embed_and_store
+functions 35 36
+– we will
+consolidate those into a single pipeline. We will ensure to attach metadata: for example, each chunk could
+
+16
+
+get a tag of the doc’s title or an ID, and perhaps the chunk’s section heading if we can parse it. The
+embedding vectors are stored in a column of type vector , dimension 1536 (for Ada embeddings). We’ll
+set up a Postgres extension (pgvector) and a similarity search function (the Supabase RPC
+match_documents ) that given a query text and optional filters will: compute the query’s embedding
+(using the same API, possibly on the fly in a secure function or by the backend before calling the RPC), and
+then do SELECT doc_id, content_chunk, similarity(embedding, query_vec) as score FROM
+embeddings WHERE project_id = X ORDER BY score DESC LIMIT K . The RPC can encapsulate this,
+and our Python backend calls it for convenience 37 . If Supabase is unreachable or no results, we fall back
+to a basic keyword search in our local doc_index.json or in-memory list, as currently done 38 39 (this
+is primarily for dev mode without Supabase).
+Retrieval & Memory Usage: With the above in place, any agent that needs contextual knowledge can
+query for it. For instance, the Slack command /brainops query <text> can call an endpoint that uses
+memory_store.search or the vector search RPC to find relevant memory entries or docs containing
+<text>
+
+40 . Those results are returned to the user or used in a prompt. For conversational memory,
+
+when a user sends a message to the AI ( /chat endpoint), we retrieve the last N messages from that
+session from memory (or tasks table) to include as “Recent history” 23 . We can also retrieve any global
+context or profile (for example, if we have a stored “user preferences” doc, we might always fetch that as
+well). The value of storing memory in Supabase is persistence and queryability: the system can answer
+questions like “when was the last time we ran this task” by searching the tasks table, or “what was the
+summary of project X” by searching memory for tag “summary” and project X 41 42 .
+Metadata Tagging: We make heavy use of tags and metadata in memory records to facilitate targeted
+retrieval. For instance, when the Gemini memory agent summarizes logs, it looks for memory entries tagged
+"summary_candidate" 43 . In our design, every memory or task entry can carry tags (like the type of
+content, project, etc.), and the search queries can filter by tags or time range 44 45 . We will maintain
+conventions for tags: e.g. use "chat" for dialogue messages, "task" for task logs, "error" for error
+entries, "summary" for summarized content, etc. The origin metadata field (JSONB) stored with memory
+can include things like source (e.g. voice if it came from a voice transcription, as the current system does
+46
+
+47 ) or a link to an originating object (e.g. a
+
+linked_transcript_id or clickup_task_id ). Our
+
+memory saving utility will merge such metadata when saving entries 48 49 . This means, for example, if a
+voice message was transcribed and fed into the system, the memory of that event can carry {"source":
+"voice", "tags":["transcript"]} . Later, an agent could retrieve specifically transcripts by filtering on
+tags.
+Maintaining Relevance: Over time, the memory table will grow. We will implement strategies like timebased filtering (only consider recent N entries by default, as currently done 25
+with
+memory_store.load_recent(scope) which by default took last 5 entries, or memory_scope can
+indicate how far back to go), and summarization of older logs. The weekly strategy or summarizer tasks
+can compress old logs into a concise form and tag them appropriately (for example, a weekly summary log
+tagged summary that references the week’s tasks). The RAG system can then pull from both detailed
+recent entries and higher-level summaries as needed.
+Supabase Integration: To implement this, we ensure our Supabase client is properly initialized (with
+SUPABASE_URL and SERVICE_ROLE_KEY for full read/write) 50 . We'll use server-side RPC calls for
+vector search (to leverage Postgres speed), and direct table inserts/selects for normal queries (as currently
+
+17
+
+done with the Python supabase client 51 and in the code for logging tasks 7 and retrieving pending
+tasks, etc.). We will also implement database constraints and triggers as needed: e.g. a foreign key from
+embeddings.doc_id to docs.doc_id for consistency, and perhaps triggers to cascade delete
+embeddings if a doc is deleted or to update updated_at . We might also add a trigger to automatically
+vectorize certain short texts (for example, maybe vectorize each memory entry's output and store in an
+embedding column of memory table too) – but that could be heavy, so we likely vectorize only long-form
+knowledge docs and use text search for memory beyond that.
+In conclusion, the memory & RAG layer ensures the AI agents are “open-book” with our data: they can
+recall what’s happened (tasks, chats) and lookup what’s known (documents, prior outputs) rather than
+working in isolation. This greatly improves coherence and accuracy. For instance, the system can answer
+“What was last week’s priority review outcome?” by retrieving the memory entry for that task (since we tag
+it, or it contains “weekly priority review” in text) and either responding directly or giving it to an agent to
+formulate an answer. This design also means that adding a new knowledge source is straightforward: just
+insert docs and embeddings, and the agents automatically gain that knowledge through retrieval. Supabase
+provides a scalable cloud-hosted Postgres, and the use of pgvector means we have production-ready
+semantic search. By structuring the data well, we facilitate not only the AI functionality but also analytics
+(the team can query how many tasks ran, success rate, etc., using the tasks table) and compliance (we have
+logs of all AI outputs which can be reviewed if needed).
+(Citations of code lines indicate where similar functionality exists in the current codebase for reference: e.g. saving
+memory 49 , searching with tags and time filters 44 , or requiring Supabase for persistent memory 1 .)
+
+Webhooks + Task Engine
+The Task Engine is the component of the backend that receives events (from users or external systems),
+dispatches tasks to be executed (immediately or after approval), and manages task lifecycle (status, retries,
+notifications). It works in tandem with various webhook endpoints which act as entry points for external
+triggers. Here we outline how webhooks from Slack, ClickUp, Stripe, Make.com, etc., feed into the task
+system, and how the engine ensures tasks run reliably and update the outside world.
+External Webhooks Integration:
+• Slack Webhooks: We implement two types of Slack integration. First, a Slack slash command (e.g.
+/brainops ) posts to our endpoint /webhook/slack/command 52 . This is used for operator
+control via Slack. For example, Slack text like approve 12345 will call the endpoint; the backend
+verifies the Slack signature ( SLACK_SIGNING_SECRET ) and then interprets the command. In our
+system, we will parse the command to perform actions: approve <id> and reject <id> will
+change the status of a pending task in the tasks table and trigger its execution or cancellation,
+status <id> will look up a task’s status, and query <text> will perform a memory search and
+respond with results 53 . The response can be sent back to Slack as a message (the endpoint will
+return a brief ACK and then use Slack Web API to post results asynchronously, possibly via a
+response_url or our own Slack bot token to reply). Second, Slack event subscriptions can be
+configured (e.g. message events). These would hit /webhook/slack/event – for instance, to
+automatically capture messages from certain channels as memory. The code already suggests
+storing Slack messages via memory_store.save_memory when events come in 54 . We will
+
+18
+
+maintain this: if configured, when Slack sends a message event (say someone tagged the bot or
+used a keyword), the system can log it or even trigger a task. Slack will thus be both an interface (for
+admins to command the system) and a data source (to feed info to memory or tasks).
+• ClickUp Webhooks: ClickUp is used for project/task management. The integration will allow two-way
+sync: When our system creates or updates a task that corresponds to a ClickUp task, it uses ClickUp
+API (already partially implemented in integrations.clickup_adapter , and invoked after task
+success via _maybe_sync_clickup
+
+55
+
+56 ). Conversely, we can set up a webhook in ClickUp that
+
+calls our /webhook/clickup endpoint whenever a task in a certain list changes status (for
+example, an item moved to “Approved” list could trigger our automation). In the new routes,
+integrations/clickup.py will handle such payloads: verify a secret if available, parse the event
+(e.g. new task created or status change), then possibly enqueue a corresponding internal task. For
+instance, if a ClickUp task with name “Generate Proposal X” is created, we could automatically trigger
+our autopublish_content or similar pipeline with context from that task. Similarly, if one of our
+tasks requires manual steps (like human approval or additional info), we might create a placeholder
+task in ClickUp for tracking, which on completion triggers our webhook to mark as done. Essentially,
+ClickUp becomes an external UI for tasks—particularly for those who prefer a Kanban/To-do view—
+and our system ensures bi-directional updates (the code’s _maybe_sync_clickup already handles
+creating/updating tasks on success). In practice, the operator could manage tasks from Slack or the
+Dashboard, and those can reflect in ClickUp for broader team visibility.
+• Make.com Webhook: The platform supports integration with Integromat/Make.com by a generic
+endpoint /webhook/make
+
+8
+
+. This allows any automation scenario configured in Make to trigger
+
+our tasks. We will maintain this as a flexible ingress: the Make webhook likely expects a secret (like
+MAKE_WEBHOOK_SECRET ) for authentication which we verify, then the payload might specify which
+task to run and with what context (similar to calling /task/run ). Our routes/webhooks.py will
+parse the JSON and simply call run_task for the specified task, then respond with a task ID or
+status. For example, a Make scenario after processing a form submission could hit us with
+{"task": "sync_sale", "context": {...}} to run the sales sync automation. We’ll ensure
+consistent response format and error handling (Make might require specific reply to acknowledge).
+The benefit is that our system can be integrated into larger workflows orchestrated by Make, but
+over time, as our platform grows, we might reduce reliance on external orchestrators and handle
+sequences internally with the agent graph.
+• Notion Webhook/API: In the backlog 57 , Notion integration is mentioned (import/export tasks).
+We will create endpoints like /webhook/notion or use the Notion API for two purposes: possibly
+ingesting tasks or content from a Notion database and outputting AI-generated results to Notion
+pages. For example, if content is drafted in Notion, our system could fetch it, improve it (via the SEO
+pipeline), and push it back. Implementation might involve periodic polling or a Notion integration
+configured to send events (Notion now has API but not sure about live webhooks, might need
+polling). In our design, we include a route integrations/notion.py to house functions like
+import_tasks_from_notion() or update_notion_page(page_id, content) . This could be
+triggered manually or by a schedule. It’s not a primary feature initially but we have a slot for it.
+• Stripe Webhook: Already present in current code, /webhook/stripe is used to handle events like
+a successful payment (new sale) 58 . On receiving a checkout.session.completed or similar
+event, we trigger the sync_sale task (notifying CRM, onboarding, etc.). We will keep this endpoint:
+
+19
+
+verify STRIPE_WEBHOOK_SECRET and then, for example, parse the event to get customer email or
+order info, then call run_task("sync_sale", {...}) . The sync_sale task might itself call out to
+Make.com or other services as configured (the README mentioned a Make scenario for new sale
+59 , which might be replaced by direct API calls or an internal sequence). We ensure idempotency
+(Stripe may retry webhooks): our task engine could check if a sale ID was already processed to avoid
+duplication.
+• Other Webhooks/Endpoints: The system also has endpoints for voice transcription upload ( /
+voice/upload ), status updates ( /webhook/status-update presumably from external triggers),
+etc. We will maintain these in the new routes/webhooks.py or relevant route files. For instance,
+/voice/upload will accept an audio file, save it, maybe call Whisper (OpenAI’s speech-to-text) to
+transcribe, store the text in memory, and possibly trigger downstream tasks (like automatically
+creating a task from a voice note). These features make the platform multi-modal. We’ll also
+incorporate email or scheduling triggers if needed (e.g. a daily cron hitting an endpoint to run daily
+summary – though we prefer to do scheduling internally in the Task Engine).
+Task Queue & Execution Engine:
+Inside the backend, once a task request is received (whether via an API call from the frontend or a
+webhook), the Task Engine takes over:
+• We use Celery with a Redis or RabbitMQ broker to offload long-running tasks from the main thread.
+The /task/run endpoint currently does execute_registered_task.delay(...) to enqueue
+a Celery job 60 . We will continue to leverage Celery for actual execution of tasks in the background,
+especially for those that might take many seconds (like calling Claude on a large prompt or waiting
+on an external API). For real-time interactive tasks (like streaming chat), we have the stream_task
+mechanism to stream via SSE without Celery (running directly async in the server process) 61
+That will remain for tasks that support it.
+
+62 .
+
+• Inbox & Approval Workflow: Some tasks require human approval or review before execution (for
+example, tasks auto-generated by an AI plan but needing sign-off). The agent inbox is implemented
+via a Supabase table (currently agent_inbox or task_queue ) that holds pending tasks with
+status "pending" 63 . In the new design, we may unify this with the tasks table (i.e. tasks table
+entries with status "pending" serve as the inbox). But we can still have a view or separate table if
+clarity is needed. The process is: when a task that needs approval is created (either by an agent like
+the weekly planner or manually by someone as a draft), it’s stored with status pending and possibly a
+summary. The code already uses agent_inbox.add_to_inbox(task_id, context, origin)
+to insert an entry and even auto-summarize it using Claude (the ai_inbox_summarizer task) 64 .
+We’ll keep that logic: e.g. if the weekly strategy agent generates a set of suggested tasks, they go to
+the inbox with a short summary of each so the human can quickly decide. The Slack command
+approve <id> or the Dashboard “Approve” button will call an endpoint (e.g. POST /agent/
+inbox/approve ) which flips the status to "approved" and then triggers the actual execution (calling
+run_task on that task ID) 65
+
+66 . If rejected, we mark it rejected and perhaps log a note. This
+
+ensures AI doesn’t execute potentially risky tasks without a human in the loop when desired. The
+inbox system will send notifications: if more than INBOX_ALERT_THRESHOLD tasks pile up, it can
+send a Slack push summarizing them (the current code _maybe_send_alert does this using
+
+20
+
+Claude to summarize multiple tasks into one message 67
+keep operators informed.
+
+68 ). We will maintain such features to
+
+• Retry and Failure Handling: The Task Engine has a built-in retry mechanism. In run_task , if a
+task’s run() function throws an exception, we capture it and automatically queue the task into a
+retry_queue
+
+with
+
+incremented
+
+retry
+
+count 69
+
+70 .
+
+We
+
+have
+
+a
+
+separate
+
+task
+
+task_rescheduler that periodically checks for tasks whose retry is due or tasks that were
+delayed by user request. The task_rescheduler.run reads a local JSON of delayed tasks and for
+each that is due, it uses Claude to decide what to do: escalate, close, or re-run 71 72 . In our design,
+we will formalize this by possibly using the database: tasks table has status = 'delayed' and a
+resume_at timestamp. A scheduler (could be Celery Beat or our own async loop) wakes up
+periodically, finds any delayed tasks whose time has come, and processes them. The processing can
+still consult an AI (Claude) as in the current design to decide next steps, which is a clever use of AI for
+ops (e.g. “This task was delayed 3 days ago, should we escalate it?” and Claude might answer “Yes
+escalate because it’s important.”). We will incorporate that logic, perhaps with more guardrails. The
+net result is that tasks rarely fall through the cracks: if failures happen, either the system retries
+automatically or prompts a human via Slack or changes status to “escalate” for manual intervention
+73 . Each failure is logged (and Slack notifications for failures are sent immediately via _log_task
+setting level=error triggers a Slack message 74
+
+75 ).
+
+• Event Bus / Messaging: While Celery covers asynchronous job execution, for certain immediate
+propagations we might use an internal event system. For example, when a task completes, we might
+want to automatically trigger a follow-up task or send data to multiple places. We can implement this
+simply within the code (after a task finishes, in run_task we call some hooks like the ClickUp sync,
+Slack notify, maybe trigger an export). If complexity grows, we might formalize an internal pub-sub
+(even using Redis or a lightweight library) where different components can subscribe to events like
+“TASK_COMPLETED” with certain tag and react (e.g. a listener that if a task with tag ‘publish’
+completed, it calls a deployment pipeline). Initially, though, our needs can be met with direct calls in
+code and scheduled checks.
+• Claude ↔ ClickUp Update Loop: This refers to the interplay where Claude (or other agents)
+continuously update task status and content in ClickUp. For instance, consider a weekly strategy task:
+Claude generates a list of strategic action items and, via _maybe_sync_clickup , those get
+created as tasks in ClickUp 56 76 . Later, as those tasks are completed or updated in our system, we
+reflect changes back to ClickUp. Conversely, if an operator updates something in ClickUp (like adding
+a note or closing a task), our webhook picks it up and could feed it to Claude for analysis (maybe to
+adjust its plan). This creates a loop: the AI plans tasks -> tasks show in ClickUp -> human maybe edits
+or adds details -> our system sees the update and perhaps triggers Claude to re-evaluate (for
+example, if a task was marked “blocked” in ClickUp, we could trigger Claude to analyze why and
+propose a solution). We will implement specific triggers for such loops. A simple approach: if a
+ClickUp webhook indicates a status change to a special status (say “Waiting for AI”), we call an agent
+to comment or progress it. Or if a task is marked “Done” by human, maybe we have Claude generate
+a brief retrospective (learning from success/failure) and store in memory. These kinds of continuous
+improvement loops ensure the AI is not just fire-and-forget but interacts smoothly with human
+project management.
+
+21
+
+• Notifications: Besides Slack, we could integrate other notification channels (email, MS Teams, etc.)
+as needed. The Slack integration is already robust (we have one central function
+utils.slack.send_slack_message used to push error logs and completions 77 78 ). We will
+keep using Slack for most internal alerts because it’s convenient for the team, and possibly add an
+email summary (e.g. a daily email of what tasks ran – that could be a separate task scheduled daily,
+generating a report from tasks table and sending out).
+• Concurrency and Rate Limiting: We will use Celery concurrency controls or FastAPI’s dependencies
+to ensure we don’t overload external APIs. The current code uses slowapi for rate limiting
+requests per minute 79 80 . We will continue to use such middleware to protect endpoints
+(especially open ones like public contact forms) from abuse. For LLM API calls, we may implement
+logic to queue them if too many at once (the tasks architecture inherently queues and can be
+configured with concurrency limits per worker). We should also ensure one user doesn’t spam a
+hundred tasks at the same time – rate limiting by user or globally via settings.
+In essence, the Task Engine is the heart that connects triggers → tasks → results → feedback. It
+embraces a robust design: tasks are persistent objects in the DB (so we never lose track), all state changes
+are logged, and the engine uses both deterministic logic and AI assistance (like Claude summarizing or
+deciding escalation) to manage the pipeline. This combination of traditional programming (for guarantees
+and data integrity) with AI (for flexibility in decision-making) yields a resilient operations core.
+Finally, every important event flows through this engine, allowing the Dashboard UI and logs to reflect
+real-time state. The /dashboard/metrics and related endpoints already aggregate counts of tasks,
+memory, errors 81 . In the new setup, those will draw from the unified tables (e.g. tasks succeeded/failed
+count from tasks table instead of multiple sources). This simplification will make building admin views (like
+“Inbox count” or “Tasks by status pie chart”) straightforward.
+
+🛠 Frontend Control Panel Blueprint
+We envision a two-part frontend: an Operator Control Panel (BrainStackStudio Dashboard) for internal
+admins, and a Copilot Interface for end users of specific brands (e.g. MyRoofGenius Copilot). Both are built
+with Next.js and share a common design system and components where possible, but they serve different
+needs and audiences.
+
+BrainStackStudio Operator UI (Admin Dashboard)
+This is a secure web application for internal use (likely only accessible to authenticated team members) that
+provides full visibility and control over the automation system. Key features and sections of the operator UI
+include:
+• Task Inbox & Approval Panel: A view showing pending tasks that require approval (the “Agent
+Inbox”). This might be presented as a list or Kanban column of tasks waiting for review. For each
+task, we display its summary (the short description generated by Claude when it was added to inbox
+82 ), origin (e.g. “recurring” or “user request”), time submitted, and options to Approve, Reject, or
+Delay. Approve triggers immediate execution (via an API call to /agent/inbox/approve with the
+task ID 65 ), Reject marks it as rejected (with an optional reason that gets logged), and Delay lets the
+
+22
+
+admin specify a later time or condition (this will call an endpoint like /agent/inbox/delay with a
+payload of task ID and new time 83 ). The UI for delay might have a date-time picker and possibly a
+dropdown of “fallback action” (our system uses a fallback field for delay which could be auto or notify
+84 ). The inbox panel will update in real-time (either via polling or WebSocket) as tasks get added or
+approved (we can leverage Supabase’s real-time capability or simple periodic fetch).
+• Live Task Monitor & Logs: A dashboard page that shows the current and recent activity of tasks.
+This can include a table of tasks with their status (running, succeeded, failed) updating live. We’ll
+include columns like Task Name, Status, Start Time, Duration, and maybe a result summary or link to
+details. For tasks that are currently “running” or recently finished, the admin might click to expand
+details: see the input context, the output (or partial output if streaming), and any logs or errors. We
+will surface the logs that our backend collects (structured JSON logs) perhaps filtered by task ID. The
+UI might have a toggle for “Show last 24h” or filters by status and tag. This effectively surfaces the
+content of the tasks table in a friendly way. Additionally, a Metrics panel will display counts like
+total tasks executed, success rate, tasks by type (pie or bar chart for which tasks run most), and error
+rate over time 17 . These charts can use an internal metrics endpoint or compute from tasks table
+(Celery also emits metrics we capture like TASKS_EXECUTED, etc. which we can expose via
+/metrics for Prometheus 85 ). We can use a library like Chart.js or recharts for this. The UI should
+also highlight if anything needs attention: e.g. a big red number of failed tasks today, or a
+notification if any task has been in “running” too long (possibly stuck).
+• AI Assistant (Copilot for Admin): The admin dashboard will include an AI chat panel (similar to
+ChatGPT interface) that is augmented with memory. This is effectively Copilot v2 endpoint that was
+mentioned 86 . In the UI, it looks like a chat: an input box where the operator can ask things like
+“Summarize the recent deployments” or “Create a task to update the marketing site tomorrow”. The
+backend /chat endpoint will handle these, using Claude or the default model, and return a
+streaming response with potentially suggested tasks in the answer 87 88 . The UI will display the
+assistant’s response token-by-token (we have a component OutputStream.tsx to append
+streaming text via SSE). If the response contains suggested tasks (the backend provides
+suggested_tasks list 89 90 ), the UI can highlight those or offer a button “Add to Inbox” for
+each. For example, if the assistant says "I suggest: 1) Run weekly priority review, 2) Prepare
+newsletter," the UI can let the admin click a suggestion to convert it into an actual task (calling
+perhaps /task/generate or directly enqueuing the named task). This way, the admin can have a
+conversational interface to manage the system – asking questions about memory ( /memory/
+search can be triggered through such chat queries if the user says "search memory for X", as Slack
+query does) or instructing it at a high level, with the AI translating to tasks.
+• Memory Search & Knowledge Base: A section of the dashboard will enable exploring the stored
+memory and docs. This could be a combined search bar where the operator enters a query and the
+UI shows results from both the memory logs and the knowledge docs. We will use the /memory/
+search or /memory/query API to fetch results 91
+
+92 . Results might be shown as snippets with
+
+context (“…found in Task 123 output on 2025-07-01” or “…in Document ‘Onboarding SOP’”). The
+operator can click a result to see the full content (hence the MarkdownViewer component to display
+a memory entry or doc nicely, with highlights of query terms). For knowledge docs, we can allow
+viewing the entire doc, downloading it, or updating it. If an operator needs to add knowledge (say
+upload a new reference PDF or paste an SOP), we’ll provide an Upload Knowledge interface (which
+calls /knowledge/doc/upload internally to embed and store it). This part essentially serves as an
+
+23
+
+internal wiki/search tool, backed by our RAG data. It’s invaluable for verifying what the AI might use
+to answer questions and for curating the knowledge base.
+• Control Panel for Automation: This is where various settings and triggers can be managed. For
+instance, the admin might have a UI to configure recurring tasks – a page showing the list of
+scheduled tasks (the recurring_tasks.json loaded by recurring_task_engine ) and toggles
+or cron schedule editors for each 93 94 . They could add a new recurring schedule via a form (select
+task, frequency daily/weekly, time, context params). The UI then calls an API (maybe POST /tasks/
+recurring ) which adds to the JSON or DB and the engine picks it up. Another panel could show
+system status like environment info (if we expose /diagnostics/state
+
+95 , which might include
+
+current memory usage, Supabase connection status, etc.), and provide controls to flush caches or
+trigger certain maintenance tasks (like a "Run DB migration" button or “Re-index documents” which
+calls /knowledge/index ). Essentially, this portion of the UI is for maintenance and fine-tuning – a
+replacement for manually running scripts or logging into servers. If needed, we can also surface
+environment variables (non-sensitive) to indicate which API keys are set or not (to quickly catch
+misconfigs).
+• Multi-Brand Management: Since the backend serves multiple brands, the admin UI could allow
+switching context or viewing tasks by brand. For example, a filter to show only tasks for
+MyRoofGenius vs TemplateForge (assuming tasks or memory entries have a project/brand tag in
+context or origin). We might also allow certain actions by brand – e.g. deploying frontends or
+running brand-specific agents. Possibly a section listing each brand with some stats (how many tasks
+run for that brand today, is its front-end online, etc.). Because all brands share the same backend,
+this is mostly an organizational view.
+• Security & Feedback: Provide UI for user management (for the admin login itself – though we may
+simply use Basic Auth or JWT with a single admin user as currently implemented 96 97 ). If multiuser, list of authorized users and roles (admin or viewer). Also a simple feedback form for admins to
+log issues/feedback into the system (calls /feedback/report to store a ticket 98 ). That endpoint
+currently likely logs to Slack or Supabase. We can surface those reports on the dashboard as well (so
+the team can see known issues).
+The admin UI is implemented as a Next.js app with likely a modern UI library (Tailwind + shadcn UI per
+README 99 ). It will use JWT auth to call the backend (obtained via /auth/token , possibly stored as httponly cookie or localStorage plus a CSRF token for safety 100 101 ). Since it’s mostly an internal tool, we value
+responsiveness and clarity: lots of real-time updates, possibly using WebSockets or SSE for events like new
+tasks or logs (Supabase Realtime could also push DB changes to the UI, but simpler might be a WebSocket
+from FastAPI that sends updates). We may implement a small Socket.IO or FastAPI websocket route
+streaming events that the UI can subscribe to (especially for log lines or new tasks, rather than polling).
+Alternatively, integrate with Supabase’s realtime if feasible by listening on the tasks table changes.
+
+24
+
+MyRoofGenius Copilot UI (User-Facing)
+MyRoofGenius (and similarly TemplateForge or other brand-specific interfaces) is a more focused
+application meant for end users or customers. It will expose only certain capabilities of the system, in a
+domain-specific and user-friendly manner. Features for MyRoofGenius Copilot might include:
+• Conversational Q&A Assistant: A chat interface where the user (e.g. a roofing salesperson or a
+homeowner client) can ask questions related to roofing estimates, solar installations, etc. This is
+backed by our system’s knowledge base and tools. For example, a user might ask “Can you generate
+an estimate for a 2000 sq ft roof replacement in Denver?” The Copilot UI sends this as a request
+(perhaps to a brand-specific endpoint like /copilot/query that internally might format some
+context like default model and knowledge base project). The system might then run a pipeline: fetch
+relevant pricing data from knowledge, run generate_roof_estimate task if needed, or directly
+answer if general. The UI will present the answer, possibly with a PDF or detailed breakdown if
+produced. This chat would be more constrained than the admin one – likely it won’t expose task
+suggestions or anything technical. If complex multi-step needed, the backend handles it behind the
+scenes. The UI just sees question -> answer.
+• Form-Driven Task Submission: For tasks that are clearly defined (like “Generate EagleView report
+parsing” or “Create proposal document”), the UI can present a form rather than a free text chat. For
+instance, an “Estimate My Roof” form could ask the user to upload an EagleView JSON or enter
+some parameters, then on submit call the parse_eagleview_report task followed by
+generate_roof_estimate task automatically. The results (CSV of quantities, cost breakdown)
+would be shown or downloadable. Another form might be “Request Solar Installation Guide” which
+triggers the generation of product docs. These forms make it easier for non-technical users to use
+the AI without phrasing a request. Under the hood, the submission calls our API (with proper brand
+context and user auth) and then the UI polls the /task/status/{id} until ready (or uses
+WebSocket events to know completion).
+• RAG-Enabled Search for Users: If we want to empower users with self-service information retrieval,
+we can include a Knowledge Base Search component. E.g., TemplateForge might let users search a
+library of templates or AI-generated articles. The front-end could call the same /memory/query or
+a brand-filtered variant and display relevant documents or answers. Potentially, an LLM could be
+used to answer user queries by pulling from docs (like a ChatGPT on documentation). We might
+incorporate a simplified version: user asks a question in Copilot chat, the backend uses RAG with
+brand-specific docs to answer. The UI can show the answer along with “Source: TemplateForge
+Guidebook” or similar, building trust through citations.
+• Live Updates and Notifications: If some tasks take time (like generating a detailed proposal might
+take 1-2 minutes if it’s doing heavy analysis), the user UI should handle that gracefully. Possibly by
+showing a loading state with messages like “Crunching numbers for your estimate…”, and then
+either streaming partial results or notifying when done. Since we might not want to expose the
+concept of “task IDs” and manual refresh to users, we can use WebSockets or server-sent events to
+push the result. For example, upon form submission the API could respond immediately “task
+accepted” and the UI opens an EventSource on /task/status/stream/{id} that sends progress
+or completion. Or simpler, the API keeps the connection open and streams the final output (though
+that’s not typical if it takes a long time; better to decouple with a push).
+
+25
+
+• User Authentication and Session: Depending on context, MyRoofGenius Copilot might require user
+login (if it’s for internal use by salespeople) or could be publicly accessible (with limited functionality).
+If login is needed, we’ll integrate with Auth – possibly using the same JWT system (we can have user
+role tokens separate from admin tokens). The backend settings allow multiple users with roles 102 ,
+so we’ll use that. The UI will have a login page if required and obtain a token from /auth/token . If
+public, perhaps no login but certain sensitive actions wouldn’t be available.
+• Branding and Customization: The Copilot UI will carry the branding of MyRoofGenius (logo, colors,
+etc.), even though it’s powered by BrainStackStudio backend. TemplateForge’s UI would look
+different accordingly. We maintain them as separate Next.js apps or as one app with dynamic
+theming (but separate simplifies deployment and customization). They will however use common
+components for chat, form, etc., possibly imported from a shared library to reduce code duplication.
+• Limits and Guidance: For a good UX, especially if the audience is non-technical, the UI will guide the
+user on what they can do. For example, showing a list of example questions or tasks (like “Ask: What
+is the best material for a 2000 sq ft roof?” or a button: “Generate my roof report”). These can be static
+hints or dynamic based on memory (e.g. if user has some data stored, suggest related questions).
+Also, any limitations or disclaimers should be shown (like “Estimates are based on standard pricing
+and may not reflect actual quotes”).
+• Real-time Collaboration: Possibly out-of-scope initially, but one can imagine multiple users or an
+admin monitoring the copilot’s conversations. If needed, the system’s memory and session model
+allow an admin to see what a user asked and what the AI responded (since all interactions are
+stored). This might be surfaced in admin UI rather than user UI, but it’s a benefit of the unified
+backend.
+Overall, the user-facing Copilot focuses on simplicity and task-specific UX, whereas the admin dashboard
+focuses on breadth and control. Both, however, rely on the same backend APIs. The Next.js apps will use
+NEXT_PUBLIC_API_BASE to know the base URL of the API (empty if same domain or a specific URL if
+separate) 103 and include the auth token for requests (for admin, a cookie or header; for user, maybe
+similar or none if open). They will also share certain pages like the marketing site (the BrainStackStudio
+admin app might double as the public site for marketing, as mentioned in README with routes
+/products , /services etc. for public content 104 ). We can maintain that by having the admin app
+serve public pages and protect the /dashboard path for actual app, or similarly.
+Frontend–Backend Interaction: All UI operations correspond to backend endpoints:
+• Approving tasks -> calls /agent/inbox/approve (with CSRF token included in header because our
+backend protects non-GET with CSRF for browser clients 105 106 ).
+• Submitting a new AI task -> calls /task/run or specialized endpoints ( /task/nl-design , /
+chat , etc.) depending on UI context.
+• Chat streaming -> opens a connection to /chat with stream=true to get SSE events 107 .
+• Searching memory -> calls /memory/search or /memory/query as appropriate.
+• Uploading file -> calls /knowledge/doc/upload (for knowledge) or other specific endpoints (like
+/voice/upload if we add voice on user side).
+• Logging in -> calls /auth/token with credentials to get JWT cookie 97 .
+
+26
+
+• The PWA aspect: the admin dashboard includes a manifest to allow “Add to Home Screen” on mobile
+108 . We will ensure to include that and service worker for offline caching of last data, which is nice
+for mobile monitoring.
+By using SSR or static generation carefully, we can ensure the public pages are SEO friendly (for marketing
+content), while the app pages use client-side auth. Given Next 13’s App Router, we might do server-side
+rendering for some pages. It’s not critical for the internal app except maybe for initial load performance.
+UI Technologies: We stick with Tailwind CSS and shadcn/ui (a popular library of accessible components
+built on Radix UI) to get a consistent and modern look. We will use Framer Motion for subtle animations
+(as seen in home page snippet 109 ). The UI should be responsive (so operators can even check things on
+mobile via the PWA, which is mentioned in README as well 108 ).
+Summary of Components and Pages:
+• Components: Reusable building blocks.
+• CopilotHeader (maybe brand logo and menu – we saw frontend/components/
+CopilotHeader.tsx in repo likely for the user side).
+• PromptPanel – a text box with maybe a dropdown to choose model (Claude vs GPT vs Gemini) for
+admin, or hidden default for user.
+• OutputStream – displays the streaming text with a typing indicator.
+• MarkdownViewer – uses a library to render markdown to HTML, maybe with styling (plus could
+add copy buttons for code blocks, etc.).
+• TaskList – lists tasks with icons or status colors; admin version might have interactive controls,
+user version might just show what they've run.
+• Charts – if using a chart library, embed charts for metrics.
+• SearchBar – with results dropdown or redirect to a search results page.
+• UploadButton – for knowledge upload, maybe integrated with drag-drop.
+• Pages (Admin):
+• /dashboard – main dashboard overview (key metrics, recent tasks, maybe a welcome message).
+• /dashboard/inbox – tasks pending approval.
+• /dashboard/tasks – full list of tasks (with filters by date/status).
+• /dashboard/tasks/[id] – detail view of a specific task (show input/output and log).
+• /dashboard/agents – perhaps a visualization of agent graph or controls (optional).
+• /dashboard/memory – search memory UI.
+• /dashboard/docs – list knowledge docs, with view/upload options.
+• /dashboard/settings – system settings like schedules, etc.
+• /dashboard/chat (or integrated via a chat widget on all pages) – the admin copilot chat.
+• (Public pages like / home, /products , etc., which can be static content as per marketing need).
+• Pages (MyRoofGenius):
+• / – might directly be the Copilot interface (or a marketing page explaining it).
+
+27
+
+• /copilot – chat interface if not on home.
+• /estimate – a form for roof estimates.
+• /reports – maybe list of past reports generated (if we allow users to retrieve old results, might
+require login or a session).
+• /guide – knowledge base Q&A page if needed.
+• /about etc – brand info.
+We will ensure security: the admin pages will check for admin role JWT (and the backend already has
+dependency require_admin on certain routes 102 ). The user pages will either not require auth or check
+for user token. Also implement CSRF protection for forms (the backend sets a CSRF cookie and expects
+header, which our frontend will handle by reading the cookie and including header for state-changing
+requests, as configured 110 ).
+To tie it together, these frontends will empower both internal team and external users to leverage the AI
+platform effectively. By providing a friendly UI on top of a complex backend, we hide the complexity and
+present clear value: For admins, a command center for AI operations; for users, a helpful assistant or tool
+that solves their domain-specific problems (whether generating content or insights).
+
+Prompt Template Architecture
+Effective prompt design is vital to guiding the AI agents’ behavior. We will establish a prompt template
+architecture organizing all prompts into structured files and categories, with variables and formatting
+rules that ensure consistent, high-quality outputs. The prompt templates will be stored in the repository
+under tasks/prompt_templates/ (as noted in the file structure), and possibly mirrored in the database
+(the prompts table) for runtime flexibility.
+Archetypes of Prompts: We identify several archetypal prompt categories, each with a distinct purpose and
+style:
+• Claude Markdown Templates: These prompts are designed for Anthropic’s Claude to produce wellstructured Markdown documents. Examples include:
+• SOP (Standard Operating Procedure) Template: A prompt that instructs Claude to draft a procedural
+document with step-by-step instructions, given context about a process. It might include
+placeholders for the process name, roles, tools used, etc., and emphasize a clear, numbered list
+structure.
+• Blueprint Template: Used when we want Claude to generate a technical design or project plan (like
+this very blueprint). It would have sections like Executive Summary, Objectives, Architecture, Tasks,
+Implementation Plan, etc. The prompt might say “You are an expert system architect. Please create a
+detailed design document in Markdown with the following sections: …” and we fill in bullet points to
+cover or context to incorporate. Variables could include system name, requirements, and any
+provided context (like backlog items or constraints).
+• Changelog Template: Instructs Claude to draft release notes or a changelog from a list of changes. It
+might have a structure like version number, date, and list of changes categorized into added/
+changed/fixed. The prompt ensures the output is in proper Markdown (using lists, maybe bold
+headings for each version). We can supply the raw commit list or change summary as input to this
+template.
+
+28
+
+• Bundle Template: If we want Claude to output multiple related documents in one go (e.g. a “bundle”
+of content pieces), this template guides how they should be combined. For instance, a product
+launch bundle might include a blog post, a tweet thread, and an email draft all in one output. The
+template might explicitly delineate sections for each piece, with clear markers (like “Blog Post:
+\n<blog content>\n\nTweet Thread:\n1. …”). This ensures the output is easy to split if needed.
+Variables can be the product details, angle, etc.
+All Claude markdown templates will share some common style guidelines: we will instruct to use
+appropriate Markdown syntax (for headings, lists, tables), to not exceed a certain length unless allowed
+(Claude can handle large output, but we might set expectations), and to include certain metadata if needed.
+Metadata tags can be embedded as HTML comments or YAML front matter. For example, we might include
+a YAML front matter at the top of an SOP like:
+
+--title: "Onboarding SOP"
+author: "Claude AI"
+date: "2025-07-14"
+tags: ["SOP","HR"]
+--This could be used later for conversion to PDF or indexing. Or we might put an HTML comment like <!-AUTOGENERATED: DO NOT EDIT --> to mark it as AI-generated. These conventions will be documented
+and consistent so that any downstream process (like publishing pipelines) can detect them.
+• Codex Handoff Template: This prompt is for instructing the Codex (GPT-4) agent how to generate
+code from a spec. It serves as the bridge between Claude’s output and Codex’s input. We want to
+eliminate guesswork, so this template will be very explicit. For instance, a template file codex/
+implement_code.md might read:
+You are an AI coding assistant. You will be given a software specification in
+Markdown, enclosed in <spec> tags. Follow the specification exactly to produce
+code.
+<instructions>
+- Only produce valid code and nothing else (no explanation).
+- If the spec contains multiple files, output them in the required format (as
+JSON or as separate code blocks with file names).
+- Preserve all structure as described.
+</instructions>
+<spec>
+{{{ blueprint_markdown }}}
+</spec>
+
+29
+
+Begin coding now.
+Here {{{ blueprint_markdown }}} (using triple braces to indicate raw insertion without escaping in
+Jinja, for example) will be replaced by the actual Claude blueprint content. The instructions emphasize that
+the assistant should not deviate. We might decide a specific output convention: perhaps Codex should
+output a JSON with keys as filenames and values as code (which our system then writes to files). Or as
+Markdown with fences labeled by filename as earlier. We have to pick one and train Codex via the prompt to
+stick to it. JSON might be easier for automated parsing (we can include in instructions “output JSON with
+keys 'filename' and 'code'”). This template thus ensures Codex knows the expected format and context.
+Additional variables could be model or language specifics (if we know programming language, but likely the
+spec itself includes that).
+• Gemini SEO Template: A prompt tailored for Google’s Gemini model, focusing on SEO or content
+optimization. For example, gemini/seo_optimize.md might contain a prompt like:
+You are an expert content editor and SEO specialist. Improve the following
+content for search engine optimization and clarity, without changing its
+meaning.
+Focus on:
+- Using the keyword "{{ target_keyword }}" naturally throughout.
+- Adding an engaging meta description (50-160 characters).
+- Ensuring headings are meaningful and include relevant phrases.
+- Making the tone appropriate for {{ audience }}.
+Content:
+"""
+{{ original_content }}
+"""
+Now provide the improved version of the content, in Markdown format. Also
+include a suggestion for a meta description at the end, under a heading "Meta
+Description".
+Variables here include
+
+target_keyword ,
+
+audience , and the
+
+original_content . The template
+
+ensures the output includes what we need (the optimized content and a meta description). We instruct
+usage of Markdown (so if the original had formatting, it remains). By having a dedicated template, if we
+want to tweak how we instruct Gemini (maybe we find it needs more guidance on not altering certain
+things, or including an H1 title), we can adjust in one place.
+We might have other Gemini-oriented templates as well, e.g. a Summary template for the
+gemini_memory_agent which summarizes logs. Currently, the code constructs the prompt dynamically
+
+30
+
+42 , but we could externalize it: e.g.
+
+gemini/brief_summary.md saying "Summarize these logs briefly:
+
+{{ logs_text }}". This keeps consistency.
+• Perplexity Research Injection Template: When we combine search results into Claude's prompt,
+we want a template that formats it cleanly so Claude can incorporate it. For instance, research/
+injected_answer.md might look like:
+You are a knowledgeable assistant with access to research data. Using the
+information below, answer the query comprehensively.
+Query: "{{ user_question }}"
+Research findings:
+{{#each sources}}
+- "{{this.text}}" (Source: {{this.source}})
+{{/each}}
+Provide a well-structured answer. Cite sources by number when used.
+(Above uses Handlebars-like syntax for iteration – actual implementation could flatten into a single string.)
+Essentially, we list the findings (maybe with numbering or some indicator so Claude can refer to them). We
+instruct Claude to use them in the answer and cite. The output might then have references like "[1]"
+corresponding to the given source list. This template ensures that our merging of Perplexity results and
+question is systematic, not ad-hoc.
+Another template in this category might be for automated report writing from data, if we had search or stats.
+But main idea is to make sure the assistant reads the provided info.
+• Other Prompt Types: We also have smaller prompts like for the inbox summarizer (Claude prompt
+that summarizes pending tasks to include in Slack alert 68 ) or the delay rescheduler prompt (Claude
+decides escalate or not 71 ). These can be templated too (to adjust phrasing or criteria easily). We
+can put them under a category like claude/ops/ or similar if we like. For clarity, one prompt per
+file with a descriptive name.
+Structure & Variables: Each template file will be written in plain text (likely Markdown or text with
+placeholder syntax). We will adopt a templating language, likely Jinja2 (since Python can easily fill Jinja
+templates using our utils.template_loader.render_template as seen used 111 ). For Jinja2,
+variables are denoted {{ var }} and we can have simple control structures. The template files might
+have .md.j2 extension to indicate Jinja, or we strip extension. In our template_loader.py , we can
+load the file and do Template.render(fields) to produce the final prompt. This allows separation of
+logic and prompt wording.
+We will maintain consistent variable names and pass in a dictionary from tasks. For example: - Claude SOP
+task will call something like render_template("claude/sop.md", {"procedure_name": ...,
+"steps":
+
+...}) .
+
+implement_code.md",
+
+-
+
+The
+
+Codex
+
+handoff
+
+pipeline
+
+{"blueprint_markdown":
+
+31
+
+will
+
+call
+
+render_template("codex/
+
+spec_text}) . - In code, these templates are
+
+referenced by name (and maybe we maintain a mapping if needed). The prompts table in DB can also store
+them: e.g. a row with name "codex_implement_code" and content matching the file. We could synchronize
+on startup (load all files into DB for quick editing in UI if needed). However, initial approach is file-first for
+version control.
+Formatting Rules for Outputs: We instruct in prompts how output should be formatted, but we'll also
+document guidelines: - All AI-generated docs should be valid Markdown for easy preview and conversion.
+Use # for main titles, ## for sections, etc. Use backticks for code, etc. - If the output is code that will be
+saved to file, prefer to output just the code (or use the agreed JSON/markdown format and we'll parse it). We discourage including any extraneous prose in Codex output (like “Here is the code:” – the prompt
+explicitly says not to). - For multi-part outputs (like the bundle), separate clearly (maybe with level-2
+headings or markdown comments). - Ensure each prompt asks the AI to stay within scope and not include
+info it wasn’t given. E.g. in summarizer prompts, instruct not to hallucinate beyond provided logs. - Use
+delimiters in prompts (like triple quotes, XML-like tags, or fenced blocks) to clearly show the AI what the
+content is vs instructions. (We see this used in many open prompts to avoid prompt injection issues). - Make
+sure to include examples in the prompt if needed. For very critical formats, an example can help. For
+instance, in the Codex template, we might actually include a short dummy spec and the expected JSON
+output as an illustration. But that lengthens prompt; might not be needed if we phrase well.
+Metadata for Conversion: As mentioned, for certain outputs like PDF conversion, including metadata in
+the output helps. E.g., if we output a documentation bundle that will be turned into a PDF, including title,
+author, date at top is useful. We might have the template itself insert those from variables (like project
+name, current date, etc.). Alternatively, we add them after generation (the docs table can combine
+metadata). But doing it in template ensures it's part of what AI sees and produces nicely.
+For example, the SOP template might automatically do:
+
+# {{ title }}
+*Last updated: {{ date }}*
+{{ content_body }}
+So all SOPs have a standardized title and timestamp. Or a blueprint might list "Prepared by Claude on
+<date>".
+We will also incorporate special markers for post-processing. If we plan to generate PDFs via a tool, maybe
+we want page breaks or image placeholders. We can instruct AI to include something like <div
+style="page-break-after: always;"></div> if needed to separate sections for printing, though
+that’s an edge case. At minimum, consistent heading levels and perhaps a table of contents (Claude can
+generate if asked).
+To ensure these rules are followed, we rely on prompt clarity. If we find the outputs deviating, we adjust the
+template and maybe add explicit "Do not do X" instructions.
+
+32
+
+Organization & Naming: Each file in prompt_templates folder uses lowercase and underscores or
+hyphens. The categories can be subfolders or part of name. We proposed subfolders by agent or use-case.
+Example file paths: prompt_templates/claude/sop.md

@@ -1,0 +1,246 @@
+# LangGraph Agent Workflow Configuration
+# 
+# This YAML file defines the multi-agent graph structure, including nodes,
+# edges, routing rules, and conditional logic for orchestrating AI agents
+# in the BrainOps system.
+
+version: "1.0"
+name: "BrainOps Multi-Agent System"
+description: "Orchestrates specialized AI agents for content, code, research, and strategic operations"
+
+# Global configuration for all agents
+config:
+  max_iterations: 10
+  timeout_seconds: 300
+  memory_enabled: true
+  approval_required_for:
+    - external_api_calls
+    - file_modifications
+    - cost_above_threshold
+  cost_threshold_usd: 1.00
+  
+# Agent node definitions
+nodes:
+  # Content Director - Claude Agent
+  content_director:
+    id: "claude_content"
+    type: "llm"
+    agent_class: "apps.backend.agents.claude_agent.ClaudeAgent"
+    model: "claude-3-opus-20240229"
+    temperature: 0.3
+    max_tokens: 4096
+    capabilities:
+      - content_generation
+      - documentation
+      - copywriting
+      - quality_assurance
+    system_prompt_template: "claude/content_director_system.md"
+    
+  # Operational Executive - GPT-4/Codex Agent  
+  operational_executive:
+    id: "codex_operations"
+    type: "llm"
+    agent_class: "apps.backend.agents.codex_agent.CodexAgent"
+    model: "gpt-4-turbo-preview"
+    temperature: 0.1
+    max_tokens: 8192
+    capabilities:
+      - code_generation
+      - automation_design
+      - technical_implementation
+      - debugging
+    system_prompt_template: "codex/operational_executive_system.md"
+    
+  # Strategic Intelligence - Gemini Agent
+  strategic_intelligence:
+    id: "gemini_strategy"
+    type: "llm" 
+    agent_class: "apps.backend.agents.gemini_agent.GeminiAgent"
+    model: "gemini-pro"
+    temperature: 0.5
+    max_tokens: 2048
+    capabilities:
+      - market_analysis
+      - strategic_planning
+      - seo_optimization
+      - trend_identification
+    system_prompt_template: "gemini/strategic_intelligence_system.md"
+    
+  # Research Intelligence - Perplexity/Search Agent
+  research_intelligence:
+    id: "search_research"
+    type: "search"
+    agent_class: "apps.backend.agents.search_agent.SearchAgent"
+    provider: "perplexity"
+    search_depth: "comprehensive"
+    capabilities:
+      - web_search
+      - fact_verification
+      - competitive_research
+      - real_time_data
+    system_prompt_template: "research/research_intelligence_system.md"
+    
+  # Human Approval Node
+  human_approval:
+    id: "human_checkpoint"
+    type: "human"
+    timeout_minutes: 60
+    slack_notification: true
+    approval_categories:
+      - content_publication
+      - code_deployment
+      - strategic_decisions
+      - high_cost_operations
+      
+  # Router Node - Decides agent routing
+  task_router:
+    id: "router"
+    type: "router"
+    routing_strategy: "conditional"
+    default_route: "content_director"
+
+# Edge definitions connecting nodes
+edges:
+  # From router to specialized agents
+  - source: "task_router"
+    target: "content_director"
+    condition: "task_type in ['content', 'documentation', 'copywriting']"
+    
+  - source: "task_router"
+    target: "operational_executive"
+    condition: "task_type in ['automation', 'code', 'technical']"
+    
+  - source: "task_router"
+    target: "strategic_intelligence"
+    condition: "task_type in ['strategy', 'analysis', 'seo']"
+    
+  - source: "task_router"
+    target: "research_intelligence"
+    condition: "requires_current_data or task_type == 'research'"
+    
+  # From agents to human approval
+  - source: "content_director"
+    target: "human_approval"
+    condition: "requires_approval or output.confidence < 0.8"
+    
+  - source: "operational_executive"
+    target: "human_approval"
+    condition: "modifies_production_code or estimated_cost > cost_threshold"
+    
+  - source: "strategic_intelligence"
+    target: "human_approval"
+    condition: "strategic_impact == 'high'"
+    
+  # Agent collaboration edges
+  - source: "research_intelligence"
+    target: "content_director"
+    condition: "task_type == 'researched_content'"
+    metadata:
+      pass_context: true
+      
+  - source: "strategic_intelligence"
+    target: "content_director"
+    condition: "needs_content_creation"
+    metadata:
+      pass_context: true
+      
+  - source: "content_director"
+    target: "operational_executive"
+    condition: "needs_technical_implementation"
+    metadata:
+      pass_context: true
+
+# Conditional routing rules
+routing_rules:
+  # Priority routing for urgent tasks
+  urgent_task_routing:
+    condition: "task.priority == 'urgent'"
+    actions:
+      - set_timeout: 60
+      - bypass_approval_for: ["minor_edits", "status_updates"]
+      
+  # Complex task decomposition
+  complex_task_routing:
+    condition: "task.complexity == 'high'"
+    actions:
+      - enable_multi_agent: true
+      - require_planning_phase: true
+      - max_agents: 3
+      
+  # Cost-sensitive routing
+  budget_routing:
+    condition: "task.budget_limit is not None"
+    actions:
+      - track_token_usage: true
+      - prefer_efficient_models: true
+      - alert_at_percentage: 80
+
+# Workflow templates for common operations
+workflows:
+  # Content publication workflow
+  content_publication:
+    steps:
+      - node: "research_intelligence"
+        action: "gather_topic_research"
+      - node: "strategic_intelligence" 
+        action: "analyze_seo_keywords"
+      - node: "content_director"
+        action: "generate_article"
+      - node: "human_approval"
+        action: "review_content"
+        
+  # Automation development workflow
+  automation_development:
+    steps:
+      - node: "operational_executive"
+        action: "design_automation"
+      - node: "operational_executive"
+        action: "implement_code"
+      - node: "content_director"
+        action: "write_documentation"
+      - node: "human_approval"
+        action: "approve_deployment"
+        
+  # Market analysis workflow
+  market_analysis:
+    steps:
+      - node: "research_intelligence"
+        action: "gather_market_data"
+      - node: "strategic_intelligence"
+        action: "analyze_trends"
+      - node: "content_director"
+        action: "create_report"
+
+# Performance monitoring configuration
+monitoring:
+  metrics:
+    - response_time
+    - token_usage
+    - success_rate
+    - approval_rate
+  alerts:
+    - type: "threshold"
+      metric: "response_time"
+      condition: "> 30 seconds"
+      notify: "slack"
+    - type: "failure_rate"
+      threshold: 0.1
+      window: "1 hour"
+      notify: "email"
+
+# Memory and context configuration
+memory:
+  provider: "supabase"
+  vector_store: "pgvector"
+  embedding_model: "text-embedding-ada-002"
+  context_window: 8000
+  relevance_threshold: 0.75
+  
+# Security and compliance
+security:
+  require_authentication: true
+  audit_logging: true
+  pii_detection: true
+  rate_limiting:
+    requests_per_minute: 60
+    tokens_per_hour: 100000
