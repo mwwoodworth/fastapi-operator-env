@@ -75,12 +75,19 @@ def create_app(settings: Settings) -> FastAPI:
     scheduler = JobScheduler(settings)
     
     # Start scheduler
-    scheduler.start()
+    try:
+        scheduler.start()
+    except Exception as e:
+        logger.error(f"Failed to start scheduler: {e}")
+        # Continue without scheduler for now
     
     @app.on_event("shutdown")
     def shutdown_event():
         """Clean up on shutdown"""
-        scheduler.stop()
+        try:
+            scheduler.stop()
+        except Exception as e:
+            logger.error(f"Error during scheduler shutdown: {e}")
     
     # Routes
     @app.get("/")

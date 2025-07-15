@@ -10,6 +10,7 @@ from apscheduler.triggers.interval import IntervalTrigger
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 from apscheduler.executors.pool import ThreadPoolExecutor
+from apscheduler.events import EVENT_JOB_ERROR, EVENT_JOB_EXECUTED
 import pytz
 
 from config.settings import Settings
@@ -29,9 +30,10 @@ class JobScheduler:
     
     def _init_scheduler(self):
         """Initialize the scheduler with configuration"""
-        # Configure job stores
+        # Use memory store for simplicity in initial deployment
+        # TODO: Switch to SQLAlchemy when database is properly configured
         jobstores = {
-            'default': SQLAlchemyJobStore(url=self.settings.database_url)
+            'default': 'memory'
         }
         
         # Configure executors
@@ -57,12 +59,12 @@ class JobScheduler:
         # Add listeners
         self._scheduler.add_listener(
             self._job_error_listener,
-            mask='EVENT_JOB_ERROR'
+            EVENT_JOB_ERROR
         )
         
         self._scheduler.add_listener(
             self._job_executed_listener,
-            mask='EVENT_JOB_EXECUTED'
+            EVENT_JOB_EXECUTED
         )
     
     def _job_error_listener(self, event):
