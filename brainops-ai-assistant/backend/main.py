@@ -130,6 +130,15 @@ async def root():
     }
 
 
+@app.get("/health")
+async def health_check():
+    """Health check endpoint for deployment."""
+    return {
+        "status": "healthy",
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }
+
+
 @app.get("/api/status")
 async def system_status():
     """Get system status."""
