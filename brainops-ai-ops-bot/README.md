@@ -1,299 +1,471 @@
-# BrainOps AI Ops Bot
+# 🤖 BrainOps AI Ops Bot
 
-A comprehensive DevOps automation bot that integrates with multiple services to provide health checks, monitoring, deployments, and real-time alerts.
+> **Production-ready DevOps automation and monitoring bot for multi-service infrastructure management.**
 
-## Features
+## 🚀 Overview
 
-- **Multi-Service Integration**: ClickUp, Notion, GitHub, Slack, Airtable, Supabase, Stripe, Render, Vercel, and more
-- **Health Monitoring**: Real-time health checks for all integrated services
-- **Automated Deployments**: Trigger deployments and monitor build status
-- **Alert System**: Slack and email notifications for errors, downtime, or build failures
-- **Secure Credential Management**: All secrets stored securely with masked logging
-- **Extensible Architecture**: Easy to add new service integrations
-- **Multiple Run Modes**: CLI, Server (API), or Scheduled Jobs
+BrainOps AI Ops Bot is a comprehensive DevOps automation platform that integrates with 11+ services to provide:
+- **Real-time health monitoring** across all integrated services
+- **Automated deployment triggers** with rollback capabilities
+- **Multi-channel alerting** via Slack, email, and webhooks
+- **Scheduled task management** with cron-like scheduling
+- **Service resource management** and monitoring
+- **CLI and API interfaces** for maximum flexibility
 
-## Quick Start
+## 📦 Supported Integrations
 
-### 1. Installation
+### Core Services
+- **Render** - Deployment management and monitoring
+- **Vercel** - Frontend deployment and analytics
+- **GitHub** - Repository management and CI/CD
+- **Slack** - Team communication and alerts
+
+### Business Tools
+- **ClickUp** - Project management and task tracking
+- **Notion** - Knowledge base and documentation
+- **Airtable** - Database management and workflows
+- **Stripe** - Payment processing and billing
+
+### Data & Storage
+- **Supabase** - Database and backend services
+- **PostgreSQL** - Primary data storage
+
+### AI & ML
+- **OpenAI** - GPT models and AI automation
+- **Claude/Anthropic** - Advanced AI capabilities
+
+## 🏗️ Architecture
+
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   CLI Interface │    │   API Server    │    │  Web Dashboard  │
+│                 │    │  (FastAPI)      │    │   (Future)      │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+         │                       │                       │
+         └───────────────────────┼───────────────────────┘
+                                 │
+         ┌─────────────────────────────────────────────────┐
+         │              Core Engine                        │
+         │  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐│
+         │  │  Monitor    │ │  Scheduler  │ │   Alerts    ││
+         │  │  System     │ │  Engine     │ │  Manager    ││
+         │  └─────────────┘ └─────────────┘ └─────────────┘│
+         └─────────────────────────────────────────────────┘
+                                 │
+         ┌─────────────────────────────────────────────────┐
+         │              Service Connectors                 │
+         │  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐│
+         │  │ Render  │ │ Vercel  │ │ GitHub  │ │  Slack  ││
+         │  └─────────┘ └─────────┘ └─────────┘ └─────────┘│
+         │  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐│
+         │  │ClickUp  │ │ Notion  │ │Airtable │ │ Stripe  ││
+         │  └─────────┘ └─────────┘ └─────────┘ └─────────┘│
+         └─────────────────────────────────────────────────┘
+```
+
+## 🚀 Quick Start
+
+### 1. Environment Setup
 
 ```bash
 # Clone the repository
-git clone <your-repo-url>
+git clone https://github.com/mwwoodworth/brainops-ai-ops-bot.git
 cd brainops-ai-ops-bot
 
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+# Copy environment template
+cp .env.example .env
 
+# Edit .env with your credentials
+nano .env
+```
+
+### 2. Local Development
+
+```bash
 # Install dependencies
 pip install -r requirements.txt
-```
 
-### 2. Configuration
-
-Copy the example environment file and add your credentials:
-
-```bash
-cp .env.example .env
-```
-
-Edit `.env` with your actual credentials (see Configuration section below).
-
-### 3. Usage
-
-#### CLI Mode
-```bash
-# Check health of all services
+# Run health check
 python bot.py health --all
 
-# Check specific service
-python bot.py health --service github
-
-# Deploy to Render
-python bot.py deploy --service render --app myapp
-
-# Fetch logs
-python bot.py logs --service vercel --app myapp --lines 100
-
-# List resources
-python bot.py list --service clickup --resource tasks
-```
-
-#### Server Mode (API)
-```bash
-# Start the API server
+# Start API server
 python bot.py serve --port 8000
 
-# API endpoints will be available at:
-# GET  /health/{service}
-# POST /deploy/{service}
-# GET  /logs/{service}/{app}
-# GET  /resources/{service}/{type}
-```
-
-#### Scheduled Mode
-```bash
-# Run scheduled health checks every 5 minutes
+# Schedule monitoring (runs in background)
 python bot.py schedule --interval 5
 ```
 
-## Configuration
+### 3. Docker Deployment
 
-### Environment Variables
+```bash
+# Build image
+docker build -t brainops-ai-ops-bot .
 
-Create a `.env` file with the following structure:
-
-```env
-# ClickUp
-CLICKUP_API_TOKEN=your_token_here
-CLICKUP_WORKSPACE_ID=your_workspace_id
-
-# Notion
-NOTION_API_TOKEN=your_token_here
-NOTION_DATABASE_IDS={"master": "db_id", "bids": "db_id"}
-
-# GitHub
-GITHUB_TOKEN=your_token_here
-GITHUB_REPOS=["repo1", "repo2"]
-
-# Slack
-SLACK_BOT_TOKEN=your_token_here
-SLACK_WEBHOOK_URL=your_webhook_url
-SLACK_ALERT_CHANNEL=#alerts
-
-# Add other services...
+# Run container
+docker run -p 8000:8000 --env-file .env brainops-ai-ops-bot
 ```
 
-See `.env.example` for the complete list of required variables.
+## 🌐 Render Deployment
 
-### Alert Configuration
+### One-Click Deploy
 
-Configure alert preferences in `config/alerts.yaml`:
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/mwwoodworth/brainops-ai-ops-bot)
 
-```yaml
-alerts:
-  channels:
-    - type: slack
-      channel: "#critical-alerts"
-      severity: ["critical", "error"]
-    - type: email
-      recipients: ["ops@brainops.com"]
-      severity: ["critical"]
-  
-  thresholds:
-    response_time: 5000  # ms
-    error_rate: 0.05     # 5%
-    uptime: 0.99         # 99%
+### Manual Deployment
+
+1. **Create Render Account** at https://render.com
+2. **Create New Web Service** from Dashboard
+3. **Connect Repository**: `https://github.com/mwwoodworth/brainops-ai-ops-bot`
+4. **Configure Settings**:
+   - Runtime: `Docker`
+   - Branch: `main`
+   - Build Command: `Auto-detected`
+   - Start Command: `Auto-detected`
+   - Health Check Path: `/health`
+5. **Set Environment Variables** (see [Environment Variables](#environment-variables))
+6. **Deploy**
+
+## 🔧 Environment Variables
+
+### Required Variables
+
+```bash
+# Database (provided by Render)
+DATABASE_URL=postgresql://...
+
+# Core Services (at least one required)
+RENDER_API_KEY=your_render_api_key
+GITHUB_TOKEN=ghp_your_github_token
+SLACK_BOT_TOKEN=xoxb-your-slack-bot-token
+
+# Alert Configuration
+SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
+EMAIL_ALERT_RECIPIENTS=["admin@example.com"]
 ```
 
-## Service Integrations
+### Optional Variables
 
-### Currently Supported Services
+```bash
+# Additional Services
+VERCEL_TOKEN=your_vercel_token
+CLICKUP_API_TOKEN=your_clickup_token
+NOTION_API_TOKEN=secret_your_notion_token
+STRIPE_API_KEY_LIVE=sk_live_your_stripe_key
+SUPABASE_URL=https://your-project.supabase.co
+OPENAI_API_KEY=sk-your_openai_key
+CLAUDE_API_KEY=sk-ant-your_claude_key
 
-1. **ClickUp**: Tasks, lists, workspaces
-2. **Notion**: Databases, pages, blocks
-3. **GitHub**: Repos, actions, deployments
-4. **Slack**: Messages, channels, webhooks
-5. **Airtable**: Bases, tables, records
-6. **Supabase**: Database, auth, storage
-7. **Stripe**: Payments, subscriptions, webhooks
-8. **Render**: Apps, services, deployments
-9. **Vercel**: Projects, deployments, domains
-10. **Make.com**: Scenarios, webhooks, executions
-11. **Toggl**: Time tracking, reports
-12. **ConvertKit**: Subscribers, forms, sequences
-13. **Tana**: Nodes, workspaces
-14. **OpenAI/Claude**: API usage, models
-
-### Adding New Integrations
-
-1. Create a new connector in `connectors/`:
-
-```python
-# connectors/newservice.py
-from connectors.base import BaseConnector
-
-class NewServiceConnector(BaseConnector):
-    def __init__(self, config):
-        super().__init__(config)
-        self.api_key = config.get('api_key')
-    
-    def health_check(self):
-        # Implement health check
-        pass
-    
-    def get_resources(self, resource_type):
-        # Implement resource listing
-        pass
+# Feature Flags
+ENABLE_SLACK_ALERTS=true
+ENABLE_EMAIL_ALERTS=true
+ENABLE_HEALTH_CHECKS=true
+ENABLE_AUTO_DEPLOY=false
 ```
 
-2. Register in `connectors/__init__.py`:
+## 📚 API Documentation
 
-```python
-CONNECTORS = {
-    'newservice': NewServiceConnector,
-    # ... other connectors
+### Core Endpoints
+
+#### Health Check
+```http
+GET /health
+```
+Returns basic health status of the API.
+
+#### Service Health Check
+```http
+POST /health/check
+Content-Type: application/json
+
+{
+  "services": ["render", "github", "slack"],
+  "parallel": true
 }
 ```
 
-3. Add configuration to `.env.example`
+#### Deployment Trigger
+```http
+POST /deploy
+Content-Type: application/json
 
-## Monitoring & Alerts
+{
+  "service": "render",
+  "app": "my-app",
+  "branch": "main"
+}
+```
 
-The bot continuously monitors service health and sends alerts when:
+#### Alert Management
+```http
+POST /alerts/send
+Content-Type: application/json
 
-- Service is down or unreachable
-- API errors exceed threshold
-- Build/deployment failures
-- Response time degradation
-- Custom conditions (configurable)
+{
+  "service": "render",
+  "severity": "error",
+  "message": "Service is down",
+  "details": {"response_time": "timeout"}
+}
+```
+
+#### Job Scheduling
+```http
+POST /jobs
+Content-Type: application/json
+
+{
+  "func_name": "health_check",
+  "interval_minutes": 5
+}
+```
+
+### Full API Documentation
+
+Once deployed, visit `/docs` for interactive API documentation.
+
+## 🖥️ CLI Usage
+
+### Health Monitoring
+
+```bash
+# Check all services
+python bot.py health --all
+
+# Check specific service
+python bot.py health --service render
+
+# Get health summary
+python bot.py health --all --format table
+```
+
+### Deployment Management
+
+```bash
+# Deploy to Render
+python bot.py deploy --service render --app my-app --branch main
+
+# Deploy with wait
+python bot.py deploy --service render --app my-app --wait
+```
+
+### Log Management
+
+```bash
+# Fetch logs
+python bot.py logs --service render --app my-app --lines 100
+
+# Follow logs
+python bot.py logs --service render --app my-app --follow
+```
+
+### Resource Management
+
+```bash
+# List services
+python bot.py list --service render --resource services
+
+# List databases
+python bot.py list --service render --resource databases
+
+# List deployments
+python bot.py list --service github --resource deployments
+```
+
+### Scheduled Monitoring
+
+```bash
+# Run health checks every 5 minutes
+python bot.py schedule --interval 5
+
+# Monitor specific services
+python bot.py schedule --interval 10 --services render,github,slack
+```
+
+### Alert Testing
+
+```bash
+# Test all alert channels
+python bot.py test-alerts
+
+# Check bot configuration
+python bot.py info
+```
+
+## 📊 Monitoring & Alerting
+
+### Alert Channels
+
+- **Slack**: Real-time notifications to configured channels
+- **Email**: Multi-recipient email alerts via Resend
+- **Webhooks**: Custom webhook endpoints for integration
 
 ### Alert Types
 
-- **Critical**: Service down, auth failures
-- **Error**: Build failures, API errors
-- **Warning**: Slow response, high error rate
-- **Info**: Successful deployments, status updates
+- **Critical**: Service downtime, deployment failures
+- **Warning**: Performance degradation, high response times
+- **Info**: Deployment success, scheduled task completion
 
-## Security
+### Alert Configuration
 
-- All credentials stored in environment variables
-- Secrets are masked in logs (shows only first/last 4 chars)
-- Encryption for sensitive data in transit
-- Audit logging for all operations
-- Role-based access control (when in server mode)
+```bash
+# Alert thresholds
+ALERT_COOLDOWN_MINUTES=15
+ERROR_THRESHOLD=5
+RESPONSE_TIME_THRESHOLD_MS=5000
 
-## Development
+# Alert channels
+ENABLE_SLACK_ALERTS=true
+ENABLE_EMAIL_ALERTS=true
+SLACK_ALERT_CHANNEL=#alerts
+EMAIL_ALERT_RECIPIENTS=["admin@example.com", "ops@example.com"]
+```
+
+## 🔐 Security
+
+### Authentication
+
+- **Environment Variables**: All credentials stored securely
+- **API Keys**: Masked in logs and API responses
+- **JWT Tokens**: Secure API authentication (optional)
+
+### Best Practices
+
+- Use service-specific API keys with minimal permissions
+- Rotate credentials regularly
+- Enable audit logging for all operations
+- Use secure webhook URLs with authentication
+
+## 🛠️ Development
 
 ### Project Structure
 
 ```
 brainops-ai-ops-bot/
-├── bot.py                 # Main entry point
-├── requirements.txt       # Python dependencies
-├── .env.example          # Example environment file
-├── config/
+├── api/                 # FastAPI application
 │   ├── __init__.py
-│   ├── settings.py       # Configuration management
-│   └── alerts.yaml       # Alert configuration
-├── connectors/
+│   └── app.py
+├── bot.py              # CLI interface
+├── config/             # Configuration management
 │   ├── __init__.py
-│   ├── base.py          # Base connector class
-│   ├── clickup.py       # ClickUp integration
-│   ├── notion.py        # Notion integration
-│   └── ...              # Other service connectors
-├── core/
+│   ├── settings.py
+│   └── alerts.yaml
+├── connectors/         # Service integrations
 │   ├── __init__.py
-│   ├── monitor.py       # Health monitoring
-│   ├── alerts.py        # Alert management
-│   ├── scheduler.py     # Job scheduling
-│   └── security.py      # Security utilities
-├── api/
+│   ├── base.py
+│   ├── render.py
+│   ├── github.py
+│   └── ...
+├── core/              # Core functionality
 │   ├── __init__.py
-│   ├── app.py          # FastAPI application
-│   └── routes.py       # API routes
-└── tests/
-    ├── __init__.py
-    └── test_*.py       # Unit tests
+│   ├── monitor.py
+│   ├── scheduler.py
+│   └── alerts.py
+├── Dockerfile
+├── requirements.txt
+├── render.yaml
+└── README.md
 ```
+
+### Adding New Connectors
+
+1. Create new connector in `connectors/` directory
+2. Inherit from `BaseConnector` class
+3. Implement required methods:
+   - `health_check()`
+   - `deploy()`
+   - `get_logs()`
+   - `list_resources()`
+4. Add configuration to `settings.py`
+5. Register in `connectors/__init__.py`
 
 ### Running Tests
 
 ```bash
-# Run all tests
-pytest
+# Install test dependencies
+pip install pytest pytest-asyncio pytest-cov
+
+# Run tests
+pytest tests/
 
 # Run with coverage
-pytest --cov=.
-
-# Run specific test
-pytest tests/test_connectors.py
+pytest --cov=. tests/
 ```
 
-### Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Add tests for new functionality
-4. Ensure all tests pass
-5. Submit a pull request
-
-## Troubleshooting
+## 🚨 Troubleshooting
 
 ### Common Issues
 
-1. **Authentication Errors**
-   - Verify API tokens in `.env`
-   - Check token permissions/scopes
-   - Ensure tokens haven't expired
+#### 1. Service Connection Errors
 
-2. **Connection Timeouts**
-   - Check network connectivity
-   - Verify service endpoints
-   - Adjust timeout settings in config
+```bash
+# Check credentials
+python bot.py info
 
-3. **Missing Dependencies**
-   - Run `pip install -r requirements.txt`
-   - Check Python version (3.8+ required)
+# Test specific service
+python bot.py health --service render
+```
+
+#### 2. Deployment Failures
+
+```bash
+# Check logs
+python bot.py logs --service render --app my-app
+
+# Verify environment variables
+python bot.py config
+```
+
+#### 3. Alert Delivery Issues
+
+```bash
+# Test alerts
+python bot.py test-alerts
+
+# Check configuration
+python bot.py info
+```
 
 ### Debug Mode
 
-Enable debug logging:
-
 ```bash
-# Set in .env
-LOG_LEVEL=DEBUG
-
-# Or via command line
+# Enable debug logging
+export DEBUG_MODE=true
 python bot.py --debug health --all
 ```
 
-## License
+## 📝 Deployment Checklist
 
-MIT License - See LICENSE file for details
+- [ ] Environment variables configured
+- [ ] Database connection established
+- [ ] Service credentials validated
+- [ ] Health checks passing
+- [ ] Alert channels tested
+- [ ] Backup and monitoring configured
+- [ ] SSL certificates installed
+- [ ] Domain configured (if applicable)
 
-## Support
+## 🤝 Contributing
 
-- Documentation: [docs.brainops.com/ai-ops-bot](https://docs.brainops.com/ai-ops-bot)
-- Issues: [GitHub Issues](https://github.com/brainops/ai-ops-bot/issues)
-- Email: support@brainops.com
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests
+5. Submit a pull request
+
+## 📄 License
+
+This project is licensed under the MIT License.
+
+## 🆘 Support
+
+- **Issues**: [GitHub Issues](https://github.com/mwwoodworth/brainops-ai-ops-bot/issues)
+- **Documentation**: [API Docs](https://brainops-ai-ops-bot.onrender.com/docs)
+- **Email**: support@brainops.com
+
+---
+
+**Built with ❤️ by BrainOps**
+
+🤖 Generated with [Claude Code](https://claude.ai/code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>
