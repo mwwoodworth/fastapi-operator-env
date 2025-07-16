@@ -63,4 +63,4 @@ EXPOSE ${PORT}
 
 # Start the FastAPI application with Uvicorn
 # Use exec form to ensure proper signal handling
-CMD ["uvicorn", "apps.backend.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]
+CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]
