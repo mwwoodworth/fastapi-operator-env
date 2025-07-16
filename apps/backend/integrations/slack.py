@@ -15,7 +15,7 @@ from slack_sdk.web.async_client import AsyncWebClient
 from slack_sdk.errors import SlackApiError
 from slack_sdk.signature import SignatureVerifier
 
-from ..core.settings import get_settings
+from apps.backend.core.settings import settings
 from ..core.logging import get_logger
 from ..memory.memory_store import MemoryStore
 from ..tasks import get_task_registry
@@ -30,7 +30,6 @@ class SlackIntegration:
     """
     
     def __init__(self):
-        settings = get_settings()
         self.client = AsyncWebClient(token=settings.SLACK_BOT_TOKEN)
         self.signature_verifier = SignatureVerifier(settings.SLACK_SIGNING_SECRET)
         self.memory = MemoryStore()

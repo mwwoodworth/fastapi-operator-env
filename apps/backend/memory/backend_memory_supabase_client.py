@@ -10,9 +10,8 @@ import os
 from supabase import create_client, Client
 from postgrest import AsyncPostgrestClient
 import asyncio
-from functools import lru_cache
 
-from ..core.settings import get_settings
+from apps.backend.core.settings import settings
 from ..core.logging import get_logger
 
 logger = get_logger(__name__)
@@ -20,13 +19,6 @@ logger = get_logger(__name__)
 # Global client instance
 _supabase_client: Optional[Client] = None
 _client_lock = asyncio.Lock()
-
-
-@lru_cache()
-def get_settings_cached():
-    """Cache settings to avoid repeated instantiation."""
-    return get_settings()
-
 
 async def get_supabase_client() -> Client:
     """
@@ -45,8 +37,6 @@ async def get_supabase_client() -> Client:
         # Double-check after acquiring lock
         if _supabase_client is not None:
             return _supabase_client
-        
-        settings = get_settings_cached()
         
         try:
             # Create Supabase client with custom configuration

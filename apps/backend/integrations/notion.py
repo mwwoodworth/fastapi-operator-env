@@ -11,7 +11,7 @@ import aiohttp
 import asyncio
 from enum import Enum
 
-from ..core.settings import get_settings
+from apps.backend.core.settings import settings
 from ..core.logging import get_logger
 from ..memory.memory_store import MemoryStore
 from ..memory.models import MemoryType, KnowledgeCategory
@@ -42,9 +42,7 @@ class NotionClient:
     """
     
     def __init__(self):
-        settings = get_settings()
         self.api_key = settings.NOTION_API_KEY
-        self.version = "2022-06-28"  # Notion API version
         self.base_url = "https://api.notion.com/v1"
         self.memory = MemoryStore()
         

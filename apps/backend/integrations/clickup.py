@@ -11,7 +11,7 @@ import aiohttp
 import asyncio
 from enum import Enum
 
-from ..core.settings import get_settings
+from apps.backend.core.settings import settings
 from ..core.logging import get_logger
 from ..memory.memory_store import MemoryStore
 from ..memory.models import MemoryType
@@ -43,7 +43,7 @@ class ClickUpClient:
     """
     
     def __init__(self):
-        settings = get_settings()
+        
         self.api_key = settings.CLICKUP_API_KEY
         self.workspace_id = settings.CLICKUP_WORKSPACE_ID
         self.base_url = "https://api.clickup.com/api/v2"

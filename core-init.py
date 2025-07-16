@@ -6,7 +6,7 @@ security, logging, and scheduling. Built to ensure consistent initialization
 across all backend components.
 """
 
-from .settings import settings, get_settings
+from .settings import settings
 from .security import (
     security_manager,
     get_current_user,
@@ -26,7 +26,6 @@ from .scheduler import scheduler, schedule_after
 __all__ = [
     # Settings
     "settings",
-    "get_settings",
     
     # Security
     "security_manager",

@@ -217,8 +217,6 @@ class Settings(BaseSettings):
         
         return configs.get(service, {})
     
-    def get_settings():
-    return settings
     
     def mask_secrets(self) -> Dict[str, str]:
         """Return configuration with masked secrets for logging"""
