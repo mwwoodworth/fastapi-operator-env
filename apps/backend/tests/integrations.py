@@ -383,5 +383,5 @@ class TestStripeIntegration:
 @pytest.fixture
 def test_client():
     """Create FastAPI test client."""
-    from apps.backend.main import app
+    from ..main import app
     return TestClient(app)
