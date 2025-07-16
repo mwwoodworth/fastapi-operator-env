@@ -92,3 +92,10 @@ tests/test_*.py
 # Duplicate directories that should not exist
 fastapi-operator-env/
 brainops-ai-assistant/
+# Heavy or unused directories
+Reference/
+brainops-ai-ops-bot/
+test_env/
+frontend/
+myroofgenius-app/
+weathercraft/
