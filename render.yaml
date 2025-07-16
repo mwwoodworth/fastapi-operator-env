@@ -1,61 +1,97 @@
 services:
-  # BrainOps FastAPI Backend
+  # BrainStackStudio FastAPI Backend
   - type: web
-    name: brainops-backend
-    runtime: docker
+    name: brainstackstudio-backend
+    runtime: python
     plan: free
     region: oregon
-    branch: master
+    branch: main
     rootDir: .
-    dockerfilePath: ./Dockerfile
-    dockerContext: .
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn apps.backend.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
     envVars:
-      # AI API Keys
       - key: OPENAI_API_KEY
         sync: false
       - key: ANTHROPIC_API_KEY
         sync: false
       - key: CLAUDE_API_KEY
         sync: false
-      
-      # Database
       - key: DATABASE_URL
+        fromDatabase:
+          type: postgres
+          name: brainstackstudio-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: brainstackstudio-redis
+          property: connectionString
+      - key: SUPABASE_URL
         sync: false
-      
-      # Integrations
+      - key: SUPABASE_KEY
+        sync: false
       - key: GITHUB_TOKEN
         sync: false
       - key: NOTION_TOKEN
         sync: false
       - key: CLICKUP_API_TOKEN
         sync: false
-      - key: SLACK_BOT_TOKEN
+    autoDeploy: true
+    env: python
+    pythonVersion: 3.11
+
+  # Background Worker
+  - type: worker
+    name: brainstackstudio-worker
+    runtime: python
+    plan: free
+    region: oregon
+    branch: main
+    rootDir: .
+    buildCommand: pip install -r requirements.txt
+    startCommand: celery -A celery_app worker --loglevel=info -B
+    envVars:
+      - key: OPENAI_API_KEY
         sync: false
-      - key: SLACK_WEBHOOK_URL
+      - key: ANTHROPIC_API_KEY
         sync: false
-      
-      # Supabase
+      - key: CLAUDE_API_KEY
+        sync: false
+      - key: DATABASE_URL
+        fromDatabase:
+          type: postgres
+          name: brainstackstudio-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: brainstackstudio-redis
+          property: connectionString
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_KEY
         sync: false
-      - key: SUPABASE_ANON_KEY
+      - key: GITHUB_TOKEN
         sync: false
-      
-      # Other services
-      - key: RESEND_API_KEY
+      - key: NOTION_TOKEN
         sync: false
-      - key: STRIPE_API_KEY_LIVE
+      - key: CLICKUP_API_TOKEN
         sync: false
-      - key: AIRTABLE_API_KEY
-        sync: false
-      
-      # Application settings
-      - key: SECRET_KEY
-        generateValue: true
-      - key: ENVIRONMENT
-        value: production
-      - key: LOG_LEVEL
-        value: INFO
     autoDeploy: true
+    env: python
+    pythonVersion: 3.11
+
+databases:
+  - name: brainstackstudio-db
+    databaseName: brainstackstudio
+    user: brainstackstudio_user
+    plan: free
+    region: oregon
+    ipAllowList: []
+
+  - type: redis
+    name: brainstackstudio-redis
+    plan: free
+    region: oregon
+    ipAllowList: []
