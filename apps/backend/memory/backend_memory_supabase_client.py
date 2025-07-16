@@ -458,3 +458,23 @@ async def check_connection_health() -> bool:
     except Exception as e:
         logger.error(f"Connection health check failed: {str(e)}")
         return False
+
+
+async def init_supabase():
+    """
+    Initialize Supabase connection and verify it's working.
+    This is called during application startup.
+    """
+    try:
+        # Get client to initialize connection
+        client = await get_supabase_client()
+        
+        # Check connection health
+        if await check_connection_health():
+            logger.info("Supabase connection initialized successfully")
+        else:
+            logger.warning("Supabase connection initialized but health check failed")
+            
+    except Exception as e:
+        logger.error(f"Failed to initialize Supabase: {str(e)}")
+        raise
