@@ -77,3 +77,14 @@ tmp/
 fastapi-operator-env/tests/
 fastapi-operator-env/scripts/
 fastapi-operator-env/misc/
+
+# Specific problematic test files with apps.backend imports
+fastapi-operator-env/tests/agents.py
+fastapi-operator-env/tests/tasks.py
+fastapi-operator-env/tests/execution.py
+fastapi-operator-env/tests/integrations.py
+fastapi-operator-env/tests/memory.py
+
+# Test files
+fastapi-operator-env/test_*.py
+fastapi-operator-env/tests/test_*.py
