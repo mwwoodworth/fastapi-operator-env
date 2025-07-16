@@ -13,7 +13,7 @@ from apscheduler.executors.pool import ThreadPoolExecutor
 from apscheduler.events import EVENT_JOB_ERROR, EVENT_JOB_EXECUTED
 import pytz
 
-from config.settings import Settings
+from apps.backend.core.settings import Settings
 
 
 logger = logging.getLogger(__name__)
@@ -313,7 +313,7 @@ class JobScheduler:
     
     def add_deployment_job(self, service: str, cron_expression: str):
         """Add a scheduled deployment job"""
-        from connectors import get_connector
+        from apps.backend.connectors import get_connector
         
         def deployment_job():
             logger.info(f"Running scheduled deployment for {service}")

@@ -11,8 +11,8 @@ import threading
 from pathlib import Path
 import yaml
 
-from config.settings import Settings
-from connectors.slack import SlackConnector
+from apps.backend.core.settings import Settings
+from apps.backend.connectors.slack import SlackConnector
 
 
 logger = logging.getLogger(__name__)

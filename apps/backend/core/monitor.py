@@ -9,8 +9,8 @@ from datetime import datetime, timedelta
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
 
-from config.settings import Settings
-from connectors import get_connector
+from apps.backend.core.settings import Settings
+from apps.backend.connectors import get_connector
 
 
 logger = logging.getLogger(__name__)
