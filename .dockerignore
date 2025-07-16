@@ -2,7 +2,6 @@
 venv/
 env/
 .venv/
-fastapi-operator-env/
 
 # Python cache files
 **/__pycache__/
@@ -40,6 +39,8 @@ logs/
 .coverage
 .pytest_cache/
 htmlcov/
+tests/
+test_*.py
 
 # Documentation
 docs/
@@ -51,16 +52,15 @@ build/
 dist/
 *.egg-info/
 
-# Node.js (for any frontend components)
+# Node.js
 node_modules/
 frontend/node_modules/
-myroofgenius-app/node_modules/
 
 # Docker files
 Dockerfile*
 docker-compose*.yml
 
-# Environment files (will be set via environment variables)
+# Environment files
 .env
 .env.*
 
@@ -74,15 +74,14 @@ temp/
 tmp/
 .tmp/
 
-# Other unnecessary directories - exclude subdirectories
-tests/
-scripts/
-misc/
+# Other unnecessary directories
 brainops-ai-assistant/
+brainops-ai-ops-bot/
 myroofgenius-app/
 Reference/
 weathercraft/
+misc/
+scripts/
 
-# Test files
-test_*.py
-tests/test_*.py
+# Fresh repo clone
+fresh-repo/
