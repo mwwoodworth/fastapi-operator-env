@@ -38,6 +38,8 @@ class Settings(BaseSettings):
     # Security
     SECRET_KEY: str = Field(default="change-me-in-production", env="SECRET_KEY")
     API_KEYS: str = Field(default="", env="API_KEYS")
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(default=30, env="ACCESS_TOKEN_EXPIRE_MINUTES")
+    REFRESH_TOKEN_EXPIRE_DAYS: int = Field(default=7, env="REFRESH_TOKEN_EXPIRE_DAYS")
     CORS_ORIGINS: List[str] = Field(default=["http://localhost:3000", "http://localhost:8000"], env="CORS_ORIGINS")
     SENTRY_DSN: Optional[str] = Field(default=None, env="SENTRY_DSN")
     
@@ -49,6 +51,7 @@ class Settings(BaseSettings):
     clickup_api_token: Optional[str] = Field(default=None, env="CLICKUP_API_TOKEN")
     clickup_workspace_id: Optional[str] = Field(default=None, env="CLICKUP_WORKSPACE_ID")
     clickup_folder_ids: Optional[Dict[str, str]] = Field(default=None, env="CLICKUP_FOLDER_IDS")
+    CLICKUP_WEBHOOK_SECRET: Optional[str] = Field(default=None, env="CLICKUP_WEBHOOK_SECRET")
     
     # Notion
     NOTION_API_KEY: Optional[str] = Field(default=None, env="NOTION_API_KEY")
@@ -83,6 +86,12 @@ class Settings(BaseSettings):
     stripe_api_key_live: Optional[str] = Field(default=None, env="STRIPE_API_KEY_LIVE")
     stripe_api_key_test: Optional[str] = Field(default=None, env="STRIPE_API_KEY_TEST")
     stripe_webhook_secret: Optional[str] = Field(default=None, env="STRIPE_WEBHOOK_SECRET")
+    STRIPE_SECRET_KEY: Optional[str] = Field(default=None, env="STRIPE_SECRET_KEY")
+
+    make_webhook_secret: Optional[str] = Field(default=None, env="MAKE_WEBHOOK_SECRET")
+    make_webhook_base_url: Optional[str] = Field(default=None, env="MAKE_WEBHOOK_BASE_URL")
+    MAKE_WEBHOOK_SECRETS: Optional[Dict[str, str]] = Field(default=None, env="MAKE_WEBHOOK_SECRETS")
+    GENERIC_WEBHOOK_INTEGRATIONS: Optional[Dict[str, Any]] = Field(default=None, env="GENERIC_WEBHOOK_INTEGRATIONS")
     
     # Render
     render_api_key: Optional[str] = Field(default=None, env="RENDER_API_KEY")
@@ -94,9 +103,14 @@ class Settings(BaseSettings):
     
     # OpenAI
     openai_api_key: Optional[str] = Field(default=None, env="OPENAI_API_KEY")
-    
+
+    GOOGLE_AI_API_KEY: Optional[str] = Field(default=None, env="GOOGLE_AI_API_KEY")
+    EMBEDDING_MODEL: str = Field(default="text-embedding-3-small", env="EMBEDDING_MODEL")
+
     # Claude
     claude_api_key: Optional[str] = Field(default=None, env="CLAUDE_API_KEY")
+
+    COST_THRESHOLD_USD: float = Field(default=100.0, env="COST_THRESHOLD_USD")
     
     # Email
     resend_api_key: Optional[str] = Field(default=None, env="RESEND_API_KEY")

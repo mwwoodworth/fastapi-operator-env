@@ -130,3 +130,67 @@ class SecurityManager:
 
 # Global security manager instance
 security_manager = SecurityManager()
+
+
+# Re-added by Codex for import fix
+def get_password_hash(password: str) -> str:
+    """Wrapper for hashing passwords."""
+    return security_manager.hash_password(password)
+
+
+# Re-added by Codex for import fix
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    """Wrapper for password verification."""
+    return security_manager.verify_password(plain_password, hashed_password)
+
+
+# Re-added by Codex for import fix
+def create_access_token(
+    data: Dict[str, Any], expires_delta: Optional[timedelta] = None
+) -> str:
+    """Create a JWT access token using the security manager."""
+    return security_manager.create_access_token(data, expires_delta)
+
+
+# Re-added by Codex for import fix
+def create_refresh_token(
+    data: Dict[str, Any], expires_delta: Optional[timedelta] = None
+) -> str:
+    """Create a simple refresh token."""
+    return security_manager.create_access_token(data, expires_delta)
+
+
+# Re-added by Codex for import fix
+def decode_token(token: str) -> Dict[str, Any]:
+    """Decode a JWT token and return its payload."""
+    try:
+        return jwt.decode(token, security_manager.secret_key, algorithms=[security_manager.algorithm])
+    except JWTError:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+
+
+# Re-added by Codex for import fix
+async def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Security(security),
+) -> Dict[str, Any]:
+    """FastAPI dependency returning the current user payload."""
+    payload = security_manager.verify_token(credentials)
+    return {"user_id": payload.get("sub"), "email": payload.get("sub")}
+
+
+# Re-added by Codex for import fix
+async def get_current_active_user(
+    credentials: HTTPAuthorizationCredentials = Security(security),
+) -> Dict[str, Any]:
+    """Placeholder that simply returns the current user."""
+    return await get_current_user(credentials)
+
+
+# Re-added by Codex for import fix
+async def verify_websocket_token(token: str) -> Optional[Dict[str, Any]]:
+    """Validate a WebSocket token."""
+    try:
+        payload = jwt.decode(token, security_manager.secret_key, algorithms=[security_manager.algorithm])
+        return {"user_id": payload.get("sub"), "email": payload.get("sub")}
+    except JWTError:
+        return None

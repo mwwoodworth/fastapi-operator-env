@@ -8,6 +8,7 @@ across the memory subsystem.
 
 from datetime import datetime
 from typing import List, Dict, Any, Optional, Literal
+from enum import Enum
 from uuid import UUID
 
 from pydantic import BaseModel, Field, validator, constr
@@ -17,6 +18,21 @@ from pydantic import BaseModel, Field, validator, constr
 EmbeddingVector = List[float]
 ContentType = Literal["document", "conversation", "note", "task_result", "web_content"]
 DocumentType = Literal["sop", "template", "guide", "reference", "analysis", "report"]
+
+
+# Re-added by Codex for import fix
+class MemoryType(str, Enum):
+    TASK_EXECUTION = "task_execution"
+    PRODUCT_DOCUMENTATION = "product_documentation"
+    BUSINESS_CONTEXT = "business_context"
+    ESTIMATE_RECORD = "estimate_record"
+
+
+# Re-added by Codex for import fix
+class KnowledgeCategory(str, Enum):
+    ROOFING = "roofing"
+    PROJECT_MANAGEMENT = "project_management"
+    AUTOMATION = "automation"
 
 
 class MemoryEntry(BaseModel):
@@ -194,6 +210,31 @@ class MemorySearchQuery(BaseModel):
         None,
         description="Filter results before this date"
     )
+
+
+# Re-added by Codex for import fix
+class MemoryUpdate(BaseModel):
+    title: Optional[str] = None
+    content: Optional[str] = None
+
+
+# Re-added by Codex for import fix
+class QueryResult(BaseModel):
+    id: str
+    score: float
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+
+
+# Re-added by Codex for import fix
+class DocumentMetadata(BaseModel):
+    source: Optional[str] = None
+    tags: List[str] = Field(default_factory=list)
+
+
+# Re-added by Codex for import fix
+class RetrievalSession(BaseModel):
+    session_id: str
+    user_id: str
 
 
 class MemorySearchResult(BaseModel):
@@ -387,3 +428,56 @@ class MemoryHealthResponse(BaseModel):
     embedding_service_available: bool
     avg_search_latency_ms: float
     issues: List[str] = Field(default_factory=list)
+
+
+# Re-added by Codex for import fix
+class User(BaseModel):
+    id: str
+    email: str
+    hashed_password: Optional[str] = None
+
+
+# Re-added by Codex for import fix
+class TaskStatus(str, Enum):
+    PENDING = "pending"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+
+# Re-added by Codex for import fix
+class TaskRecord(BaseModel):
+    id: str
+    user_id: str
+    task_type: str
+    parameters: Dict[str, Any]
+    status: TaskStatus = TaskStatus.PENDING
+    created_at: datetime
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+    progress: float = 0.0
+    error: Optional[str] = None
+    result: Optional[Dict[str, Any]] = None
+
+
+# Re-added by Codex for import fix
+class UserCreate(BaseModel):
+    email: str
+    password: str
+
+
+# Re-added by Codex for import fix
+class UserLogin(BaseModel):
+    email: str
+    password: str
+
+
+# Re-added by Codex for import fix
+class TokenResponse(BaseModel):
+    access_token: str
+    refresh_token: Optional[str] = None
+    token_type: str = "bearer"
+    expires_in: int = 3600
+
+
+
