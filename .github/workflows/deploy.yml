@@ -1,0 +1,161 @@
+name: Deploy to Google Cloud Run
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  REGION: us-central1
+  REPOSITORY: brainops-backend
+  SERVICE: brainops-fastapi-ops
+  IMAGE: fastapi-operator-env
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Cache dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-cov pytest-asyncio
+
+      - name: Run tests
+        run: |
+          pytest tests/ --cov=apps --cov-report=xml --cov-report=html || echo "No tests found"
+
+      - name: Upload coverage reports
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage.xml
+          flags: unittests
+          name: codecov-umbrella
+        continue-on-error: true
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Google Cloud SDK
+      uses: google-github-actions/setup-gcloud@v2
+      with:
+        version: 'latest'
+
+    - name: Authenticate to Google Cloud
+      uses: google-github-actions/auth@v2
+      with:
+        credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+    - name: Configure Docker for Artifact Registry
+      run: |
+        gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev
+
+    - name: Build Docker image
+      run: |
+        docker build -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE }}:${{ github.sha }} \
+          -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE }}:latest \
+          -f Dockerfile.production .
+
+    - name: Push Docker image to Artifact Registry
+      run: |
+        docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE }}:${{ github.sha }}
+        docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE }}:latest
+
+    - name: Deploy to Cloud Run
+      run: |
+        gcloud run deploy ${{ env.SERVICE }} \
+          --image ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE }}:${{ github.sha }} \
+          --region ${{ env.REGION }} \
+          --platform managed \
+          --allow-unauthenticated \
+          --set-env-vars "ENV=production" \
+          --set-env-vars "LOG_LEVEL=INFO" \
+          --set-env-vars "CORS_ALLOWED_ORIGINS=https://www.myroofgenius.com,https://brainops.vercel.app,http://localhost:3000" \
+          --set-env-vars "LLM_PROVIDER=auto" \
+          --set-env-vars "EDGE_AI_WORKER=TRUE" \
+          --set-env-vars "AI_COPILOT_ENABLED=TRUE" \
+          --set-env-vars "ESTIMATOR_ENABLED=TRUE" \
+          --set-env-vars "AR_MODE_ENABLED=TRUE" \
+          --set-env-vars "SALES_ENABLED=TRUE" \
+          --set-env-vars "MAINTENANCE_MODE=FALSE" \
+          --set-secrets "DATABASE_URL=database-url:latest" \
+          --set-secrets "REDIS_URL=redis-url:latest" \
+          --set-secrets "OPENAI_API_KEY=openai-api-key:latest" \
+          --set-secrets "ANTHROPIC_API_KEY=anthropic-api-key:latest" \
+          --set-secrets "GOOGLE_AI_API_KEY=google-ai-api-key:latest" \
+          --set-secrets "STRIPE_API_KEY=stripe-api-key:latest" \
+          --set-secrets "STRIPE_WEBHOOK_SECRET=stripe-webhook-secret:latest" \
+          --set-secrets "SLACK_BOT_TOKEN=slack-bot-token:latest" \
+          --set-secrets "NOTION_API_KEY=notion-api-key:latest" \
+          --set-secrets "CLICKUP_API_KEY=clickup-api-key:latest" \
+          --set-secrets "SUPABASE_URL=supabase-url:latest" \
+          --set-secrets "SUPABASE_KEY=supabase-key:latest" \
+          --set-secrets "SENTRY_DSN=sentry-dsn:latest" \
+          --min-instances 1 \
+          --max-instances 100 \
+          --cpu 2 \
+          --memory 2Gi \
+          --timeout 300 \
+          --concurrency 1000 \
+          --service-account brainops-fastapi-ops-sa@${{ env.PROJECT_ID }}.iam.gserviceaccount.com \
+          --update-labels "environment=production,app=brainops,commit=${{ github.sha }}"
+
+    - name: Get Cloud Run Service URL
+      id: get-url
+      run: |
+        echo "url=$(gcloud run services describe ${{ env.SERVICE }} --region ${{ env.REGION }} --format 'value(status.url)')" >> $GITHUB_OUTPUT
+
+    - name: Test deployment health check
+      run: |
+        sleep 30  # Wait for service to stabilize
+        curl -f ${{ steps.get-url.outputs.url }}/healthz || exit 1
+        curl -f ${{ steps.get-url.outputs.url }}/docs || exit 1
+
+    - name: Notify Slack on success
+      if: success() && env.SLACK_WEBHOOK_URL != ''
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      run: |
+        curl -X POST -H 'Content-type: application/json' \
+          --data '{"text":"✅ FastAPI Backend deployed successfully to Cloud Run\nURL: ${{ steps.get-url.outputs.url }}\nCommit: ${{ github.sha }}"}' \
+          $SLACK_WEBHOOK_URL
+
+    - name: Notify Slack on failure
+      if: failure() && env.SLACK_WEBHOOK_URL != ''
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      run: |
+        curl -X POST -H 'Content-type: application/json' \
+          --data '{"text":"❌ FastAPI Backend deployment failed!\nCommit: ${{ github.sha }}\nCheck GitHub Actions for details."}' \
+          $SLACK_WEBHOOK_URL

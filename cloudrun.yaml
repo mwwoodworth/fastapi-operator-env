@@ -1,0 +1,169 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: fastapi-backend
+  labels:
+    cloud.googleapis.com/location: us-central1
+  annotations:
+    run.googleapis.com/launch-stage: GA
+spec:
+  template:
+    metadata:
+      annotations:
+        # Maximum number of concurrent requests per container instance
+        run.googleapis.com/execution-environment: gen2
+        autoscaling.knative.dev/maxScale: "100"
+        autoscaling.knative.dev/minScale: "1"
+        # CPU allocation
+        run.googleapis.com/cpu-throttling: "false"
+    spec:
+      # Service account for accessing other GCP services
+      serviceAccountName: fastapi-backend@PROJECT_ID.iam.gserviceaccount.com
+      
+      # Container configuration
+      containers:
+      - image: LOCATION-docker.pkg.dev/PROJECT_ID/brainops/fastapi-backend:latest
+        ports:
+        - name: http1
+          containerPort: 8000
+        
+        # Resource allocation
+        resources:
+          limits:
+            cpu: "2"
+            memory: "2Gi"
+          requests:
+            cpu: "1"
+            memory: "512Mi"
+        
+        # Health checks
+        startupProbe:
+          httpGet:
+            path: /health
+            port: 8000
+            httpHeaders:
+            - name: User-Agent
+              value: GoogleHC/1.0
+          initialDelaySeconds: 0
+          timeoutSeconds: 1
+          periodSeconds: 5
+          failureThreshold: 20
+          
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+            httpHeaders:
+            - name: User-Agent
+              value: GoogleHC/1.0
+          initialDelaySeconds: 30
+          timeoutSeconds: 1
+          periodSeconds: 30
+          failureThreshold: 3
+        
+        # Environment variables from Secret Manager
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: database-url
+              key: latest
+        
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: redis-url
+              key: latest
+        
+        - name: OPENAI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: openai-api-key
+              key: latest
+        
+        - name: ANTHROPIC_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: anthropic-api-key
+              key: latest
+        
+        - name: GOOGLE_AI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: google-ai-api-key
+              key: latest
+        
+        - name: STRIPE_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: stripe-api-key
+              key: latest
+        
+        - name: STRIPE_WEBHOOK_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: stripe-webhook-secret
+              key: latest
+        
+        - name: SLACK_BOT_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: slack-bot-token
+              key: latest
+        
+        - name: NOTION_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: notion-api-key
+              key: latest
+        
+        - name: CLICKUP_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: clickup-api-key
+              key: latest
+        
+        - name: SUPABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: supabase-url
+              key: latest
+        
+        - name: SUPABASE_KEY
+          valueFrom:
+            secretKeyRef:
+              name: supabase-key
+              key: latest
+        
+        - name: SENTRY_DSN
+          valueFrom:
+            secretKeyRef:
+              name: sentry-dsn
+              key: latest
+        
+        # Non-secret environment variables
+        - name: ENVIRONMENT
+          value: "production"
+        
+        - name: LOG_LEVEL
+          value: "INFO"
+        
+        - name: CORS_ORIGINS
+          value: "https://app.brainops.com,https://brainops.com"
+        
+        - name: PORT
+          value: "8000"
+        
+        - name: WORKERS_PER_CORE
+          value: "2"
+        
+        - name: MAX_WORKERS
+          value: "4"
+        
+      # Timeout configuration
+      timeoutSeconds: 300
+      
+  # Traffic configuration
+  traffic:
+  - percent: 100
+    latestRevision: true

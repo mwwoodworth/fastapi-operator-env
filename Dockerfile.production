@@ -1,0 +1,139 @@
+# Multi-stage Dockerfile for FastAPI Production Deployment
+# Stage 1: Builder
+FROM python:3.11-slim as builder
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    gcc \
+    g++ \
+    build-essential \
+    libpq-dev \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set working directory
+WORKDIR /build
+
+# Copy requirements
+COPY requirements.txt .
+
+# Install Python dependencies
+RUN pip install --upgrade pip && \
+    pip wheel --no-cache-dir --no-deps --wheel-dir /build/wheels -r requirements.txt
+
+# Stage 2: Runtime
+FROM python:3.11-slim
+
+# Install runtime dependencies only
+RUN apt-get update && apt-get install -y \
+    libpq-dev \
+    curl \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/* \
+    && update-ca-certificates
+
+# Create non-root user
+RUN groupadd -r appuser && useradd -r -g appuser appuser
+
+# Set working directory
+WORKDIR /app
+
+# Copy wheels from builder
+COPY --from=builder /build/wheels /wheels
+COPY --from=builder /build/requirements.txt .
+
+# Install dependencies from wheels
+RUN pip install --upgrade pip && \
+    pip install --no-cache /wheels/*
+
+# Copy application code
+COPY apps/ ./apps/
+COPY fastapi-operator-env/ ./fastapi-operator-env/
+COPY --chown=appuser:appuser alembic.ini* ./
+COPY --chown=appuser:appuser alembic/ ./alembic/ || true
+
+# Create necessary directories and set permissions
+RUN mkdir -p /app/logs /app/temp && \
+    chown -R appuser:appuser /app
+
+# Switch to non-root user
+USER appuser
+
+# Environment variables for production
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PORT=8000 \
+    MODULE_NAME="apps.backend.main" \
+    VARIABLE_NAME="app" \
+    GUNICORN_CONF="/app/gunicorn_conf.py"
+
+# Create Gunicorn configuration
+RUN echo 'import multiprocessing\n\
+import os\n\
+\n\
+workers_per_core_str = os.getenv("WORKERS_PER_CORE", "1")\n\
+max_workers_str = os.getenv("MAX_WORKERS")\n\
+use_max_workers = None\n\
+if max_workers_str:\n\
+    use_max_workers = int(max_workers_str)\n\
+\n\
+web_concurrency_str = os.getenv("WEB_CONCURRENCY", None)\n\
+\n\
+host = os.getenv("HOST", "0.0.0.0")\n\
+port = os.getenv("PORT", "8000")\n\
+bind_env = os.getenv("BIND", None)\n\
+use_loglevel = os.getenv("LOG_LEVEL", "info")\n\
+if bind_env:\n\
+    use_bind = bind_env\n\
+else:\n\
+    use_bind = f"{host}:{port}"\n\
+\n\
+cores = multiprocessing.cpu_count()\n\
+workers_per_core = float(workers_per_core_str)\n\
+default_web_concurrency = workers_per_core * cores\n\
+if web_concurrency_str:\n\
+    web_concurrency = int(web_concurrency_str)\n\
+    assert web_concurrency > 0\n\
+else:\n\
+    web_concurrency = max(int(default_web_concurrency), 2)\n\
+    if use_max_workers:\n\
+        web_concurrency = min(web_concurrency, use_max_workers)\n\
+\n\
+# Gunicorn config variables\n\
+loglevel = use_loglevel\n\
+workers = web_concurrency\n\
+bind = use_bind\n\
+keepalive = 120\n\
+errorlog = "-"\n\
+worker_tmp_dir = "/dev/shm"\n\
+graceful_timeout = 120\n\
+timeout = 120\n\
+worker_class = "uvicorn.workers.UvicornWorker"\n\
+\n\
+# For debugging and testing\n\
+log_data = {\n\
+    "loglevel": loglevel,\n\
+    "workers": workers,\n\
+    "bind": bind,\n\
+    "graceful_timeout": graceful_timeout,\n\
+    "timeout": timeout,\n\
+    "keepalive": keepalive,\n\
+    "errorlog": errorlog,\n\
+    "worker_tmp_dir": worker_tmp_dir,\n\
+    "host": host,\n\
+    "port": port,\n\
+}\n\
+print(log_data)' > /app/gunicorn_conf.py
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD curl -f http://localhost:8000/healthz || exit 1
+
+# Expose port
+EXPOSE 8000
+
+# Start command with pre-start script
+COPY --chown=appuser:appuser docker/prestart.sh /app/
+RUN chmod +x /app/prestart.sh
+
+CMD ["/bin/bash", "-c", "/app/prestart.sh && exec gunicorn -k uvicorn.workers.UvicornWorker -c /app/gunicorn_conf.py apps.backend.main:app"]
