@@ -1,9 +1,19 @@
 // Offline Queue Management System
 import { offlineStorage } from './offline-storage';
 
+interface Message {
+  id: string;
+  content: string;
+  role: 'user' | 'assistant' | 'system';
+  timestamp: number;
+  synced?: boolean;
+  sessionId?: string;
+  metadata?: Record<string, unknown>;
+}
+
 export interface QueueItem {
   type: 'message' | 'file' | 'voice' | 'task';
-  payload: any;
+  payload: Record<string, unknown>;
   endpoint?: string;
   method?: string;
 }
@@ -14,8 +24,10 @@ export class OfflineQueue {
   private syncInterval: NodeJS.Timeout | null = null;
 
   constructor() {
-    this.setupOnlineListener();
-    this.startPeriodicSync();
+    if (typeof window !== 'undefined') {
+      this.setupOnlineListener();
+      this.startPeriodicSync();
+    }
   }
 
   // Setup online/offline detection
@@ -69,7 +81,15 @@ export class OfflineQueue {
   }
 
   // Process queued messages
-  async processMessage(item: any): Promise<boolean> {
+  async processMessage(item: {
+    id: string;
+    type: string;
+    payload: Record<string, unknown> & { messageId?: string; sessionId?: string };
+    endpoint?: string;
+    method?: string;
+    status: string;
+    retries: number;
+  }): Promise<boolean> {
     try {
       const response = await fetch(item.endpoint || '/api/assistant/messages', {
         method: 'POST',
@@ -84,9 +104,9 @@ export class OfflineQueue {
       }
 
       // Mark the original message as synced
-      if (item.payload.messageId) {
+      if (item.payload.messageId && item.payload.sessionId) {
         const messages = await offlineStorage.getMessages(item.payload.sessionId);
-        const message = messages.find(m => m.id === item.payload.messageId);
+        const message = messages.find((m: Message) => m.id === item.payload.messageId);
         if (message) {
           message.synced = true;
           await offlineStorage.saveMessage(message);
@@ -101,9 +121,21 @@ export class OfflineQueue {
   }
 
   // Process queued files
-  async processFile(item: any): Promise<boolean> {
+  async processFile(item: {
+    id: string;
+    type: string;
+    payload: Record<string, unknown> & { fileId?: string };
+    endpoint?: string;
+    method?: string;
+    status: string;
+    retries: number;
+  }): Promise<boolean> {
     try {
-      const file = await offlineStorage.getFile(item.payload.fileId);
+      if (!item.payload.fileId) {
+        console.error('[OfflineQueue] No fileId in payload');
+        return true; // Remove from queue anyway
+      }
+      const file = await offlineStorage.getFile(item.payload.fileId as string);
       if (!file) {
         console.error('[OfflineQueue] File not found:', item.payload.fileId);
         return true; // Remove from queue anyway
@@ -123,7 +155,7 @@ export class OfflineQueue {
       }
 
       // Mark file as synced
-      await offlineStorage.db!.put('files', { ...file, synced: true });
+      await offlineStorage.markFileAsSynced(file.id);
 
       return true;
     } catch (error) {
@@ -133,9 +165,21 @@ export class OfflineQueue {
   }
 
   // Process queued voice memos
-  async processVoiceMemo(item: any): Promise<boolean> {
+  async processVoiceMemo(item: {
+    id: string;
+    type: string;
+    payload: Record<string, unknown> & { voiceId?: string };
+    endpoint?: string;
+    method?: string;
+    status: string;
+    retries: number;
+  }): Promise<boolean> {
     try {
-      const voiceMemo = await offlineStorage.getVoiceMemo(item.payload.voiceId);
+      if (!item.payload.voiceId) {
+        console.error('[OfflineQueue] No voiceId in payload');
+        return true; // Remove from queue anyway
+      }
+      const voiceMemo = await offlineStorage.getVoiceMemo(item.payload.voiceId as string);
       if (!voiceMemo) {
         console.error('[OfflineQueue] Voice memo not found:', item.payload.voiceId);
         return true; // Remove from queue anyway
@@ -162,7 +206,7 @@ export class OfflineQueue {
       }
 
       // Mark as synced
-      await offlineStorage.db!.put('voiceMemos', { ...voiceMemo, synced: true });
+      await offlineStorage.markVoiceMemoAsSynced(voiceMemo.id);
 
       return true;
     } catch (error) {
@@ -172,7 +216,15 @@ export class OfflineQueue {
   }
 
   // Process queued tasks
-  async processTask(item: any): Promise<boolean> {
+  async processTask(item: {
+    id: string;
+    type: string;
+    payload: Record<string, unknown>;
+    endpoint?: string;
+    method?: string;
+    status: string;
+    retries: number;
+  }): Promise<boolean> {
     try {
       const response = await fetch(item.endpoint || '/api/tasks', {
         method: item.method || 'POST',
@@ -303,4 +355,4 @@ export class OfflineQueue {
 }
 
 // Export singleton instance
-export const offlineQueue = new OfflineQueue();
+export const offlineQueue = typeof window !== 'undefined' ? new OfflineQueue() : null as unknown as OfflineQueue;

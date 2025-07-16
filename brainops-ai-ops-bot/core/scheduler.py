@@ -10,6 +10,7 @@ from apscheduler.triggers.interval import IntervalTrigger
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 from apscheduler.executors.pool import ThreadPoolExecutor
+from apscheduler.events import EVENT_JOB_ERROR, EVENT_JOB_EXECUTED
 import pytz
 
 from config.settings import Settings
@@ -29,41 +30,62 @@ class JobScheduler:
     
     def _init_scheduler(self):
         """Initialize the scheduler with configuration"""
-        # Configure job stores
-        jobstores = {
-            'default': SQLAlchemyJobStore(url=self.settings.database_url)
-        }
-        
-        # Configure executors
-        executors = {
-            'default': ThreadPoolExecutor(20),
-        }
-        
-        # Configure job defaults
-        job_defaults = {
+        try:
+            # Use memory store for simplicity in initial deployment
+            # TODO: Switch to SQLAlchemy when database is properly configured
+            from apscheduler.jobstores.memory import MemoryJobStore
+            
+            jobstores = {
+                'default': MemoryJobStore()
+            }
+            
+            # Configure executors
+            from apscheduler.executors.pool import ProcessPoolExecutor
+            
+            executors = {
+                'default': ThreadPoolExecutor(20),
+                'processpool': ProcessPoolExecutor(5)
+            }
+            
+            # Configure job defaults
+            job_defaults = {
             'coalesce': False,
             'max_instances': 3,
             'misfire_grace_time': 30
         }
         
-        # Create scheduler
-        self._scheduler = BackgroundScheduler(
-            jobstores=jobstores,
-            executors=executors,
-            job_defaults=job_defaults,
-            timezone=pytz.timezone(self.settings.timezone)
-        )
-        
-        # Add listeners
-        self._scheduler.add_listener(
-            self._job_error_listener,
-            mask='EVENT_JOB_ERROR'
-        )
-        
-        self._scheduler.add_listener(
-            self._job_executed_listener,
-            mask='EVENT_JOB_EXECUTED'
-        )
+            # Create scheduler
+            self._scheduler = BackgroundScheduler(
+                jobstores=jobstores,
+                executors=executors,
+                job_defaults=job_defaults,
+                timezone=pytz.timezone(self.settings.timezone)
+            )
+            
+            # Add listeners with proper event mask handling
+            # EVENT_JOB_ERROR and EVENT_JOB_EXECUTED are integer constants
+            # Ensure they are integers to avoid TypeError
+            logger.debug(f"EVENT_JOB_ERROR type: {type(EVENT_JOB_ERROR)}, value: {EVENT_JOB_ERROR}")
+            logger.debug(f"EVENT_JOB_EXECUTED type: {type(EVENT_JOB_EXECUTED)}, value: {EVENT_JOB_EXECUTED}")
+            
+            # Add listeners with explicit integer event codes
+            self._scheduler.add_listener(
+                self._job_error_listener,
+                int(EVENT_JOB_ERROR) if not isinstance(EVENT_JOB_ERROR, int) else EVENT_JOB_ERROR
+            )
+            
+            self._scheduler.add_listener(
+                self._job_executed_listener,
+                int(EVENT_JOB_EXECUTED) if not isinstance(EVENT_JOB_EXECUTED, int) else EVENT_JOB_EXECUTED
+            )
+            
+            logger.info("Scheduler initialized successfully")
+            
+        except Exception as e:
+            logger.error(f"Failed to initialize scheduler: {e}")
+            # Create a minimal scheduler without advanced features
+            self._scheduler = BackgroundScheduler()
+            logger.warning("Using minimal scheduler configuration")
     
     def _job_error_listener(self, event):
         """Handle job errors"""
@@ -86,9 +108,15 @@ class JobScheduler:
     
     def start(self):
         """Start the scheduler"""
-        if not self._scheduler.running:
-            self._scheduler.start()
-            logger.info("Job scheduler started")
+        try:
+            if not self._scheduler.running:
+                self._scheduler.start()
+                logger.info("Job scheduler started")
+            else:
+                logger.info("Job scheduler is already running")
+        except Exception as e:
+            logger.error(f"Failed to start scheduler: {e}")
+            raise
     
     def stop(self):
         """Stop the scheduler"""

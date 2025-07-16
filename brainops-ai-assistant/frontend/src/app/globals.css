@@ -64,7 +64,13 @@ body {
 }
 
 .glass-card {
-  @apply glass p-6 transition-all duration-300;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(var(--blur-amount));
+  -webkit-backdrop-filter: blur(var(--blur-amount));
+  border-radius: 16px;
+  box-shadow: 0 8px 32px var(--glass-shadow);
+  @apply p-6 transition-all duration-300;
 }
 
 .glass-card:hover {
@@ -74,11 +80,23 @@ body {
 }
 
 .glass-button {
-  @apply glass px-6 py-3 text-white font-medium rounded-lg transition-all duration-200 hover:bg-white/10 active:scale-95;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(var(--blur-amount));
+  -webkit-backdrop-filter: blur(var(--blur-amount));
+  border-radius: 16px;
+  box-shadow: 0 8px 32px var(--glass-shadow);
+  @apply px-6 py-3 text-white font-medium rounded-lg transition-all duration-200 hover:bg-white/10 active:scale-95;
 }
 
 .glass-input {
-  @apply glass px-4 py-3 text-white placeholder-gray-400 outline-none transition-all duration-200 focus:border-white/30 focus:bg-white/10;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(var(--blur-amount));
+  -webkit-backdrop-filter: blur(var(--blur-amount));
+  border-radius: 16px;
+  box-shadow: 0 8px 32px var(--glass-shadow);
+  @apply px-4 py-3 text-white placeholder-gray-400 outline-none transition-all duration-200 focus:border-white/30 focus:bg-white/10;
 }
 
 /* Custom Scrollbar */
@@ -198,19 +216,46 @@ body {
 }
 
 .chat-input {
-  @apply glass-input w-full resize-none min-h-[3rem] max-h-32;
+  @apply w-full resize-none min-h-[3rem] max-h-32;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-radius: 0.75rem;
+  box-shadow: 0 8px 32px var(--glass-shadow);
 }
 
 .message-user {
-  @apply ml-12 glass-card bg-blue-500/20 border-blue-500/30;
+  @apply ml-12 bg-blue-500/20 border-blue-500/30;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-radius: 0.75rem;
+  box-shadow: 0 8px 32px var(--glass-shadow);
+  padding: 1rem;
 }
 
 .message-assistant {
-  @apply mr-12 glass-card bg-purple-500/20 border-purple-500/30;
+  @apply mr-12 bg-purple-500/20 border-purple-500/30;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-radius: 0.75rem;
+  box-shadow: 0 8px 32px var(--glass-shadow);
+  padding: 1rem;
 }
 
 .message-system {
-  @apply glass-card bg-gray-500/20 border-gray-500/30 text-center text-sm;
+  @apply bg-gray-500/20 border-gray-500/30 text-center text-sm;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-radius: 0.75rem;
+  box-shadow: 0 8px 32px var(--glass-shadow);
+  padding: 1rem;
 }
 
 /* File Manager Styles */
@@ -219,7 +264,14 @@ body {
 }
 
 .file-item {
-  @apply glass-card cursor-pointer hover:bg-white/10 transition-all duration-200;
+  @apply cursor-pointer hover:bg-white/10 transition-all duration-200;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-radius: 0.75rem;
+  box-shadow: 0 8px 32px var(--glass-shadow);
+  padding: 1rem;
 }
 
 .file-item:hover {
@@ -232,7 +284,14 @@ body {
 }
 
 .workflow-node {
-  @apply glass-card absolute cursor-move select-none min-w-32 min-h-20 flex items-center justify-center text-sm font-medium;
+  @apply absolute cursor-move select-none min-w-32 min-h-20 flex items-center justify-center text-sm font-medium;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-radius: 0.75rem;
+  box-shadow: 0 8px 32px var(--glass-shadow);
+  padding: 1rem;
 }
 
 .workflow-connection {

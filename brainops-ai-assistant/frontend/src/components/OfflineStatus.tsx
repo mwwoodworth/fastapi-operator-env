@@ -2,9 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { WifiOff, Wifi, RefreshCw, CheckCircle, AlertCircle, Cloud } from 'lucide-react';
+import { WifiOff, Wifi, RefreshCw, CheckCircle, Cloud } from 'lucide-react';
 import { offlineQueue } from '@/lib/offline-queue';
-import { offlineStorage } from '@/lib/offline-storage';
 
 interface OfflineStatusProps {
   className?: string;
@@ -14,7 +13,11 @@ export default function OfflineStatus({ className = '' }: OfflineStatusProps) {
   const [isOnline, setIsOnline] = useState(true);
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'complete'>('idle');
   const [queuedItems, setQueuedItems] = useState(0);
-  const [storageStats, setStorageStats] = useState<any>(null);
+  const [storageStats, setStorageStats] = useState<{
+    messages: number;
+    files: number;
+    voiceMemos: number;
+  } | null>(null);
   const [showDetails, setShowDetails] = useState(false);
 
   useEffect(() => {
@@ -33,7 +36,7 @@ export default function OfflineStatus({ className = '' }: OfflineStatusProps) {
     });
 
     // Listen for sync events
-    const handleSyncComplete = (event: CustomEvent) => {
+    const handleSyncComplete = () => {
       setSyncStatus('complete');
       setTimeout(() => setSyncStatus('idle'), 3000);
       updateQueueStatus();

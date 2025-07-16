@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     APP_NAME: str = "BrainOps AI Assistant"
     VERSION: str = "1.0.0"
     DEBUG: bool = False
-    PORT: int = 8001
+    PORT: int = 8000
     
     # Security
     SECRET_KEY: str

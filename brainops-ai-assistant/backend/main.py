@@ -31,31 +31,58 @@ from services.qa_system import QASystem
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Application lifespan manager."""
-    logger.info("Starting BrainOps AI Assistant...")
-    
-    # Initialize database
-    await init_db()
-    
-    # Initialize services
-    app.state.assistant = AssistantService()
-    app.state.memory = MemoryService()
-    app.state.voice = VoiceInterface()
-    app.state.workflow_engine = WorkflowEngine()
-    app.state.qa_system = QASystem()
-    
-    # Initialize voice interface
-    await app.state.voice.initialize()
-    
-    logger.info("BrainOps AI Assistant ready!")
-    
-    yield
-    
-    # Cleanup
-    logger.info("Shutting down BrainOps AI Assistant...")
-    await app.state.assistant.shutdown()
-    await app.state.voice.shutdown()
-    await app.state.workflow_engine.shutdown()
+    """Application lifespan manager with comprehensive error logging."""
+    try:
+        logger.info("Starting BrainOps AI Assistant...")
+        logger.info(f"Configuration: PORT={settings.PORT}, DEBUG={settings.DEBUG}")
+        
+        # Initialize database with error handling
+        try:
+            await init_db()
+            logger.info("Database initialized successfully")
+        except Exception as e:
+            logger.error(f"Failed to initialize database: {e}")
+            raise
+        
+        # Initialize services with error handling
+        try:
+            app.state.assistant = AssistantService()
+            app.state.memory = MemoryService()
+            app.state.voice = VoiceInterface()
+            app.state.workflow_engine = WorkflowEngine()
+            app.state.qa_system = QASystem()
+            logger.info("All services initialized successfully")
+        except Exception as e:
+            logger.error(f"Failed to initialize services: {e}")
+            raise
+        
+        # Initialize voice interface
+        try:
+            await app.state.voice.initialize()
+            logger.info("Voice interface initialized successfully")
+        except Exception as e:
+            logger.warning(f"Voice interface initialization failed (non-critical): {e}")
+            # Don't raise - voice is optional
+        
+        logger.info(f"BrainOps AI Assistant ready on port {settings.PORT}!")
+        
+        yield
+        
+    except Exception as e:
+        logger.error(f"Critical error during startup: {e}")
+        raise
+    finally:
+        # Cleanup
+        logger.info("Shutting down BrainOps AI Assistant...")
+        try:
+            if hasattr(app.state, 'assistant'):
+                await app.state.assistant.shutdown()
+            if hasattr(app.state, 'voice'):
+                await app.state.voice.shutdown()
+            if hasattr(app.state, 'workflow_engine'):
+                await app.state.workflow_engine.shutdown()
+        except Exception as e:
+            logger.error(f"Error during shutdown: {e}")
 
 
 app = FastAPI(
@@ -133,6 +160,15 @@ async def root():
 @app.get("/health")
 async def health_check():
     """Health check endpoint for deployment."""
+    return {
+        "status": "healthy",
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }
+
+
+@app.get("/api/health")
+async def api_health_check():
+    """API health check endpoint for deployment."""
     return {
         "status": "healthy",
         "timestamp": datetime.now(timezone.utc).isoformat()

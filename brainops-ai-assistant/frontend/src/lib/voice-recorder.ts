@@ -2,6 +2,37 @@
 import { offlineStorage } from './offline-storage';
 import { offlineQueue } from './offline-queue';
 
+// Type definitions for SpeechRecognition API
+interface SpeechRecognitionEvent extends Event {
+  resultIndex: number;
+  results: SpeechRecognitionResultList;
+}
+
+interface SpeechRecognitionErrorEvent extends Event {
+  error: string;
+  message?: string;
+}
+
+// Extend Window interface for SpeechRecognition
+declare global {
+  interface Window {
+    SpeechRecognition: new () => SpeechRecognition;
+    webkitSpeechRecognition: new () => SpeechRecognition;
+  }
+  
+  interface SpeechRecognition extends EventTarget {
+    continuous: boolean;
+    interimResults: boolean;
+    lang: string;
+    start(): void;
+    stop(): void;
+    abort(): void;
+    onresult: ((event: SpeechRecognitionEvent) => void) | null;
+    onerror: ((event: SpeechRecognitionErrorEvent) => void) | null;
+    onend: (() => void) | null;
+  }
+}
+
 export class VoiceRecorder {
   private mediaRecorder: MediaRecorder | null = null;
   private chunks: Blob[] = [];
@@ -108,14 +139,14 @@ export class VoiceRecorder {
       // Set up one-time listener for completion
       const originalHandler = this.mediaRecorder!.onstop;
       this.mediaRecorder!.onstop = async () => {
-        if (originalHandler) {
+        if (originalHandler && this.mediaRecorder) {
           await originalHandler.call(this.mediaRecorder, new Event('stop'));
         }
         const memoId = await this.handleRecordingComplete();
         resolve(memoId);
       };
 
-      this.mediaRecorder.stop();
+      this.mediaRecorder!.stop();
       this.isRecording = false;
       this.notifyListeners(false);
 
@@ -177,7 +208,7 @@ export class VoiceRecorder {
       const audio = new Audio(audioUrl);
       
       // Create speech recognition instance
-      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       const recognition = new SpeechRecognition();
       
       recognition.continuous = true;
@@ -187,7 +218,7 @@ export class VoiceRecorder {
       return new Promise((resolve, reject) => {
         let finalTranscript = '';
 
-        recognition.onresult = (event: any) => {
+        recognition.onresult = (event: SpeechRecognitionEvent) => {
           for (let i = event.resultIndex; i < event.results.length; i++) {
             const transcript = event.results[i][0].transcript;
             if (event.results[i].isFinal) {
@@ -196,7 +227,7 @@ export class VoiceRecorder {
           }
         };
 
-        recognition.onerror = (event: any) => {
+        recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
           console.error('[VoiceRecorder] Recognition error:', event.error);
           reject(event.error);
         };
@@ -225,12 +256,12 @@ export class VoiceRecorder {
 
   // Get all voice memos
   async getVoiceMemos() {
-    return offlineStorage.db?.getAll('voiceMemos');
+    return offlineStorage.getAllVoiceMemos();
   }
 
   // Delete voice memo
   async deleteVoiceMemo(id: string) {
-    return offlineStorage.db?.delete('voiceMemos', id);
+    return offlineStorage.deleteVoiceMemo(id);
   }
 
   // Add recording status listener
@@ -257,4 +288,4 @@ export class VoiceRecorder {
 }
 
 // Export singleton instance
-export const voiceRecorder = new VoiceRecorder();
+export const voiceRecorder = typeof window !== 'undefined' ? new VoiceRecorder() : null as unknown as VoiceRecorder;

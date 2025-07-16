@@ -74,12 +74,17 @@ RUN mkdir -p /app/uploads /app/logs && \
 
 USER appuser
 
+# Environment variables for port configuration (support Render's PORT env)
+ENV BACKEND_PORT=8000
+ENV FRONTEND_PORT=3000
+ENV PORT=80
+
 # Expose ports
 EXPOSE 8000 3000 80
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD curl -f http://localhost:8000/api/health && curl -f http://localhost:3000 || exit 1
+    CMD curl -f http://localhost:${BACKEND_PORT}/api/health && curl -f http://localhost:${FRONTEND_PORT} || exit 1
 
 # Start supervisor
 CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]

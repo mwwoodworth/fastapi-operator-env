@@ -7,6 +7,8 @@ Multi-service DevOps automation and monitoring bot
 import sys
 import asyncio
 import signal
+import time
+import logging
 from typing import Optional
 import click
 from rich.console import Console
@@ -20,8 +22,16 @@ from core.scheduler import JobScheduler
 from api.app import create_app
 from connectors import get_connector
 
-console = Console()
+# Initialize settings first
 settings = Settings()
+
+# Configure logging based on settings
+logging.basicConfig(
+    level=getattr(logging, settings.log_level.upper(), logging.INFO),
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+
+console = Console()
 monitor = HealthMonitor(settings)
 alert_manager = AlertManager(settings)
 scheduler = JobScheduler(settings)
@@ -190,7 +200,7 @@ def list(service: str, resource: str, output_format: str):
 
 
 @cli.command()
-@click.option('--port', default=8000, help='Port to run the API server')
+@click.option('--port', default=10000, help='Port to run the API server')
 @click.option('--host', default='0.0.0.0', help='Host to bind to')
 def serve(port: int, host: str):
     """Start the API server"""
@@ -220,7 +230,8 @@ def schedule(interval: int, services: Optional[str]):
     console.print("[dim]Press Ctrl+C to stop[/dim]\n")
     
     def health_check_job():
-        console.print(f"\n[cyan]Running health check at {asyncio.get_event_loop().time()}[/cyan]")
+        from datetime import datetime
+        console.print(f"\n[cyan]Running health check at {datetime.now()}[/cyan]")
         
         for service_name in service_list:
             try:
@@ -240,8 +251,14 @@ def schedule(interval: int, services: Optional[str]):
     try:
         scheduler.start()
         # Keep the main thread alive
-        signal.pause()
+        while True:
+            try:
+                time.sleep(1)
+            except KeyboardInterrupt:
+                break
     except KeyboardInterrupt:
+        pass
+    finally:
         console.print("\n[yellow]Stopping scheduler[/yellow]")
         scheduler.stop()
 
