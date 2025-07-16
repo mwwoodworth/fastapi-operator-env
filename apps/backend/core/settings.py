@@ -33,11 +33,13 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = Field(default="INFO", env="LOG_LEVEL")
     debug_mode: bool = Field(default=False, env="DEBUG_MODE")
     timezone: str = Field(default="UTC", env="TIMEZONE")
+    API_V1_PREFIX: str = Field(default="/api/v1", env="API_V1_PREFIX")
     
     # Security
     SECRET_KEY: str = Field(default="change-me-in-production", env="SECRET_KEY")
     API_KEYS: str = Field(default="", env="API_KEYS")
     CORS_ORIGINS: List[str] = Field(default=["http://localhost:3000", "http://localhost:8000"], env="CORS_ORIGINS")
+    SENTRY_DSN: Optional[str] = Field(default=None, env="SENTRY_DSN")
     
     # ClickUp
     CLICKUP_API_KEY: Optional[str] = Field(default=None, env="CLICKUP_API_KEY")
@@ -248,6 +250,36 @@ class Settings(BaseSettings):
                 masked[field_name] = str(field_value)
                 
         return masked
+    
+    def validate_required_integrations(self) -> Dict[str, bool]:
+        """Check which integrations are configured"""
+        return {
+            'clickup': bool(self.CLICKUP_API_KEY),
+            'notion': bool(self.NOTION_API_KEY),
+            'slack': bool(self.SLACK_BOT_TOKEN),
+            'supabase': bool(self.SUPABASE_URL and self.SUPABASE_ANON_KEY),
+            'openai': bool(self.openai_api_key),
+            'claude': bool(self.claude_api_key),
+            'github': bool(self.github_token),
+            'stripe': bool(self.stripe_api_key_live or self.stripe_api_key_test),
+            'render': bool(self.render_api_key),
+            'vercel': bool(self.vercel_token),
+        }
+    
+    def get_ai_limits(self) -> Dict[str, Any]:
+        """Get AI service limits and configuration"""
+        return {
+            'openai': {
+                'max_tokens': 4096,
+                'model': 'gpt-4-turbo-preview',
+                'temperature': 0.7
+            },
+            'claude': {
+                'max_tokens': 4096,
+                'model': 'claude-3-opus-20240229',
+                'temperature': 0.7
+            }
+        }
 
 
 # Create global settings instance

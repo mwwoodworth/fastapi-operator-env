@@ -167,7 +167,7 @@ async def general_exception_handler(request: Request, exc: Exception):
     logger.error(f"Unhandled exception: {str(exc)}", exc_info=True)
     
     # Return generic error in production, detailed in development
-    if settings.DEBUG:
+    if settings.debug_mode:
         message = str(exc)
     else:
         message = "An internal error occurred"
@@ -310,7 +310,7 @@ async def root():
     return {
         "service": "BrainOps Operator Service",
         "version": settings.APP_VERSION,
-        "documentation": f"{settings.API_V1_PREFIX}/docs" if settings.DEBUG else "Contact support for API documentation",
+        "documentation": f"{settings.API_V1_PREFIX}/docs" if settings.debug_mode else "Contact support for API documentation",
         "health": "/health",
         "status": "operational"
     }
@@ -325,13 +325,13 @@ if settings.SENTRY_DSN:
 
 
 # Development-only endpoints
-if settings.DEBUG:
+if settings.debug_mode:
     @app.get("/debug/settings", tags=["debug"])
     async def debug_settings():
         """Show current settings (development only)."""
         return {
             "environment": settings.ENVIRONMENT,
-            "debug": settings.DEBUG,
+            "debug": settings.debug_mode,
             "ai_limits": settings.get_ai_limits(),
             "configured_integrations": settings.validate_required_integrations()
         }
