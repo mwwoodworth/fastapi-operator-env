@@ -13,11 +13,11 @@ from datetime import datetime
 import uuid
 import json
 
-from .core.security import get_current_user
-from .memory.models import User, TaskRecord, TaskStatus
-from .memory.memory_store import save_task, get_task, list_user_tasks
-from .tasks import task_registry
-from .agents.base import ExecutionContext
+from apps.backend.core.security import get_current_user
+from apps.backend.memory.models import User, TaskRecord, TaskStatus
+from apps.backend.memory.memory_store import save_task, get_task, list_user_tasks
+from apps.backend.tasks import task_registry
+from apps.backend.agents.base import ExecutionContext
 
 
 router = APIRouter()

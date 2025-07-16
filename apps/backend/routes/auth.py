@@ -12,7 +12,7 @@ from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
 import secrets
 
-from .core.security import (
+from apps.backend.core.security import (
     verify_password,
     get_password_hash,
     create_access_token,
@@ -21,9 +21,9 @@ from .core.security import (
     get_current_user,
     get_current_active_user
 )
-from .core.settings import settings
-from .memory.models import User, UserCreate, UserLogin, TokenResponse
-from .memory.memory_store import (
+from apps.backend.core.settings import settings
+from apps.backend.memory.models import User, UserCreate, UserLogin, TokenResponse
+from apps.backend.memory.memory_store import (
     get_user_by_email,
     create_user,
     update_user_last_login,

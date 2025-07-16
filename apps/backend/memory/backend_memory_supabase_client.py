@@ -12,7 +12,7 @@ from postgrest import AsyncPostgrestClient
 import asyncio
 
 from apps.backend.core.settings import settings
-from ..core.logging import get_logger
+from apps.backend.core.logging import get_logger
 
 logger = get_logger(__name__)
 

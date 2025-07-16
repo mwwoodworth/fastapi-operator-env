@@ -14,8 +14,8 @@ import re
 import tiktoken
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 
-from ..core.settings import settings
-from ..core.logging import get_logger
+from apps.backend.core.settings import settings
+from apps.backend.core.logging import get_logger
 from .vector_utils import generate_embeddings, cosine_similarity
 from .supabase_client import get_supabase_client
 

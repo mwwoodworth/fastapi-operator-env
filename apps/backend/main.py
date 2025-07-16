@@ -18,15 +18,15 @@ from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from .core.settings import settings
-from .core.logging import configure_logging, get_logger, LogContext
-from .core.scheduler import scheduler
-from .core.security import security_manager
-from .memory.supabase_client import init_supabase
-from .tasks import register_all_tasks
+from apps.backend.core.settings import settings
+from apps.backend.core.logging import configure_logging, get_logger, LogContext
+from apps.backend.core.scheduler import scheduler
+from apps.backend.core.security import security_manager
+from apps.backend.memory.supabase_client import init_supabase
+from apps.backend.tasks import register_all_tasks
 
 # Import all route modules
-from .routes import tasks, auth, memory, webhooks, agents
+from apps.backend.routes import tasks, auth, memory, webhooks, agents
 
 # Configure logging before anything else
 configure_logging()
@@ -90,9 +90,9 @@ app = FastAPI(
     title="BrainOps Operator Service",
     description="AI-powered automation engine for high-stakes business operations",
     version=settings.APP_VERSION,
-    docs_url="/api/docs" if settings.DEBUG else None,  # Disable docs in production
-    redoc_url="/api/redoc" if settings.DEBUG else None,
-    openapi_url="/api/openapi.json" if settings.DEBUG else None,
+    docs_url="/api/docs" if settings.debug_mode else None,  # Disable docs in production
+    redoc_url="/api/redoc" if settings.debug_mode else None,
+    openapi_url="/api/openapi.json" if settings.debug_mode else None,
     lifespan=lifespan
 )
 
