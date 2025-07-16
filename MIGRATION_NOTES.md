@@ -44,18 +44,23 @@ This migration fixed critical Docker module resolution issues that were causing 
 - **Docker health check**: `CMD curl -f http://localhost:${PORT}/health || exit 1`
 - **Render configuration**: `healthCheckPath: /health` in render.yaml
 
-## File Structure Confirmed
+## File Structure After Reorganization
 
 ```
-/brainstackstudio/
+/fastapi-operator-env/ (repository root)
 ├── Dockerfile ✅ (CORRECT - uses main:app)
 ├── render.yaml ✅ (points to correct Dockerfile)
-├── fastapi-operator-env/
-│   ├── main.py ✅ (contains app = FastAPI())
-│   ├── requirements.txt ✅
-│   └── [application modules] ✅
-├── brainops-ai-assistant/ ✅ (frontend repo)
-└── [removed] docker/Dockerfile ❌ (had incorrect apps.backend.main:app)
+├── main.py ✅ (contains app = FastAPI())
+├── requirements.txt ✅
+├── core/ ✅ (application modules)
+├── codex/ ✅ (application modules)
+├── utils/ ✅ (application modules)
+├── db/ ✅ (application modules)
+├── celery_app.py ✅
+├── response_models.py ✅
+├── chat_task_api.py ✅
+├── *_utils.py ✅
+└── [excluded] fastapi-operator-env/ ❌ (old subdirectory - excluded via .dockerignore)
 ```
 
 ## Deployment Configuration
@@ -63,8 +68,8 @@ This migration fixed critical Docker module resolution issues that were causing 
 ### Working Docker Configuration
 
 ```dockerfile
-# Copies from fastapi-operator-env/ to /app
-COPY fastapi-operator-env/ .
+# Copies from repository root to /app (excludes subdirectories via .dockerignore)
+COPY . .
 
 # Correct entrypoint
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]
