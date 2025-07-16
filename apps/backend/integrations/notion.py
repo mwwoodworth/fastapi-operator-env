@@ -44,6 +44,7 @@ class NotionClient:
     def __init__(self):
         self.api_key = settings.NOTION_API_KEY
         self.base_url = "https://api.notion.com/v1"
+        self.version = "2022-06-28"  # Notion API version
         self.memory = MemoryStore()
         
         # Database IDs for different content types

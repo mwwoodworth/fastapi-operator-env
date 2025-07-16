@@ -40,11 +40,19 @@ class Settings(BaseSettings):
     CORS_ORIGINS: List[str] = Field(default=["http://localhost:3000", "http://localhost:8000"], env="CORS_ORIGINS")
     
     # ClickUp
+    CLICKUP_API_KEY: Optional[str] = Field(default=None, env="CLICKUP_API_KEY")
+    CLICKUP_WORKSPACE_ID: Optional[str] = Field(default=None, env="CLICKUP_WORKSPACE_ID")
+    CLICKUP_DEFAULT_LIST_ID: Optional[str] = Field(default=None, env="CLICKUP_DEFAULT_LIST_ID")
+    CLICKUP_ESTIMATE_LIST_ID: Optional[str] = Field(default=None, env="CLICKUP_ESTIMATE_LIST_ID")
     clickup_api_token: Optional[str] = Field(default=None, env="CLICKUP_API_TOKEN")
     clickup_workspace_id: Optional[str] = Field(default=None, env="CLICKUP_WORKSPACE_ID")
     clickup_folder_ids: Optional[Dict[str, str]] = Field(default=None, env="CLICKUP_FOLDER_IDS")
     
     # Notion
+    NOTION_API_KEY: Optional[str] = Field(default=None, env="NOTION_API_KEY")
+    NOTION_TASKS_DB_ID: Optional[str] = Field(default=None, env="NOTION_TASKS_DB_ID")
+    NOTION_KNOWLEDGE_DB_ID: Optional[str] = Field(default=None, env="NOTION_KNOWLEDGE_DB_ID")
+    NOTION_ESTIMATES_DB_ID: Optional[str] = Field(default=None, env="NOTION_ESTIMATES_DB_ID")
     notion_api_token: Optional[str] = Field(default=None, env="NOTION_API_TOKEN")
     notion_database_ids: Optional[Dict[str, str]] = Field(default=None, env="NOTION_DATABASE_IDS")
     
@@ -53,7 +61,10 @@ class Settings(BaseSettings):
     github_repos: Optional[List[str]] = Field(default=None, env="GITHUB_REPOS")
     
     # Slack
-    slack_bot_token: Optional[str] = Field(default=None, env="SLACK_BOT_TOKEN")
+    SLACK_BOT_TOKEN: Optional[str] = Field(default=None, env="SLACK_BOT_TOKEN")
+    SLACK_SIGNING_SECRET: Optional[str] = Field(default=None, env="SLACK_SIGNING_SECRET")
+    SLACK_DEFAULT_CHANNEL: str = Field(default="#general", env="SLACK_DEFAULT_CHANNEL")
+    SLACK_APPROVAL_CHANNEL: Optional[str] = Field(default=None, env="SLACK_APPROVAL_CHANNEL")
     slack_webhook_url: Optional[str] = Field(default=None, env="SLACK_WEBHOOK_URL")
     slack_alert_channel: str = Field(default="#alerts", env="SLACK_ALERT_CHANNEL")
     
@@ -144,11 +155,11 @@ class Settings(BaseSettings):
             services.append('notion')
         if self.github_token:
             services.append('github')
-        if self.slack_bot_token:
+        if self.SLACK_BOT_TOKEN:
             services.append('slack')
         if self.airtable_api_key:
             services.append('airtable')
-        if self.supabase_url and self.supabase_anon_key:
+        if self.SUPABASE_URL and self.SUPABASE_ANON_KEY:
             services.append('supabase')
         if self.stripe_api_key_live or self.stripe_api_key_test:
             services.append('stripe')
@@ -180,19 +191,21 @@ class Settings(BaseSettings):
                 'repos': self.github_repos,
             },
             'slack': {
-                'bot_token': self.slack_bot_token,
+                'bot_token': self.SLACK_BOT_TOKEN,
+                'signing_secret': self.SLACK_SIGNING_SECRET,
                 'webhook_url': self.slack_webhook_url,
                 'alert_channel': self.slack_alert_channel,
+                'default_channel': self.SLACK_DEFAULT_CHANNEL,
+                'approval_channel': self.SLACK_APPROVAL_CHANNEL,
             },
             'airtable': {
                 'api_key': self.airtable_api_key,
                 'base_ids': self.airtable_base_ids,
             },
             'supabase': {
-                'url': self.supabase_url,
-                'anon_key': self.supabase_anon_key,
-                'service_key': self.supabase_service_key,
-                'db_password': self.supabase_db_password,
+                'url': self.SUPABASE_URL,
+                'anon_key': self.SUPABASE_ANON_KEY,
+                'db_url': self.SUPABASE_DB_URL,
             },
             'stripe': {
                 'api_key_live': self.stripe_api_key_live,
