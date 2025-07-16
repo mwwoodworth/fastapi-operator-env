@@ -13,7 +13,7 @@ from openai import AsyncOpenAI
 import hashlib
 from functools import lru_cache
 
-from ..core.settings import get_settings
+from apps.backend.core.settings import settings
 from ..core.logging import get_logger
 
 logger = get_logger(__name__)
@@ -32,7 +32,7 @@ def get_openai_client() -> AsyncOpenAI:
     global _openai_client
     
     if _openai_client is None:
-        settings = get_settings()
+        
         _openai_client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
     
     return _openai_client
