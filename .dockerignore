@@ -1,7 +1,7 @@
 # Virtual environments
-fastapi-operator-env/venv/
-fastapi-operator-env/env/
-fastapi-operator-env/.venv/
+venv/
+env/
+.venv/
 
 # Python cache files
 **/__pycache__/
@@ -51,9 +51,9 @@ dist/
 *.egg-info/
 
 # Node.js (for any frontend components)
-fastapi-operator-env/node_modules/
-fastapi-operator-env/frontend/node_modules/
-fastapi-operator-env/myroofgenius-app/node_modules/
+node_modules/
+frontend/node_modules/
+myroofgenius-app/node_modules/
 
 # Docker files
 Dockerfile*
@@ -74,17 +74,21 @@ tmp/
 .tmp/
 
 # Other unnecessary directories
-fastapi-operator-env/tests/
-fastapi-operator-env/scripts/
-fastapi-operator-env/misc/
+tests/
+scripts/
+misc/
 
 # Specific problematic test files with apps.backend imports
-fastapi-operator-env/tests/agents.py
-fastapi-operator-env/tests/tasks.py
-fastapi-operator-env/tests/execution.py
-fastapi-operator-env/tests/integrations.py
-fastapi-operator-env/tests/memory.py
+tests/agents.py
+tests/tasks.py
+tests/execution.py
+tests/integrations.py
+tests/memory.py
 
 # Test files
-fastapi-operator-env/test_*.py
-fastapi-operator-env/tests/test_*.py
+test_*.py
+tests/test_*.py
+
+# Duplicate directories that should not exist
+fastapi-operator-env/
+brainops-ai-assistant/

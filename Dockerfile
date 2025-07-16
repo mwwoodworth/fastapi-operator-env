@@ -24,14 +24,14 @@ RUN groupadd -r appuser && useradd -r -g appuser appuser
 WORKDIR /app
 
 # Copy requirements first for better Docker layer caching
-COPY fastapi-operator-env/requirements.txt requirements.txt
+COPY requirements.txt requirements.txt
 
 # Install Python dependencies
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
-# Copy the entire FastAPI application from fastapi-operator-env
-COPY fastapi-operator-env/ .
+# Copy the entire FastAPI application
+COPY . .
 
 # Create necessary directories and set permissions
 RUN mkdir -p logs data temp && \
