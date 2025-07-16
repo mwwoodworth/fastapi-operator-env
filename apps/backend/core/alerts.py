@@ -12,7 +12,7 @@ from pathlib import Path
 import yaml
 
 from apps.backend.core.settings import Settings
-from apps.backend.connectors.slack import SlackConnector
+from apps.backend.integrations.slack import SlackIntegration
 
 
 logger = logging.getLogger(__name__)
@@ -26,7 +26,7 @@ class AlertManager:
         self._alert_history = defaultdict(list)
         self._history_lock = threading.Lock()
         self._cooldown_minutes = settings.alert_cooldown_minutes
-        self._slack_connector = None
+        self._slack_integration = None
         
         # Load alert rules
         self.alert_rules = self._load_alert_rules()
@@ -39,8 +39,10 @@ class AlertManager:
         if self.settings.enable_slack_alerts and self.settings.slack_bot_token:
             try:
                 slack_config = self.settings.get_service_config('slack')
-                self._slack_connector = SlackConnector(slack_config)
-                self._slack_connector.authenticate()
+                # TODO: Update to use SlackIntegration initialization
+                # self._slack_integration = SlackIntegration(slack_config)
+                # self._slack_integration.authenticate()
+                pass
             except Exception as e:
                 logger.error(f"Failed to initialize Slack connector: {e}")
     
@@ -141,7 +143,7 @@ class AlertManager:
     def _send_slack_alert(self, service: str, severity: str, 
                          message: str, details: Optional[Dict[str, Any]] = None) -> bool:
         """Send alert via Slack"""
-        if not self._slack_connector:
+        if not self._slack_integration:
             logger.error("Slack connector not initialized")
             return False
         
@@ -156,7 +158,9 @@ class AlertManager:
             if details:
                 fields.update(details)
             
-            return self._slack_connector.send_alert(
+            # TODO: Update to use SlackIntegration send method
+            # return self._slack_integration.send_alert(
+            return {
                 title=f"{service} Alert",
                 message=message,
                 severity=severity,
