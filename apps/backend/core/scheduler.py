@@ -106,7 +106,7 @@ class JobScheduler:
         """Handle successful job execution"""
         logger.debug(f"Job {event.job_id} executed successfully")
     
-    def start(self):
+    async def start(self):
         """Start the scheduler"""
         try:
             if not self._scheduler.running:
@@ -118,7 +118,7 @@ class JobScheduler:
             logger.error(f"Failed to start scheduler: {e}")
             raise
     
-    def stop(self):
+    async def shutdown(self):
         """Stop the scheduler"""
         if self._scheduler.running:
             self._scheduler.shutdown(wait=True)
@@ -274,8 +274,8 @@ class JobScheduler:
     
     def add_health_check_job(self, services: List[str], interval_minutes: int = 5):
         """Add a health check job for specified services"""
-        from core.monitor import HealthMonitor
-        from core.alerts import AlertManager
+        from apps.backend.core.monitor import HealthMonitor
+        from apps.backend.core.alerts import AlertManager
         
         monitor = HealthMonitor(self.settings)
         alert_manager = AlertManager(self.settings)
@@ -336,3 +336,8 @@ class JobScheduler:
             cron_expression=cron_expression,
             job_id=f'deployment_{service}'
         )
+
+
+# Create global scheduler instance
+from apps.backend.core.settings import settings
+scheduler = JobScheduler(settings)

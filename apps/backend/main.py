@@ -280,7 +280,7 @@ async def detailed_health_check() -> Dict[str, Any]:
         health_status["status"] = "degraded"
     
     # Check scheduler status
-    if scheduler.scheduler.running:
+    if scheduler._scheduler and scheduler._scheduler.running:
         health_status["components"]["scheduler"] = "healthy"
     else:
         health_status["components"]["scheduler"] = "unhealthy: not running"
