@@ -18,7 +18,7 @@ RUN apt-get update && apt-get install -y \
 COPY requirements.txt .
 
 # Install Python dependencies
-RUN pip install --user --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Stage 2: Production image
 FROM python:3.11-slim
@@ -26,7 +26,6 @@ FROM python:3.11-slim
 # Set environment variables
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    PATH=/home/appuser/.local/bin:$PATH \
     PORT=8000
 
 # Install runtime dependencies
@@ -42,7 +41,7 @@ RUN useradd -m -u 1000 appuser
 WORKDIR /app
 
 # Copy Python dependencies from builder
-COPY --from=builder --chown=appuser:appuser /root/.local /home/appuser/.local
+COPY --from=builder --chown=appuser:appuser /usr/local /usr/local
 
 # Copy application code
 COPY --chown=appuser:appuser . .
@@ -63,4 +62,4 @@ EXPOSE ${PORT}
 
 # Start the FastAPI application with Uvicorn
 # Use exec form to ensure proper signal handling
-CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]
+CMD ["uvicorn", "apps.backend.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]
