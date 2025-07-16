@@ -16,8 +16,8 @@ from pathlib import Path
 # Add the backend directory to Python path for imports
 sys.path.append(str(Path(__file__).parents[3]))
 
-from .core.settings import settings
-from .db.models import Base  # Import all models
+from apps.backend.core.settings import settings
+from apps.backend.db.models import Base  # Import all models
 
 # Alembic Config object
 config = context.config
