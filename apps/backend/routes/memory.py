@@ -29,7 +29,7 @@ from apps.backend.memory.knowledge import (
     hybrid_search,
     get_relevant_context
 )
-from apps.backend.memory.vector_utils import generate_embedding
+from apps.backend.memory.backend_memory_vector_utils import generate_embedding
 
 
 router = APIRouter()

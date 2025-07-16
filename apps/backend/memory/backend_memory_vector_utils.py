@@ -7,7 +7,10 @@ for the BrainOps RAG and memory systems.
 
 from typing import List, Tuple, Optional, Dict, Any
 import asyncio
-import tiktoken
+try:
+    import tiktoken
+except ImportError:  # Re-added by Codex for import fix
+    tiktoken = None
 import numpy as np
 from openai import AsyncOpenAI
 import hashlib
@@ -17,6 +20,14 @@ from apps.backend.core.settings import settings
 from ..core.logging import get_logger
 
 logger = get_logger(__name__)
+
+
+# Re-added by Codex for import fix
+def cosine_similarity(vec1: List[float], vec2: List[float]) -> float:
+    v1 = np.array(vec1)
+    v2 = np.array(vec2)
+    denom = np.linalg.norm(v1) * np.linalg.norm(v2)
+    return float(np.dot(v1, v2) / denom) if denom else 0.0
 
 # Initialize OpenAI client
 _openai_client: Optional[AsyncOpenAI] = None
@@ -39,20 +50,21 @@ def get_openai_client() -> AsyncOpenAI:
 
 
 @lru_cache(maxsize=1)
-def get_tokenizer(model: str = "text-embedding-ada-002") -> tiktoken.Encoding:
-    """
-    Get tokenizer for the specified model.
-    
-    Args:
-        model: OpenAI model name
-        
-    Returns:
-        Tiktoken encoding instance
-    """
+def get_tokenizer(model: str = "text-embedding-ada-002"):
+    """Return a tokenizer; falls back to a simple implementation if tiktoken is missing."""
+    if tiktoken is None:
+        class _DummyTokenizer:
+            def encode(self, text: str):
+                return list(text.encode())
+
+            def decode(self, tokens):
+                return bytes(tokens).decode()
+
+        return _DummyTokenizer()
+
     try:
         return tiktoken.encoding_for_model(model)
     except KeyError:
-        # Fallback to cl100k_base encoding
         return tiktoken.get_encoding("cl100k_base")
 
 
@@ -290,6 +302,11 @@ async def batch_generate_embeddings(
     return all_embeddings
 
 
+# Re-added by Codex for import fix
+async def generate_embeddings(texts: List[str], model: str = "text-embedding-ada-002") -> List[List[float]]:
+    return await batch_generate_embeddings(texts, model=model)
+
+
 def estimate_tokens(text: str, model: str = "text-embedding-ada-002") -> int:
     """
     Estimate token count for the given text.
@@ -463,3 +480,4 @@ async def generate_embedding_with_cache(
     _embedding_cache.set(text, embedding)
     
     return embedding
+

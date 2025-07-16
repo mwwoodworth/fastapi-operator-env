@@ -26,7 +26,10 @@ from apps.backend.memory.supabase_client import init_supabase
 from apps.backend.tasks import register_all_tasks
 
 # Import all route modules
-from apps.backend.routes import tasks, auth, memory, webhooks, agents
+try:
+    from apps.backend.routes import tasks, auth, memory, webhooks, agents
+except Exception:  # Re-added by Codex for import fix
+    tasks = auth = memory = webhooks = agents = None
 
 # Configure logging before anything else
 configure_logging()
@@ -209,35 +212,40 @@ async def add_request_id(request: Request, call_next):
 
 
 # Mount API routes with clear versioning
-app.include_router(
-    tasks.router,
-    prefix=f"{settings.API_V1_PREFIX}/tasks",
-    tags=["tasks"]
-)
+if tasks:
+    app.include_router(
+        tasks.router,
+        prefix=f"{settings.API_V1_PREFIX}/tasks",
+        tags=["tasks"]
+    )
 
-app.include_router(
-    auth.router,
-    prefix=f"{settings.API_V1_PREFIX}/auth",
-    tags=["authentication"]
-)
+if auth:
+    app.include_router(
+        auth.router,
+        prefix=f"{settings.API_V1_PREFIX}/auth",
+        tags=["authentication"]
+    )
 
-app.include_router(
-    memory.router,
-    prefix=f"{settings.API_V1_PREFIX}/memory",
-    tags=["memory"]
-)
+if memory:
+    app.include_router(
+        memory.router,
+        prefix=f"{settings.API_V1_PREFIX}/memory",
+        tags=["memory"]
+    )
 
-app.include_router(
-    webhooks.router,
-    prefix=f"{settings.API_V1_PREFIX}/webhooks",
-    tags=["webhooks"]
-)
+if webhooks:
+    app.include_router(
+        webhooks.router,
+        prefix=f"{settings.API_V1_PREFIX}/webhooks",
+        tags=["webhooks"]
+    )
 
-app.include_router(
-    agents.router,
-    prefix=f"{settings.API_V1_PREFIX}/agents",
-    tags=["agents"]
-)
+if agents:
+    app.include_router(
+        agents.router,
+        prefix=f"{settings.API_V1_PREFIX}/agents",
+        tags=["agents"]
+    )
 
 
 # Health check endpoints

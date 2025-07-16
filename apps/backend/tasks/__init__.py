@@ -89,3 +89,8 @@ def list_tasks() -> Dict[str, str]:
         name: func.__doc__.strip() if func.__doc__ else "No description"
         for name, func in task_registry.items()
     }
+
+
+# Re-added by Codex for import fix
+def get_task_registry() -> Dict[str, Callable]:
+    return task_registry
