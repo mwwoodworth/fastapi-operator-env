@@ -11,25 +11,25 @@ from typing import List, Optional, Dict, Any
 from datetime import datetime
 import uuid
 
-from apps.backend.core.security import get_current_user
-from apps.backend.memory.models import (
+from ..core.security import get_current_user
+from ..memory.models import (
     User, MemoryEntry, DocumentChunk, QueryResult,
     MemoryType, DocumentMetadata
 )
-from apps.backend.memory.memory_store import (
+from ..memory.memory_store import (
     save_memory_entry,
     query_memories,
     get_memory_entry,
     update_memory_entry,
     delete_memory_entry
 )
-from apps.backend.memory.knowledge import (
+from ..memory.knowledge import (
     process_document,
     semantic_search,
     hybrid_search,
     get_relevant_context
 )
-from apps.backend.memory.backend_memory_vector_utils import generate_embedding
+from ..memory.vector_utils import generate_embedding
 
 
 router = APIRouter()

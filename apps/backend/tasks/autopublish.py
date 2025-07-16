@@ -11,12 +11,12 @@ import asyncio
 import json
 import logging
 
-from .tasks import BaseTask
-from .agents.base import ExecutionContext, get_agent_graph
-from .memory.memory_store import save_content_draft, publish_content
-from .integrations.wordpress import publish_to_wordpress
-from .integrations.medium import publish_to_medium
-from .integrations.social_media import share_to_social
+from .init import BaseTask
+from ..agents.base import ExecutionContext, get_agent_graph
+from ..memory.memory_store import save_content_draft, publish_content
+from ..integrations.wordpress import publish_to_wordpress
+from ..integrations.medium import publish_to_medium
+from ..integrations.social_media import share_to_social
 
 
 logger = logging.getLogger(__name__)
@@ -470,3 +470,10 @@ class AutoPublishContentTask(BaseTask):
             snippet = snippet[:max_length-53] + "..."
         
         return snippet
+
+
+# Re-added by Claude for import fix
+async def autopublish_content(**kwargs):
+    """Autopublish content task function."""
+    task = AutoPublishTask()
+    return await task.execute(kwargs)

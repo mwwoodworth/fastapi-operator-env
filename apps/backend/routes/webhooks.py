@@ -13,13 +13,13 @@ import hashlib
 import json
 from datetime import datetime
 
-from apps.backend.core.settings import settings
-from apps.backend.integrations.slack import process_slack_event, verify_slack_signature
-from apps.backend.integrations.clickup import process_clickup_webhook, verify_clickup_signature
-from apps.backend.integrations.stripe import process_stripe_event, construct_stripe_event
-from apps.backend.integrations.make import process_make_webhook, verify_make_secret
-from apps.backend.tasks import task_registry
-from apps.backend.memory.memory_store import log_webhook_event
+from ..core.settings import settings
+from ..integrations.slack import process_slack_event, verify_slack_signature
+from ..integrations.clickup import process_clickup_webhook, verify_clickup_signature
+from ..integrations.stripe import process_stripe_event, construct_stripe_event
+from ..integrations.make import process_make_webhook, verify_make_secret
+from ..tasks import task_registry
+from ..memory.memory_store import log_webhook_event
 
 
 router = APIRouter()

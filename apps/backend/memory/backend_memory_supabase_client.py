@@ -12,14 +12,21 @@ from supabase import create_client, Client
 from postgrest import AsyncPostgrestClient
 import asyncio
 
-from apps.backend.core.settings import settings
-from apps.backend.core.logging import get_logger
+from ..core.settings import settings
+from ..core.logging import get_logger
 
 logger = get_logger(__name__)
 
 # Global client instance
 _supabase_client: Optional[Client] = None
 _client_lock = asyncio.Lock()
+
+
+@lru_cache()
+def get_settings_cached():
+    """Cache settings to avoid repeated instantiation."""
+    return settings
+
 
 async def get_supabase_client() -> Client:
     """
@@ -152,6 +159,16 @@ class SupabaseQueryBuilder:
         
         return result.data
 
+
+async def init_supabase():
+    """Initialize Supabase connection and create schema if needed."""
+    try:
+        client = await get_supabase_client()
+        await create_database_schema()
+        logger.info("Supabase initialized successfully")
+    except Exception as e:
+        logger.error(f"Failed to initialize Supabase: {e}")
+        raise
 
 async def create_database_schema():
     """

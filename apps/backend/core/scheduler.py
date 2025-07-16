@@ -13,7 +13,7 @@ from apscheduler.executors.pool import ThreadPoolExecutor
 from apscheduler.events import EVENT_JOB_ERROR, EVENT_JOB_EXECUTED
 import pytz
 
-from apps.backend.core.settings import Settings, settings  # <- add global settings import here
+from .settings import settings, Settings
 
 logger = logging.getLogger(__name__)
 
@@ -264,6 +264,5 @@ class JobScheduler:
             cron_expression=cron_expression,
             job_id=f'deployment_{service}'
         )
-
-# Create global scheduler instance at the end, so imports are ready and no circular import occurs
+# Create global scheduler instance
 scheduler = JobScheduler(settings)
