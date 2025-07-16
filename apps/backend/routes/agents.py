@@ -12,16 +12,16 @@ from datetime import datetime
 import asyncio
 import json
 
-from apps.backend.core.security import get_current_user, verify_websocket_token
-from apps.backend.memory.models import User, AgentStatus, ApprovalRequest, PipelineConfig
-from apps.backend.agents.base import (
+from .core.security import get_current_user, verify_websocket_token
+from .memory.models import User, AgentStatus, ApprovalRequest, PipelineConfig
+from .agents.base import (
     AgentGraph,
     AgentNode,
     ExecutionContext,
     get_agent_graph,
     get_agent_status
 )
-from apps.backend.memory.memory_store import (
+from .memory.memory_store import (
     get_pending_approvals,
     update_approval_status,
     log_agent_execution

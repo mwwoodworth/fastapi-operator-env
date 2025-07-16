@@ -14,12 +14,12 @@ import hmac
 import hashlib
 
 from fastapi.testclient import TestClient
-from apps.backend.integrations.slack import SlackIntegration
-from apps.backend.integrations.clickup import ClickUpIntegration
-from apps.backend.integrations.notion import NotionIntegration
-from apps.backend.integrations.make import MakeIntegration
-from apps.backend.integrations.stripe import StripeIntegration
-from apps.backend.core.settings import settings
+from .integrations.slack import SlackIntegration
+from .integrations.clickup import ClickUpIntegration
+from .integrations.notion import NotionIntegration
+from .integrations.make import MakeIntegration
+from .integrations.stripe import StripeIntegration
+from .core.settings import settings
 
 
 @pytest.mark.asyncio

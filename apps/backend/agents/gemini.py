@@ -13,9 +13,9 @@ import google.generativeai as genai
 from google.generativeai.types import HarmCategory, HarmBlockThreshold
 import logging
 
-from apps.backend.agents.base import AgentNode, AgentResponse, ExecutionContext, AgentType
-from apps.backend.core.settings import settings
-from apps.backend.memory.memory_store import get_prompt_template
+from .base import AgentNode, AgentResponse, ExecutionContext, AgentType
+from ..core.settings import settings
+from ..memory.memory_store import get_prompt_template
 
 
 logger = logging.getLogger(__name__)

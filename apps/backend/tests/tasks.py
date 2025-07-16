@@ -9,12 +9,12 @@ from unittest.mock import Mock, AsyncMock, patch
 from datetime import datetime
 from typing import Dict, Any
 
-from apps.backend.tasks.base_task import BaseTask, TaskResult
-from apps.backend.tasks.autopublish_content import AutopublishContentTask
-from apps.backend.tasks.generate_roof_estimate import GenerateRoofEstimateTask
-from apps.backend.tasks.customer_onboarding import CustomerOnboardingTask
-from apps.backend.agents.base import AgentContext, AgentResult
-from apps.backend.memory.memory_store import MemoryStore
+from .tasks.base_task import BaseTask, TaskResult
+from .tasks.autopublish_content import AutopublishContentTask
+from .tasks.generate_roof_estimate import GenerateRoofEstimateTask
+from .tasks.customer_onboarding import CustomerOnboardingTask
+from .agents.base import AgentContext, AgentResult
+from .memory.memory_store import MemoryStore
 
 
 class TestBaseTask:
@@ -331,7 +331,7 @@ class TestTaskRegistry:
     @pytest.mark.asyncio
     async def test_task_registration(self):
         """Test that tasks are properly registered."""
-        from apps.backend.tasks import task_registry
+        from .tasks import task_registry
         
         # Verify core tasks are registered
         assert "autopublish_content" in task_registry
@@ -341,7 +341,7 @@ class TestTaskRegistry:
     @pytest.mark.asyncio
     async def test_task_instantiation(self):
         """Test that registered tasks can be instantiated."""
-        from apps.backend.tasks import task_registry
+        from .tasks import task_registry
         
         # Get and instantiate a task
         task_class = task_registry.get("autopublish_content")

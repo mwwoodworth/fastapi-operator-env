@@ -11,11 +11,11 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from datetime import datetime
 import json
 
-from apps.backend.tasks import task_registry
-from apps.backend.tasks.base import BaseTask
-from apps.backend.tasks.autopublish_content import AutoPublishContentTask
-from apps.backend.tasks.generate_roof_estimate import GenerateRoofEstimateTask
-from apps.backend.db.models import TaskExecution, AgentExecution
+from .tasks import task_registry
+from .tasks.base import BaseTask
+from .tasks.autopublish_content import AutoPublishContentTask
+from .tasks.generate_roof_estimate import GenerateRoofEstimateTask
+from .db.models import TaskExecution, AgentExecution
 
 
 class TestTaskRegistry:

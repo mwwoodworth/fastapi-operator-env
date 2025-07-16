@@ -13,10 +13,10 @@ from decimal import Decimal
 import stripe
 from fastapi import HTTPException, Header, Request
 
-from apps.backend.core.settings import settings
-from apps.backend.core.logging import logger
-from apps.backend.memory.memory_store import MemoryStore
-from apps.backend.tasks import task_registry
+from ..core.settings import settings
+from ..core.logging import logger
+from ..memory.memory_store import MemoryStore
+from ..tasks import task_registry
 
 
 class StripeIntegration:

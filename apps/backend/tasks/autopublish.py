@@ -11,12 +11,12 @@ import asyncio
 import json
 import logging
 
-from apps.backend.tasks import BaseTask
-from apps.backend.agents.base import ExecutionContext, get_agent_graph
-from apps.backend.memory.memory_store import save_content_draft, publish_content
-from apps.backend.integrations.wordpress import publish_to_wordpress
-from apps.backend.integrations.medium import publish_to_medium
-from apps.backend.integrations.social_media import share_to_social
+from .tasks import BaseTask
+from .agents.base import ExecutionContext, get_agent_graph
+from .memory.memory_store import save_content_draft, publish_content
+from .integrations.wordpress import publish_to_wordpress
+from .integrations.medium import publish_to_medium
+from .integrations.social_media import share_to_social
 
 
 logger = logging.getLogger(__name__)

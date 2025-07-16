@@ -15,9 +15,9 @@ import asyncio
 import yaml
 import logging
 
-from apps.backend.memory.models import User, TaskRecord
-from apps.backend.memory.memory_store import get_relevant_memories
-from apps.backend.core.settings import settings
+from .memory.models import User, TaskRecord
+from .memory.memory_store import get_relevant_memories
+from .core.settings import settings
 
 
 logger = logging.getLogger(__name__)

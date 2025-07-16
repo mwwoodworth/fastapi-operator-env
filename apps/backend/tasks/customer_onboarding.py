@@ -10,12 +10,12 @@ from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta
 import asyncio
 
-from apps.backend.tasks.base import BaseTask
-from apps.backend.agents.claude_agent import ClaudeAgent
-from apps.backend.integrations.slack import SlackIntegration
-from apps.backend.integrations.clickup import ClickUpIntegration
-from apps.backend.memory.memory_store import MemoryStore
-from apps.backend.core.logging import logger
+from .tasks.base import BaseTask
+from .agents.claude_agent import ClaudeAgent
+from .integrations.slack import SlackIntegration
+from .integrations.clickup import ClickUpIntegration
+from .memory.memory_store import MemoryStore
+from .core.logging import logger
 
 
 class CustomerOnboardingTask(BaseTask):

@@ -12,10 +12,10 @@ from datetime import datetime, timedelta
 import json
 import numpy as np
 
-from apps.backend.memory.memory_store import MemoryStore
-from apps.backend.memory.knowledge import KnowledgeManager
-from apps.backend.memory.vector_utils import VectorUtils
-from apps.backend.memory.models import MemoryEntry, ConversationSession, DocumentChunk
+from .memory.memory_store import MemoryStore
+from .memory.knowledge import KnowledgeManager
+from .memory.vector_utils import VectorUtils
+from .memory.models import MemoryEntry, ConversationSession, DocumentChunk
 
 
 @pytest.mark.asyncio

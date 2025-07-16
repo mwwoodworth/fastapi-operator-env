@@ -11,11 +11,11 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from datetime import datetime
 import json
 
-from apps.backend.agents.base import BaseAgent, AgentNode, AgentGraph
-from apps.backend.agents.claude_agent import ClaudeAgent
-from apps.backend.agents.codex_agent import CodexAgent
-from apps.backend.agents.gemini_agent import GeminiAgent
-from apps.backend.agents.search_agent import SearchAgent
+from .agents.base import BaseAgent, AgentNode, AgentGraph
+from .agents.claude_agent import ClaudeAgent
+from .agents.codex_agent import CodexAgent
+from .agents.gemini_agent import GeminiAgent
+from .agents.search_agent import SearchAgent
 
 
 @pytest.mark.asyncio

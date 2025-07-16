@@ -10,11 +10,11 @@ from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta
 import asyncio
 
-from apps.backend.tasks.base import BaseTask
-from apps.backend.integrations.clickup import ClickUpIntegration
-from apps.backend.integrations.notion import NotionIntegration
-from apps.backend.memory.memory_store import MemoryStore
-from apps.backend.core.logging import logger
+from .tasks.base import BaseTask
+from .integrations.clickup import ClickUpIntegration
+from .integrations.notion import NotionIntegration
+from .memory.memory_store import MemoryStore
+from .core.logging import logger
 
 
 class SyncDatabaseTask(BaseTask):

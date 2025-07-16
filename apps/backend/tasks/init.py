@@ -12,7 +12,7 @@ import inspect
 from typing import Dict, Type, Any, List
 import logging
 
-from apps.backend.agents.base import ExecutionContext, AgentResponse
+from .agents.base import ExecutionContext, AgentResponse
 
 
 logger = logging.getLogger(__name__)

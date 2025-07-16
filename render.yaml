@@ -41,46 +41,46 @@ services:
     env: python
     pythonVersion: 3.11
 
-  # Background Worker
-  - type: worker
-    name: brainstackstudio-worker
-    runtime: python
-    plan: free
-    region: oregon
-    branch: main
-    rootDir: .
-    buildCommand: pip install -r requirements.txt
-    startCommand: celery -A celery_app worker --loglevel=info -B
-    envVars:
-      - key: OPENAI_API_KEY
-        sync: false
-      - key: ANTHROPIC_API_KEY
-        sync: false
-      - key: CLAUDE_API_KEY
-        sync: false
-      - key: DATABASE_URL
-        fromDatabase:
-          type: postgres
-          name: brainstackstudio-db
-          property: connectionString
-      - key: REDIS_URL
-        fromService:
-          type: redis
-          name: brainstackstudio-redis
-          property: connectionString
-      - key: SUPABASE_URL
-        sync: false
-      - key: SUPABASE_KEY
-        sync: false
-      - key: GITHUB_TOKEN
-        sync: false
-      - key: NOTION_TOKEN
-        sync: false
-      - key: CLICKUP_API_TOKEN
-        sync: false
-    autoDeploy: true
-    env: python
-    pythonVersion: 3.11
+  # Background Worker (commented out until celery_app is properly configured)
+  # - type: worker
+  #   name: brainstackstudio-worker
+  #   runtime: python
+  #   plan: free
+  #   region: oregon
+  #   branch: main
+  #   rootDir: .
+  #   buildCommand: pip install -r requirements.txt
+  #   startCommand: celery -A apps.backend.celery_app worker --loglevel=info -B
+  #   envVars:
+  #     - key: OPENAI_API_KEY
+  #       sync: false
+  #     - key: ANTHROPIC_API_KEY
+  #       sync: false
+  #     - key: CLAUDE_API_KEY
+  #       sync: false
+  #     - key: DATABASE_URL
+  #       fromDatabase:
+  #         type: postgres
+  #         name: brainstackstudio-db
+  #         property: connectionString
+  #     - key: REDIS_URL
+  #       fromService:
+  #         type: redis
+  #         name: brainstackstudio-redis
+  #         property: connectionString
+  #     - key: SUPABASE_URL
+  #       sync: false
+  #     - key: SUPABASE_KEY
+  #       sync: false
+  #     - key: GITHUB_TOKEN
+  #       sync: false
+  #     - key: NOTION_TOKEN
+  #       sync: false
+  #     - key: CLICKUP_API_TOKEN
+  #       sync: false
+  #   autoDeploy: true
+  #   env: python
+  #   pythonVersion: 3.11
 
 databases:
   - name: brainstackstudio-db
