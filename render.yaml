@@ -5,9 +5,9 @@ services:
     runtime: docker
     plan: free
     region: oregon
-    branch: main
+    branch: master
     rootDir: .
-    dockerfilePath: ./Dockerfile
+    dockerfilePath: ./Dockerfile_minimal
     dockerContext: .
     healthCheckPath: /health
     envVars:
