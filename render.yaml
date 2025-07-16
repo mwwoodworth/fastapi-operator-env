@@ -7,7 +7,7 @@ services:
     region: oregon
     branch: master
     rootDir: .
-    dockerfilePath: ./Dockerfile_minimal
+    dockerfilePath: ./Dockerfile
     dockerContext: .
     healthCheckPath: /health
     envVars:
