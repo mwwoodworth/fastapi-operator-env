@@ -23,6 +23,26 @@ export function useOfflineSync(options: UseOfflineSyncOptions = {}) {
     offlineStorage.initialize().catch(console.error);
   }, []);
 
+  // Sync data to server
+  const syncData = useCallback(async () => {
+    if (!isOnline || isSyncing) return;
+    
+    setIsSyncing(true);
+    try {
+      await offlineQueue.sync();
+    } catch (error) {
+      console.error('Sync failed:', error);
+      toast.error('Failed to sync data. Will retry later.');
+      setIsSyncing(false);
+    }
+  }, [isOnline, isSyncing]);
+
+  // Update queued items count
+  const updateQueueCount = useCallback(async () => {
+    const status = await offlineQueue.getStatus();
+    setQueuedCount(status.queuedItems);
+  }, []);
+
   // Monitor online status
   useEffect(() => {
     const handleOnline = () => {
@@ -69,13 +89,7 @@ export function useOfflineSync(options: UseOfflineSyncOptions = {}) {
       window.removeEventListener('offline', handleOffline);
       window.removeEventListener('offline-sync-complete', handleSyncComplete);
     };
-  }, [autoSync, onSyncComplete]);
-
-  // Update queued items count
-  const updateQueueCount = useCallback(async () => {
-    const status = await offlineQueue.getStatus();
-    setQueuedCount(status.queuedItems);
-  }, []);
+  }, [autoSync, onSyncComplete, syncData, updateQueueCount]);
 
   // Save message locally
   const saveMessage = useCallback(async (content: string, role: 'user' | 'assistant' | 'system') => {
@@ -155,26 +169,6 @@ export function useOfflineSync(options: UseOfflineSyncOptions = {}) {
       return null;
     }
   }, [updateQueueCount]);
-
-  // Manual sync
-  const syncData = useCallback(async () => {
-    if (!isOnline || isSyncing) return;
-
-    setIsSyncing(true);
-    toast.loading('Syncing your data...', {
-      id: 'sync-toast',
-    });
-
-    try {
-      await offlineQueue.sync();
-    } catch (error) {
-      console.error('Sync error:', error);
-      toast.error('Sync failed. Will retry automatically.', {
-        id: 'sync-toast',
-      });
-      setIsSyncing(false);
-    }
-  }, [isOnline, isSyncing]);
 
   // Get session messages
   const getSessionMessages = useCallback(async () => {

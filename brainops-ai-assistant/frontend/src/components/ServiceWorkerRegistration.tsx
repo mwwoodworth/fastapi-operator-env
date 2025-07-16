@@ -23,12 +23,22 @@ export default function ServiceWorkerRegistration() {
             if (newWorker) {
               newWorker.addEventListener('statechange', () => {
                 if (newWorker.state === 'activated') {
-                  toast.success('App updated! Refresh for latest version.', {
+                  toast((t) => (
+                    <div className="flex items-center gap-3">
+                      <span>App updated! Refresh for latest version.</span>
+                      <button
+                        onClick={() => {
+                          toast.dismiss(t.id);
+                          window.location.reload();
+                        }}
+                        className="px-3 py-1 bg-white/20 hover:bg-white/30 rounded-md text-sm font-medium transition-colors"
+                      >
+                        Refresh
+                      </button>
+                    </div>
+                  ), {
                     duration: 5000,
-                    action: {
-                      label: 'Refresh',
-                      onClick: () => window.location.reload(),
-                    },
+                    icon: '🎉',
                   });
                 }
               });

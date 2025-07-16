@@ -1,79 +1,62 @@
 // IndexedDB Storage for Offline Resilience
-import { openDB, DBSchema, IDBPDatabase } from 'idb';
+import { openDB, IDBPDatabase } from 'idb';
 
-// Database schema
-interface BrainOpsDB extends DBSchema {
-  messages: {
-    key: string;
-    value: {
-      id: string;
-      content: string;
-      role: 'user' | 'assistant' | 'system';
-      timestamp: number;
-      synced: boolean;
-      sessionId: string;
-      metadata?: any;
-    };
-  };
-  
-  sessions: {
-    key: string;
-    value: {
-      id: string;
-      createdAt: number;
-      updatedAt: number;
-      context: any;
-      online: boolean;
-    };
-  };
-  
-  queue: {
-    key: string;
-    value: {
-      id: string;
-      type: 'message' | 'file' | 'voice' | 'task';
-      payload: any;
-      timestamp: number;
-      retries: number;
-      status: 'pending' | 'syncing' | 'failed';
-    };
-  };
-  
-  files: {
-    key: string;
-    value: {
-      id: string;
-      name: string;
-      type: string;
-      size: number;
-      data: ArrayBuffer;
-      timestamp: number;
-      synced: boolean;
-    };
-  };
-  
-  voiceMemos: {
-    key: string;
-    value: {
-      id: string;
-      blob: Blob;
-      duration: number;
-      timestamp: number;
-      transcription?: string;
-      synced: boolean;
-    };
-  };
+// Type definitions for message and other data structures
+interface Message {
+  id: string;
+  content: string;
+  role: 'user' | 'assistant' | 'system';
+  timestamp: number;
+  synced: boolean;
+  sessionId: string;
+  metadata?: Record<string, unknown>;
+}
+
+interface Session {
+  id: string;
+  createdAt: number;
+  updatedAt: number;
+  context: Record<string, unknown>;
+  online: boolean;
+}
+
+interface QueueItem {
+  id: string;
+  type: 'message' | 'file' | 'voice' | 'task';
+  payload: Record<string, unknown>;
+  timestamp: number;
+  retries: number;
+  status: 'pending' | 'syncing' | 'failed';
+}
+
+interface FileItem {
+  id: string;
+  name: string;
+  type: string;
+  size: number;
+  data: ArrayBuffer;
+  timestamp: number;
+  synced: boolean;
+}
+
+interface VoiceMemo {
+  id: string;
+  blob: Blob;
+  duration: number;
+  timestamp: number;
+  transcription?: string;
+  synced: boolean;
 }
 
 class OfflineStorage {
-  private db: IDBPDatabase<BrainOpsDB> | null = null;
+  private db: IDBPDatabase | null = null;
   private readonly DB_NAME = 'BrainOpsAssistant';
   private readonly DB_VERSION = 1;
 
   async initialize() {
     if (this.db) return;
 
-    this.db = await openDB<BrainOpsDB>(this.DB_NAME, this.DB_VERSION, {
+    this.db = await openDB(this.DB_NAME, this.DB_VERSION, {
       upgrade(db) {
         // Messages store
         if (!db.objectStoreNames.contains('messages')) {
@@ -114,7 +97,7 @@ class OfflineStorage {
   }
 
   // Message operations
-  async saveMessage(message: BrainOpsDB['messages']['value']) {
+  async saveMessage(message: Message) {
     await this.ensureDB();
     return this.db!.put('messages', message);
   }
@@ -126,11 +109,12 @@ class OfflineStorage {
 
   async getUnsyncedMessages() {
     await this.ensureDB();
-    return this.db!.getAllFromIndex('messages', 'synced', false);
+    const allMessages = await this.db!.getAll('messages');
+    return allMessages.filter(msg => !msg.synced);
   }
 
   // Session operations
-  async saveSession(session: BrainOpsDB['sessions']['value']) {
+  async saveSession(session: Session) {
     await this.ensureDB();
     return this.db!.put('sessions', session);
   }
@@ -147,13 +131,14 @@ class OfflineStorage {
   }
 
   // Queue operations
-  async addToQueue(item: Omit<BrainOpsDB['queue']['value'], 'id'>) {
+  async addToQueue(item: Omit<QueueItem, 'id'>) {
     await this.ensureDB();
     const id = `queue-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    return this.db!.put('queue', { ...item, id });
+    await this.db!.put('queue', { ...item, id });
+    return id;
   }
 
-  async getQueueItems(status?: BrainOpsDB['queue']['value']['status']) {
+  async getQueueItems(status?: QueueItem['status']) {
     await this.ensureDB();
     if (status) {
       return this.db!.getAllFromIndex('queue', 'status', status);
@@ -161,7 +146,7 @@ class OfflineStorage {
     return this.db!.getAll('queue');
   }
 
-  async updateQueueItem(id: string, updates: Partial<BrainOpsDB['queue']['value']>) {
+  async updateQueueItem(id: string, updates: Partial<QueueItem>) {
     await this.ensureDB();
     const item = await this.db!.get('queue', id);
     if (item) {
@@ -180,7 +165,7 @@ class OfflineStorage {
     const id = `file-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const data = await file.arrayBuffer();
     
-    return this.db!.put('files', {
+    await this.db!.put('files', {
       id,
       name: file.name,
       type: file.type,
@@ -189,6 +174,7 @@ class OfflineStorage {
       timestamp: Date.now(),
       synced: false,
     });
+    return id;
   }
 
   async getFile(id: string) {
@@ -198,7 +184,8 @@ class OfflineStorage {
 
   async getUnsyncedFiles() {
     await this.ensureDB();
-    return this.db!.getAllFromIndex('files', 'synced', false);
+    const allFiles = await this.db!.getAll('files');
+    return allFiles.filter(file => !file.synced);
   }
 
   // Voice memo operations
@@ -206,13 +193,14 @@ class OfflineStorage {
     await this.ensureDB();
     const id = `voice-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     
-    return this.db!.put('voiceMemos', {
+    await this.db!.put('voiceMemos', {
       id,
       blob,
       duration,
       timestamp: Date.now(),
       synced: false,
     });
+    return id;
   }
 
   async getVoiceMemo(id: string) {
@@ -230,7 +218,35 @@ class OfflineStorage {
 
   async getUnsyncedVoiceMemos() {
     await this.ensureDB();
-    return this.db!.getAllFromIndex('voiceMemos', 'synced', false);
+    const allMemos = await this.db!.getAll('voiceMemos');
+    return allMemos.filter(memo => !memo.synced);
+  }
+
+  async getAllVoiceMemos() {
+    await this.ensureDB();
+    return this.db!.getAll('voiceMemos');
+  }
+
+  async deleteVoiceMemo(id: string) {
+    await this.ensureDB();
+    return this.db!.delete('voiceMemos', id);
+  }
+
+  // Mark items as synced
+  async markFileAsSynced(id: string) {
+    await this.ensureDB();
+    const file = await this.db!.get('files', id);
+    if (file) {
+      return this.db!.put('files', { ...file, synced: true });
+    }
+  }
+
+  async markVoiceMemoAsSynced(id: string) {
+    await this.ensureDB();
+    const memo = await this.db!.get('voiceMemos', id);
+    if (memo) {
+      return this.db!.put('voiceMemos', { ...memo, synced: true });
+    }
   }
 
   // Utility methods
@@ -242,7 +258,7 @@ class OfflineStorage {
 
   async clearAll() {
     await this.ensureDB();
-    const stores: (keyof BrainOpsDB)[] = ['messages', 'sessions', 'queue', 'files', 'voiceMemos'];
+    const stores = ['messages', 'sessions', 'queue', 'files', 'voiceMemos'];
     
     for (const store of stores) {
       await this.db!.clear(store);
@@ -269,7 +285,7 @@ class OfflineStorage {
 }
 
 // Export singleton instance
-export const offlineStorage = new OfflineStorage();
+export const offlineStorage = typeof window !== 'undefined' ? new OfflineStorage() : null as unknown as OfflineStorage;
 
 // Export types
-export type { BrainOpsDB };
+export type { Message, Session, QueueItem, FileItem, VoiceMemo };

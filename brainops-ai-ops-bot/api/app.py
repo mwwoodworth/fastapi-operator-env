@@ -77,15 +77,18 @@ def create_app(settings: Settings) -> FastAPI:
     # Start scheduler
     try:
         scheduler.start()
+        logger.info("Scheduler started successfully")
     except Exception as e:
-        logger.error(f"Failed to start scheduler: {e}")
-        # Continue without scheduler for now
+        logger.error(f"Failed to start scheduler: {e}", exc_info=True)
+        # Continue without scheduler for now, but create a new instance to avoid issues
+        scheduler = None
     
     @app.on_event("shutdown")
     def shutdown_event():
         """Clean up on shutdown"""
         try:
-            scheduler.stop()
+            if scheduler:
+                scheduler.stop()
         except Exception as e:
             logger.error(f"Error during scheduler shutdown: {e}")
     
@@ -207,6 +210,8 @@ def create_app(settings: Settings) -> FastAPI:
     @app.get("/jobs")
     async def list_jobs():
         """List all scheduled jobs"""
+        if not scheduler:
+            raise HTTPException(status_code=503, detail="Scheduler not available")
         return {
             "jobs": scheduler.get_jobs(),
             "timestamp": datetime.utcnow().isoformat()
@@ -215,6 +220,8 @@ def create_app(settings: Settings) -> FastAPI:
     @app.get("/jobs/{job_id}")
     async def get_job(job_id: str):
         """Get details for a specific job"""
+        if not scheduler:
+            raise HTTPException(status_code=503, detail="Scheduler not available")
         job = scheduler.get_job(job_id)
         if not job:
             raise HTTPException(status_code=404, detail="Job not found")
@@ -224,6 +231,9 @@ def create_app(settings: Settings) -> FastAPI:
     @app.post("/jobs")
     async def create_job(request: JobRequest):
         """Create a new scheduled job"""
+        if not scheduler:
+            raise HTTPException(status_code=503, detail="Scheduler not available")
+        
         # This is simplified - in production you'd want more security
         # around what functions can be scheduled
         
@@ -246,6 +256,9 @@ def create_app(settings: Settings) -> FastAPI:
     @app.delete("/jobs/{job_id}")
     async def delete_job(job_id: str):
         """Delete a scheduled job"""
+        if not scheduler:
+            raise HTTPException(status_code=503, detail="Scheduler not available")
+        
         success = scheduler.remove_job(job_id)
         
         if not success:
@@ -256,6 +269,9 @@ def create_app(settings: Settings) -> FastAPI:
     @app.post("/jobs/{job_id}/run")
     async def run_job_now(job_id: str):
         """Run a job immediately"""
+        if not scheduler:
+            raise HTTPException(status_code=503, detail="Scheduler not available")
+        
         success = scheduler.run_job_now(job_id)
         
         if not success:
@@ -266,6 +282,9 @@ def create_app(settings: Settings) -> FastAPI:
     @app.post("/jobs/{job_id}/pause")
     async def pause_job(job_id: str):
         """Pause a scheduled job"""
+        if not scheduler:
+            raise HTTPException(status_code=503, detail="Scheduler not available")
+        
         success = scheduler.pause_job(job_id)
         
         if not success:
@@ -276,6 +295,9 @@ def create_app(settings: Settings) -> FastAPI:
     @app.post("/jobs/{job_id}/resume")
     async def resume_job(job_id: str):
         """Resume a paused job"""
+        if not scheduler:
+            raise HTTPException(status_code=503, detail="Scheduler not available")
+        
         success = scheduler.resume_job(job_id)
         
         if not success:

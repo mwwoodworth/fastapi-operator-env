@@ -1,0 +1,61 @@
+services:
+  # BrainOps FastAPI Backend
+  - type: web
+    name: brainops-backend
+    runtime: docker
+    plan: free
+    region: oregon
+    branch: main
+    rootDir: .
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    envVars:
+      # AI API Keys
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: CLAUDE_API_KEY
+        sync: false
+      
+      # Database
+      - key: DATABASE_URL
+        sync: false
+      
+      # Integrations
+      - key: GITHUB_TOKEN
+        sync: false
+      - key: NOTION_TOKEN
+        sync: false
+      - key: CLICKUP_API_TOKEN
+        sync: false
+      - key: SLACK_BOT_TOKEN
+        sync: false
+      - key: SLACK_WEBHOOK_URL
+        sync: false
+      
+      # Supabase
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_KEY
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      
+      # Other services
+      - key: RESEND_API_KEY
+        sync: false
+      - key: STRIPE_API_KEY_LIVE
+        sync: false
+      - key: AIRTABLE_API_KEY
+        sync: false
+      
+      # Application settings
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ENVIRONMENT
+        value: production
+      - key: LOG_LEVEL
+        value: INFO
+    autoDeploy: true

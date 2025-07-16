@@ -2,19 +2,24 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/components/providers";
+import { PWAInit } from "@/components/pwa-init";
 
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "BrainOps AI Assistant",
   description: "AI Chief of Staff - Full Operational Control",
-  viewport: "width=device-width, initial-scale=1",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
     title: "BrainOps",
   },
+};
+
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
 };
 
 export default function RootLayout({
@@ -30,6 +35,7 @@ export default function RootLayout({
       </head>
       <body className={inter.className}>
         <Providers>
+          <PWAInit />
           {children}
         </Providers>
       </body>

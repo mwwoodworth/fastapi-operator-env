@@ -266,11 +266,30 @@ async def verify_csrf(request: Request, csrf_protect: CsrfProtect = Depends()) -
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    tasks = ", ".join(get_registry().keys())
-    logger.info("Available tasks: %s", tasks)
-    init_db()
-    app.state.settings = settings
-    yield
+    """Application lifespan manager with error logging."""
+    try:
+        logger.info("Starting FastAPI application...")
+        tasks = ", ".join(get_registry().keys())
+        logger.info("Available tasks: %s", tasks)
+        
+        # Initialize database with error handling
+        try:
+            init_db()
+            logger.info("Database initialized successfully")
+        except Exception as e:
+            logger.error(f"Failed to initialize database: {e}")
+            raise
+        
+        app.state.settings = settings
+        logger.info(f"Application started on port {getattr(settings, 'PORT', 10000)}")
+        
+        yield
+        
+    except Exception as e:
+        logger.error(f"Error during application startup: {e}")
+        raise
+    finally:
+        logger.info("Shutting down FastAPI application...")
 
 
 app = FastAPI(

@@ -9,9 +9,11 @@ import { voiceRecorder } from '@/lib/voice-recorder';
 interface Message {
   id: string;
   content: string;
-  role: 'user' | 'assistant';
+  role: 'user' | 'assistant' | 'system';
   timestamp: number;
   synced?: boolean;
+  sessionId?: string;
+  metadata?: Record<string, unknown>;
 }
 
 export default function OfflineChat() {
@@ -37,7 +39,7 @@ export default function OfflineChat() {
   // Load existing messages on mount
   useEffect(() => {
     loadMessages();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-scroll to bottom
   useEffect(() => {
@@ -51,7 +53,7 @@ export default function OfflineChat() {
 
   const loadMessages = async () => {
     const storedMessages = await getSessionMessages();
-    setMessages(storedMessages.sort((a, b) => a.timestamp - b.timestamp));
+    setMessages(storedMessages.sort((a: Message, b: Message) => a.timestamp - b.timestamp));
   };
 
   const handleSend = async () => {

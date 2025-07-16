@@ -39,12 +39,15 @@ RUN mkdir -p /app/logs /app/data && \
 # Switch to non-root user
 USER brainops
 
+# Environment variable for port (default 10000, can be overridden)
+ENV PORT=10000
+
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:10000/health || exit 1
+    CMD curl -f http://localhost:${PORT}/health || exit 1
 
 # Expose port
 EXPOSE 10000
 
-# Default command - run API server
-CMD ["python", "bot.py", "serve", "--port", "10000", "--host", "0.0.0.0"]
+# Default command - run API server with dynamic port
+CMD ["sh", "-c", "python bot.py serve --port ${PORT} --host 0.0.0.0"]
