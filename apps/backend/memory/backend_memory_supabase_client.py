@@ -67,7 +67,7 @@ async def get_supabase_client() -> Client:
             logger.info("Supabase client initialized successfully")
             
             # Verify pgvector extension is enabled
-            await verify_pgvector_extension(_supabase_client)
+            verify_pgvector_extension(_supabase_client)
             
             return _supabase_client
             
@@ -76,14 +76,14 @@ async def get_supabase_client() -> Client:
             raise
 
 
-async def verify_pgvector_extension(client: Client):
+def verify_pgvector_extension(client: Client):
     """
     Verify that pgvector extension is installed and configured.
     Creates necessary indexes if they don't exist.
     """
     try:
         # Check if pgvector extension exists
-        result = await client.rpc('check_pgvector_extension', {}).execute()
+        result = client.rpc('check_pgvector_extension', {}).execute()
         
         if not result.data:
             logger.warning("pgvector extension not found, attempting to create...")
@@ -150,7 +150,7 @@ class SupabaseQueryBuilder:
         """
         
         # Use Supabase RPC function for vector search
-        result = await self.client.rpc(
+        result = self.client.rpc(
             f'search_{table_name}',
             {
                 'query_embedding': embedding,
@@ -441,13 +441,13 @@ async def cleanup_old_records(days: int = 90):
     
     try:
         # Clean up old retrieval sessions
-        await client.table('retrieval_sessions')\
+        client.table('retrieval_sessions')\
             .delete()\
             .lt('created_at', cutoff_date.isoformat())\
             .execute()
         
         # Clean up orphaned memory records
-        await client.rpc('cleanup_orphaned_records', {}).execute()
+        client.rpc('cleanup_orphaned_records', {}).execute()
         
         logger.info(f"Cleaned up records older than {days} days")
         
@@ -468,7 +468,7 @@ async def check_connection_health() -> bool:
         client = await get_supabase_client()
         
         # Simple query to test connection
-        result = await client.table('memory_records')\
+        result = client.table('memory_records')\
             .select('id')\
             .limit(1)\
             .execute()
