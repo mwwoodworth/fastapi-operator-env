@@ -39,7 +39,7 @@ class ClaudeAgent(AgentNode):
         
         # Initialize Anthropic client
         self.client = anthropic.AsyncAnthropic(
-            api_key=settings.ANTHROPIC_API_KEY
+            api_key=settings.claude_api_key
         )
         
         # Model configuration

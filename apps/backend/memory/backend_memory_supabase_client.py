@@ -9,7 +9,7 @@ from typing import Optional, Dict, Any
 import os
 from datetime import datetime, timedelta
 from functools import lru_cache
-from supabase import create_client, Client
+from supabase import create_client, Client, ClientOptions
 from postgrest import AsyncPostgrestClient
 import asyncio
 
@@ -48,19 +48,20 @@ async def get_supabase_client() -> Client:
             return _supabase_client
         
         try:
-            # Create Supabase client with custom configuration
+            # Create Supabase client with custom configuration using ClientOptions
+            options = ClientOptions()
+            options.schema = "public"
+            options.headers = {
+                "x-brainops-version": "1.0.0"
+            }
+            options.auto_refresh_token = True
+            options.persist_session = True
+            options.local_storage = None  # Use in-memory storage
+            
             _supabase_client = create_client(
                 supabase_url=settings.SUPABASE_URL,
                 supabase_key=settings.SUPABASE_ANON_KEY,
-                options={
-                    "schema": "public",
-                    "headers": {
-                        "x-brainops-version": "1.0.0"
-                    },
-                    "auto_refresh_token": True,
-                    "persist_session": True,
-                    "local_storage": None  # Use in-memory storage
-                }
+                options=options
             )
             
             logger.info("Supabase client initialized successfully")

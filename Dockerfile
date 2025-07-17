@@ -49,4 +49,5 @@ EXPOSE $PORT
 
 # Start the FastAPI application with Uvicorn
 # Using apps.backend.main:app because main.py is in apps/backend/
-CMD ["uvicorn", "apps.backend.main:app", "--host", "0.0.0.0", "--port", "$PORT", "--workers", "2"]
+# Use shell form to enable PORT variable expansion
+CMD uvicorn apps.backend.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers 2
