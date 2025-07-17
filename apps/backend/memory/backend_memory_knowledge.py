@@ -107,7 +107,7 @@ class KnowledgeManager:
                 "created_at": datetime.utcnow().isoformat()
             }
             
-            await self.supabase.table('documents').insert(doc_metadata).execute()
+            self.supabase.table('documents').insert(doc_metadata).execute()
             
             # Process and store chunks
             chunks = await self._create_document_chunks(
@@ -171,7 +171,7 @@ class KnowledgeManager:
             }
             
             # Execute vector search
-            result = await self.supabase.rpc(
+            result = self.supabase.rpc(
                 'search_document_chunks',
                 search_params
             ).execute()
@@ -279,7 +279,7 @@ class KnowledgeManager:
             
             # Increment version if content changed
             if "body" in updates:
-                current = await self.supabase.table('knowledge_entries')\
+                current = self.supabase.table('knowledge_entries')\
                     .select('version')\
                     .eq('id', str(entry_id))\
                     .single()\
@@ -291,7 +291,7 @@ class KnowledgeManager:
                     updates['version'] = '.'.join(version_parts)
             
             # Update the entry
-            result = await self.supabase.table('knowledge_entries')\
+            result = self.supabase.table('knowledge_entries')\
                 .update(updates)\
                 .eq('id', str(entry_id))\
                 .execute()
@@ -381,7 +381,7 @@ class KnowledgeManager:
                 for chunk in chunk_objects
             ]
             
-            await self.supabase.table('document_chunks').insert(chunk_dicts).execute()
+            self.supabase.table('document_chunks').insert(chunk_dicts).execute()
         
         return chunk_objects
     
@@ -465,7 +465,7 @@ class KnowledgeManager:
         """
         
         try:
-            result = await self.supabase.table('documents')\
+            result = self.supabase.table('documents')\
                 .select('id')\
                 .eq('content_hash', content_hash)\
                 .single()\
@@ -503,7 +503,7 @@ class KnowledgeManager:
         )
         
         try:
-            await self.supabase.table('knowledge_entries').insert({
+            self.supabase.table('knowledge_entries').insert({
                 **entry.dict(exclude={'id'}),
                 "id": str(entry.id),
                 "document_id": str(document_id)
