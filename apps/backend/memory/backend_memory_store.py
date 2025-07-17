@@ -20,7 +20,7 @@ from .backend_memory_models import (
     EstimateRecord,
     RetrievalSession,
 )
-from .supabase_client import get_supabase_client
+from .supabase_client import get_supabase_client_sync
 from .backend_memory_vector_utils import generate_embedding, calculate_similarity
 from ..core.logging import get_logger
 from .models import (
@@ -41,7 +41,8 @@ class MemoryStore:
     """
     
     def __init__(self):
-        self.supabase = get_supabase_client()
+        # Initialize Supabase client synchronously for use in async methods
+        self.supabase = get_supabase_client_sync()
         self._cache = {}  # Simple in-memory cache for frequent queries
         
     async def store_memory(

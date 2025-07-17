@@ -8,8 +8,8 @@ connection pooling, and database schema management for BrainOps.
 from typing import Optional, Dict, Any
 import os
 from datetime import datetime, timedelta
-from supabase import create_client, Client
-from postgrest import AsyncPostgrestClient
+from supabase._async.client import AsyncClient
+from supabase.client import ClientOptions
 import asyncio
 
 from apps.backend.core.settings import settings
@@ -18,10 +18,10 @@ from apps.backend.core.logging import get_logger
 logger = get_logger(__name__)
 
 # Global client instance
-_supabase_client: Optional[Client] = None
+_supabase_client: Optional[AsyncClient] = None
 _client_lock = asyncio.Lock()
 
-async def get_supabase_client() -> Client:
+async def get_supabase_client() -> AsyncClient:
     """
     Get or create the Supabase client instance.
     Uses connection pooling and ensures thread safety.
@@ -40,19 +40,20 @@ async def get_supabase_client() -> Client:
             return _supabase_client
         
         try:
-            # Create Supabase client with custom configuration
-            _supabase_client = create_client(
-                supabase_url=settings.SUPABASE_URL,
-                supabase_key=settings.SUPABASE_ANON_KEY,
-                options={
-                    "schema": "public",
-                    "headers": {
-                        "x-brainops-version": "1.0.0"
-                    },
-                    "auto_refresh_token": True,
-                    "persist_session": True,
-                    "local_storage": None  # Use in-memory storage
-                }
+            if not settings.SUPABASE_URL or not settings.SUPABASE_ANON_KEY:
+                raise ValueError("Supabase credentials are not configured")
+
+            options = ClientOptions(
+                schema="public",
+                headers={"x-brainops-version": "1.0.0"},
+                auto_refresh_token=True,
+                persist_session=True,
+            )
+
+            _supabase_client = await AsyncClient.create(
+                settings.SUPABASE_URL,
+                settings.SUPABASE_ANON_KEY,
+                options,
             )
             
             logger.info("Supabase client initialized successfully")
@@ -67,7 +68,7 @@ async def get_supabase_client() -> Client:
             raise
 
 
-async def verify_pgvector_extension(client: Client):
+async def verify_pgvector_extension(client: AsyncClient):
     """
     Verify that pgvector extension is installed and configured.
     Creates necessary indexes if they don't exist.
@@ -85,7 +86,7 @@ async def verify_pgvector_extension(client: Client):
         logger.error(f"Error verifying pgvector extension: {str(e)}")
 
 
-def get_supabase_client_sync() -> Client:
+def get_supabase_client_sync() -> AsyncClient:
     """
     Synchronous version of get_supabase_client for non-async contexts.
     
@@ -101,7 +102,7 @@ class SupabaseQueryBuilder:
     Provides convenient methods for common query patterns.
     """
     
-    def __init__(self, client: Client):
+    def __init__(self, client: AsyncClient):
         self.client = client
         
     def memory_records(self):

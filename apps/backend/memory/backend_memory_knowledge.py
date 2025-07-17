@@ -16,7 +16,7 @@ from .models import (
     DocumentChunk, KnowledgeEntry, KnowledgeCategory,
     MemoryType, MemoryRecord
 )
-from .supabase_client import get_supabase_client
+from .supabase_client import get_supabase_client_sync
 from .vector_utils import generate_embedding, chunk_text_with_overlap
 from ..core.logging import get_logger
 
@@ -30,7 +30,7 @@ class KnowledgeManager:
     """
     
     def __init__(self):
-        self.supabase = get_supabase_client()
+        self.supabase = get_supabase_client_sync()
         
         # Chunking parameters optimized for different content types
         self.chunk_configs = {

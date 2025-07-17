@@ -20,7 +20,7 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from apps.backend.core.settings import settings
 from apps.backend.core.logging import get_logger
 from .backend_memory_vector_utils import generate_embeddings, cosine_similarity
-from .supabase_client import get_supabase_client
+from .supabase_client import get_supabase_client_sync
 
 
 logger = get_logger(__name__)
@@ -36,7 +36,7 @@ class KnowledgeManager:
     """
     
     def __init__(self):
-        self.supabase = get_supabase_client()
+        self.supabase = get_supabase_client_sync()
         self.encoding = tiktoken.encoding_for_model(settings.EMBEDDING_MODEL) if tiktoken else None
         
         # Configure text splitter for optimal chunk sizes
