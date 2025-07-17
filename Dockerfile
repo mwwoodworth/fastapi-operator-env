@@ -45,8 +45,8 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:${PORT}/health || exit 1
 
 # Expose port
-EXPOSE 8000
+EXPOSE $PORT
 
 # Start the FastAPI application with Uvicorn
 # Using apps.backend.main:app because main.py is in apps/backend/
-CMD ["uvicorn", "apps.backend.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]
+CMD ["uvicorn", "apps.backend.main:app", "--host", "0.0.0.0", "--port", "$PORT", "--workers", "2"]
