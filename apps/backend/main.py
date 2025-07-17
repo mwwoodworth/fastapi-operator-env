@@ -46,6 +46,9 @@ async def lifespan(app: FastAPI):
     logger.info("Starting BrainOps backend",
                 extra={"version": settings.APP_VERSION})
 
+    # Fail fast if essential configuration is missing
+    settings.ensure_critical_settings()
+
     try:
         # Initialize database connection and vector store
         await init_supabase()
