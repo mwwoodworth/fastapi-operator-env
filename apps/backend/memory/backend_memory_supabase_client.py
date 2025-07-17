@@ -8,6 +8,7 @@ connection pooling, and database schema management for BrainOps.
 from typing import Optional, Dict, Any
 import os
 from datetime import datetime, timedelta
+from functools import lru_cache
 from supabase import create_client, Client
 from postgrest import AsyncPostgrestClient
 import asyncio
