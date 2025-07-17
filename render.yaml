@@ -29,7 +29,7 @@ services:
           property: connectionString
       - key: SUPABASE_URL
         sync: false
-      - key: SUPABASE_KEY
+      - key: SUPABASE_ANON_KEY
         sync: false
       - key: GITHUB_TOKEN
         sync: false
@@ -70,7 +70,7 @@ services:
   #         property: connectionString
   #     - key: SUPABASE_URL
   #       sync: false
-  #     - key: SUPABASE_KEY
+  #     - key: SUPABASE_ANON_KEY
   #       sync: false
   #     - key: GITHUB_TOKEN
   #       sync: false

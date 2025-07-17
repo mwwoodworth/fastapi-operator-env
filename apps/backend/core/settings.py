@@ -414,6 +414,22 @@ class Settings(BaseSettings):
             }
         }
 
+    def ensure_critical_settings(self) -> None:
+        """Validate presence of essential runtime configuration."""
+        missing = []
+
+        if not self.SECRET_KEY or self.SECRET_KEY == "change-me-in-production":
+            missing.append("SECRET_KEY")
+        if not self.database_url:
+            missing.append("DATABASE_URL")
+        if not (self.SUPABASE_URL and self.SUPABASE_ANON_KEY):
+            missing.append("SUPABASE_URL/SUPABASE_ANON_KEY")
+
+        if missing:
+            raise ValueError(
+                f"Missing required settings: {', '.join(missing)}"
+            )
+
 
 # Create global settings instance
 settings = Settings()
