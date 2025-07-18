@@ -1,0 +1,86 @@
+services:
+  # Web Service - FastAPI Backend
+  - type: web
+    name: brainops-backend
+    runtime: docker
+    dockerfilePath: ./apps/backend/Dockerfile
+    repo: https://github.com/yourusername/fastapi-operator-env
+    branch: main
+    rootDir: .
+    envVars:
+      - key: APP_NAME
+        value: BrainOps
+      - key: ENVIRONMENT
+        value: production
+      - key: API_V1_PREFIX
+        value: /api/v1
+      - key: DATABASE_URL
+        fromDatabase:
+          name: brainops-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: brainops-redis
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      - key: WEBHOOK_SECRET
+        generateValue: true
+      # AI Keys (set in dashboard)
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      # Integration Keys (set in dashboard)
+      - key: STRIPE_API_KEY
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+    autoDeploy: true
+    healthCheckPath: /health
+    numInstances: 2
+    plan: standard
+
+  # Background Worker Service
+  - type: worker
+    name: brainops-worker
+    runtime: docker
+    dockerfilePath: ./apps/backend/Dockerfile
+    dockerCommand: celery -A celery_app worker --loglevel=info
+    repo: https://github.com/yourusername/fastapi-operator-env
+    branch: main
+    rootDir: .
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: brainops-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: brainops-redis
+          property: connectionString
+      - key: CELERY_BROKER_URL
+        fromService:
+          type: redis
+          name: brainops-redis
+          property: connectionString
+    autoDeploy: true
+    plan: starter
+
+databases:
+  - name: brainops-db
+    databaseName: brainops
+    postgresMajorVersion: 15
+    plan: standard
+
+services:
+  - type: redis
+    name: brainops-redis
+    ipAllowList: []
+    plan: standard
