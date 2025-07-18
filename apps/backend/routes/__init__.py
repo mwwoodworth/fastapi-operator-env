@@ -18,11 +18,14 @@ from .erp_compliance import router as erp_compliance
 from .erp_task_management import router as erp_task_management
 from .erp_financial import router as erp_financial
 from .erp_crm import router as erp_crm
+from .langgraph import router as langgraph
+from .weathercraft_features import router as weathercraft_features
 
 __all__ = [
     "agents", "auth", "memory", "tasks", "webhooks",
     "auth_extended", "users", "projects", "ai_services", 
     "automation", "marketplace", "erp_estimating",
     "erp_job_management", "erp_field_capture", "erp_compliance",
-    "erp_task_management", "erp_financial", "erp_crm"
+    "erp_task_management", "erp_financial", "erp_crm", "langgraph",
+    "weathercraft_features"
 ]

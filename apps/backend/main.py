@@ -34,7 +34,7 @@ try:
         auth_extended, users, projects, ai_services, 
         automation, marketplace, erp_estimating,
         erp_job_management, erp_field_capture, erp_compliance,
-        erp_task_management, erp_financial, erp_crm
+        erp_task_management, erp_financial, erp_crm, langgraph
     )
 except Exception as e:  # Re-added by Codex for import fix
     logger.error(f"Failed to import routes: {e}", exc_info=True)
@@ -42,7 +42,7 @@ except Exception as e:  # Re-added by Codex for import fix
     auth_extended = users = projects = ai_services = None
     automation = marketplace = None
     erp_estimating = erp_job_management = erp_field_capture = None
-    erp_compliance = erp_task_management = erp_financial = erp_crm = None
+    erp_compliance = erp_task_management = erp_financial = erp_crm = langgraph = None
 
 
 @asynccontextmanager
@@ -374,6 +374,25 @@ if erp_crm:
         erp_crm,
         prefix=f"{settings.API_V1_PREFIX}/crm",
         tags=["crm"]
+    )
+
+if langgraph:
+    app.include_router(
+        langgraph,
+        prefix=f"{settings.API_V1_PREFIX}/langgraph",
+        tags=["langgraph"]
+    )
+
+# Import weathercraft features
+try:
+    from .routes import weathercraft_features
+except ImportError:
+    weathercraft_features = None
+
+if weathercraft_features:
+    app.include_router(
+        weathercraft_features,
+        tags=["weathercraft"]
     )
 
 
