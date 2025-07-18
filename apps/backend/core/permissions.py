@@ -1,5 +1,7 @@
 """
 Permission management utilities for BrainOps backend.
+
+This module provides backward compatibility while using the new RBAC system.
 """
 
 from typing import List, Optional
@@ -7,6 +9,12 @@ from functools import wraps
 from fastapi import Depends, HTTPException, status
 
 from .auth import get_current_user
+from .rbac import (
+    RBACService, Permission, PermissionChecker,
+    require_permission as rbac_require_permission,
+    require_any_permission as rbac_require_any_permission,
+    require_all_permissions as rbac_require_all_permissions
+)
 from ..db.business_models import User, UserRole
 
 
