@@ -13,20 +13,25 @@ from .settings import settings
 logger = logging.getLogger(__name__)
 
 # Create database engine
-if settings.DATABASE_URL.startswith("sqlite"):
+if settings.database_url.startswith("sqlite"):
     # SQLite specific settings
     engine = create_engine(
-        settings.DATABASE_URL,
+        settings.database_url,
         connect_args={"check_same_thread": False},
         poolclass=NullPool
     )
 else:
     # PostgreSQL/MySQL settings
+    # Use default pool settings if not defined
+    pool_size = getattr(settings, 'DB_POOL_SIZE', 20)
+    max_overflow = getattr(settings, 'DB_MAX_OVERFLOW', 40)
+    pool_timeout = getattr(settings, 'DB_POOL_TIMEOUT', 30)
+    
     engine = create_engine(
-        settings.DATABASE_URL,
-        pool_size=settings.DB_POOL_SIZE,
-        max_overflow=settings.DB_MAX_OVERFLOW,
-        pool_timeout=settings.DB_POOL_TIMEOUT,
+        settings.database_url,
+        pool_size=pool_size,
+        max_overflow=max_overflow,
+        pool_timeout=pool_timeout,
         pool_pre_ping=True  # Verify connections before using
     )
 

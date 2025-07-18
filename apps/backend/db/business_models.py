@@ -156,7 +156,7 @@ class Project(Base):
     completed_at = Column(DateTime, nullable=True)
     
     # Custom fields
-    metadata = Column(JSON, default={})
+    meta_data = Column(JSON, default={})  # Renamed from metadata to avoid SQLAlchemy conflict
     tags = Column(JSON, default=[])
     
     # Timestamps
@@ -446,7 +446,7 @@ class Document(Base):
     # Processing
     is_processed = Column(Boolean, default=False)
     extracted_text = Column(Text, nullable=True)
-    metadata = Column(JSON, default={})
+    meta_data = Column(JSON, default={})  # Renamed from metadata to avoid SQLAlchemy conflict
     
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)

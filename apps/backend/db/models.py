@@ -103,7 +103,7 @@ class MemoryEntry(Base):
     
     # Content and metadata
     content = Column(Text, nullable=False)
-    metadata = Column(JSON, default={})
+    meta_data = Column(JSON, default={})  # Renamed from metadata to avoid SQLAlchemy conflict
     embedding = Column(JSON, nullable=True)  # Store as JSON array for pgvector
     
     # Context and ownership

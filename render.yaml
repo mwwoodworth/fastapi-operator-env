@@ -1,14 +1,12 @@
 services:
-  # BrainStackStudio FastAPI Backend
+  # BrainOps FastAPI Backend
   - type: web
-    name: brainstackstudio-backend
-    runtime: python
-    plan: free
+    name: brainops-backend
+    runtime: docker
+    plan: starter
     region: oregon
-    branch: main
-    rootDir: .
-    buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn apps.backend.main:app --host 0.0.0.0 --port $PORT
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
     healthCheckPath: /health
     envVars:
       - key: OPENAI_API_KEY
@@ -19,13 +17,12 @@ services:
         sync: false
       - key: DATABASE_URL
         fromDatabase:
-          type: postgres
-          name: brainstackstudio-db
+          name: brainops-db
           property: connectionString
       - key: REDIS_URL
         fromService:
           type: redis
-          name: brainstackstudio-redis
+          name: brainops-redis
           property: connectionString
       - key: SUPABASE_URL
         sync: false
@@ -83,15 +80,15 @@ services:
   #   pythonVersion: 3.11
 
 databases:
-  - name: brainstackstudio-db
-    databaseName: brainstackstudio
-    user: brainstackstudio_user
-    plan: free
+  - name: brainops-db
+    databaseName: brainops
+    user: brainops_user
+    plan: starter
     region: oregon
     ipAllowList: []
 
   - type: redis
-    name: brainstackstudio-redis
-    plan: free
+    name: brainops-redis
+    plan: starter
     region: oregon
     ipAllowList: []
