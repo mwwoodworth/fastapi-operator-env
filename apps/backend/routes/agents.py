@@ -379,7 +379,27 @@ async def visualize_agent_graph(
 async def notify_agent_decision(task_id: str, approval_id: str, decision: str, reason: str = None):
     """Notify waiting agent of approval decision."""
     # Implementation would send message to agent execution queue
-    pass
+    from ..core.redis_client import redis_client
+    
+    notification = {
+        "task_id": task_id,
+        "approval_id": approval_id,
+        "decision": decision,
+        "reason": reason,
+        "timestamp": datetime.utcnow().isoformat()
+    }
+    
+    # Publish to agent's decision channel
+    channel = f"agent:decisions:{task_id}"
+    await redis_client.publish(channel, json.dumps(notification))
+    
+    # Also store decision for persistence
+    decision_key = f"agent:decision:{task_id}:{approval_id}"
+    await redis_client.setex(
+        decision_key,
+        3600,  # 1 hour TTL
+        json.dumps(notification)
+    )
 
 
 async def subscribe_to_agent_events(task_id: str, user_id: str):
@@ -391,4 +411,13 @@ async def subscribe_to_agent_events(task_id: str, user_id: str):
 async def unsubscribe_from_agent_events(task_id: str, user_id: str):
     """Clean up agent event subscription."""
     # Implementation would remove event queue subscription
-    pass
+    from ..core.redis_client import redis_client
+    
+    # Remove user from subscribers list
+    subscribers_key = f"agent:subscribers:{task_id}"
+    await redis_client.srem(subscribers_key, user_id)
+    
+    # Clean up if no more subscribers
+    remaining = await redis_client.scard(subscribers_key)
+    if remaining == 0:
+        await redis_client.delete(subscribers_key)

@@ -25,9 +25,15 @@ from .tasks import register_all_tasks
 
 # Import all route modules
 try:
-    from .routes import tasks, auth, memory, webhooks, agents
+    from .routes import (
+        tasks, auth, memory, webhooks, agents,
+        auth_extended, users, projects, ai_services, 
+        automation, marketplace
+    )
 except Exception:  # Re-added by Codex for import fix
     tasks = auth = memory = webhooks = agents = None
+    auth_extended = users = projects = ai_services = None
+    automation = marketplace = None
 
 # Configure logging before anything else
 configure_logging()
@@ -224,37 +230,85 @@ async def add_request_id(request: Request, call_next):
 # Mount API routes with clear versioning
 if tasks:
     app.include_router(
-        tasks.router,
+        tasks,
         prefix=f"{settings.API_V1_PREFIX}/tasks",
         tags=["tasks"]
     )
 
 if auth:
     app.include_router(
-        auth.router,
+        auth,
         prefix=f"{settings.API_V1_PREFIX}/auth",
         tags=["authentication"]
     )
 
 if memory:
     app.include_router(
-        memory.router,
+        memory,
         prefix=f"{settings.API_V1_PREFIX}/memory",
         tags=["memory"]
     )
 
 if webhooks:
     app.include_router(
-        webhooks.router,
+        webhooks,
         prefix=f"{settings.API_V1_PREFIX}/webhooks",
         tags=["webhooks"]
     )
 
 if agents:
     app.include_router(
-        agents.router,
+        agents,
         prefix=f"{settings.API_V1_PREFIX}/agents",
         tags=["agents"]
+    )
+
+# Mount extended auth routes
+if auth_extended:
+    app.include_router(
+        auth_extended,
+        prefix=f"{settings.API_V1_PREFIX}/auth",
+        tags=["authentication"]
+    )
+
+# Mount user management routes
+if users:
+    app.include_router(
+        users.router,
+        prefix=f"{settings.API_V1_PREFIX}/users",
+        tags=["users"]
+    )
+
+# Mount project management routes
+if projects:
+    app.include_router(
+        projects.router,
+        prefix=f"{settings.API_V1_PREFIX}/projects",
+        tags=["projects"]
+    )
+
+# Mount AI service routes
+if ai_services:
+    app.include_router(
+        ai_services.router,
+        prefix=f"{settings.API_V1_PREFIX}/ai",
+        tags=["ai-services"]
+    )
+
+# Mount automation routes
+if automation:
+    app.include_router(
+        automation.router,
+        prefix=f"{settings.API_V1_PREFIX}/workflows",
+        tags=["automation"]
+    )
+
+# Mount marketplace routes
+if marketplace:
+    app.include_router(
+        marketplace.router,
+        prefix=f"{settings.API_V1_PREFIX}/marketplace",
+        tags=["marketplace"]
     )
 
 

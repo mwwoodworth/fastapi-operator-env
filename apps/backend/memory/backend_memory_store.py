@@ -101,3 +101,7 @@ async def update_approval_status(*args, **kwargs):
 async def log_agent_execution(*args, **kwargs):
     """Log agent execution stub."""
     return True
+
+async def get_relevant_memories(*args, **kwargs):
+    """Get relevant memories stub."""
+    return []
