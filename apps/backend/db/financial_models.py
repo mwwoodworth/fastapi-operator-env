@@ -59,6 +59,8 @@ class Customer(Base):
     invoices = relationship("Invoice", back_populates="customer")
     estimates = relationship("Estimate", back_populates="customer")
     jobs = relationship("Job", back_populates="customer")
+    opportunities = relationship("Opportunity", back_populates="customer")
+    contacts = relationship("Contact", back_populates="customer")
     
     __table_args__ = (
         Index("idx_customer_email", "email"),

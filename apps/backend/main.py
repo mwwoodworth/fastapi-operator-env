@@ -34,7 +34,7 @@ try:
         auth_extended, users, projects, ai_services, 
         automation, marketplace, erp_estimating,
         erp_job_management, erp_field_capture, erp_compliance,
-        erp_task_management, erp_financial
+        erp_task_management, erp_financial, erp_crm
     )
 except Exception as e:  # Re-added by Codex for import fix
     logger.error(f"Failed to import routes: {e}", exc_info=True)
@@ -42,7 +42,7 @@ except Exception as e:  # Re-added by Codex for import fix
     auth_extended = users = projects = ai_services = None
     automation = marketplace = None
     erp_estimating = erp_job_management = erp_field_capture = None
-    erp_compliance = erp_task_management = erp_financial = None
+    erp_compliance = erp_task_management = erp_financial = erp_crm = None
 
 
 @asynccontextmanager
@@ -367,6 +367,13 @@ if erp_financial:
         erp_financial,
         prefix=f"{settings.API_V1_PREFIX}/erp",
         tags=["erp-financial"]
+    )
+
+if erp_crm:
+    app.include_router(
+        erp_crm,
+        prefix=f"{settings.API_V1_PREFIX}/crm",
+        tags=["crm"]
     )
 
 
