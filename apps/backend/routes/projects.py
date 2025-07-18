@@ -10,7 +10,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import or_, and_, func
+from sqlalchemy import or_, and_, func, Integer
 from pydantic import BaseModel
 
 from ..core.database import get_db
@@ -27,24 +27,24 @@ router = APIRouter()
 # Pydantic models
 class ProjectCreate(BaseModel):
     name: str
-    description: Optional[str]
+    description: Optional[str] = None
     project_type: str = "general"
-    team_id: Optional[str]
-    start_date: Optional[datetime]
-    due_date: Optional[datetime]
+    team_id: Optional[str] = None
+    start_date: Optional[datetime] = None
+    due_date: Optional[datetime] = None
     metadata: dict = {}
     tags: List[str] = []
 
 
 class ProjectUpdate(BaseModel):
-    name: Optional[str]
-    description: Optional[str]
-    status: Optional[str]
-    priority: Optional[str]
-    start_date: Optional[datetime]
-    due_date: Optional[datetime]
-    metadata: Optional[dict]
-    tags: Optional[List[str]]
+    name: Optional[str] = None
+    description: Optional[str] = None
+    status: Optional[str] = None
+    priority: Optional[str] = None
+    start_date: Optional[datetime] = None
+    due_date: Optional[datetime] = None
+    metadata: Optional[dict] = None
+    tags: Optional[List[str]] = None
 
 
 class ProjectResponse(BaseModel):
@@ -70,27 +70,27 @@ class ProjectResponse(BaseModel):
 
 class TaskCreate(BaseModel):
     title: str
-    description: Optional[str]
+    description: Optional[str] = None
     status: str = "todo"
     priority: str = "medium"
-    assignee_id: Optional[str]
-    due_date: Optional[datetime]
-    estimated_hours: Optional[float]
+    assignee_id: Optional[str] = None
+    due_date: Optional[datetime] = None
+    estimated_hours: Optional[float] = None
     tags: List[str] = []
     checklist: List[dict] = []
 
 
 class TaskUpdate(BaseModel):
-    title: Optional[str]
-    description: Optional[str]
-    status: Optional[str]
-    priority: Optional[str]
-    assignee_id: Optional[str]
-    due_date: Optional[datetime]
-    estimated_hours: Optional[float]
-    actual_hours: Optional[float]
-    tags: Optional[List[str]]
-    checklist: Optional[List[dict]]
+    title: Optional[str] = None
+    description: Optional[str] = None
+    status: Optional[str] = None
+    priority: Optional[str] = None
+    assignee_id: Optional[str] = None
+    due_date: Optional[datetime] = None
+    estimated_hours: Optional[float] = None
+    actual_hours: Optional[float] = None
+    tags: Optional[List[str]] = None
+    checklist: Optional[List[dict]] = None
 
 
 class TaskResponse(BaseModel):
@@ -194,7 +194,7 @@ async def create_project(
         team_id=project_data.team_id,
         start_date=project_data.start_date,
         due_date=project_data.due_date,
-        metadata=project_data.metadata,
+        meta_data=project_data.metadata,
         tags=project_data.tags
     )
     
@@ -438,11 +438,11 @@ async def get_project_stats(
     # Get task stats
     task_stats = db.query(
         func.count(ProjectTask.id).label('total'),
-        func.sum(func.cast(ProjectTask.status == 'done', db.Integer)).label('completed'),
-        func.sum(func.cast(ProjectTask.status == 'in_progress', db.Integer)).label('in_progress'),
+        func.sum(func.cast(ProjectTask.status == 'done', Integer)).label('completed'),
+        func.sum(func.cast(ProjectTask.status == 'in_progress', Integer)).label('in_progress'),
         func.sum(func.cast(
             and_(ProjectTask.due_date < datetime.utcnow(), ProjectTask.status != 'done'),
-            db.Integer
+            Integer
         )).label('overdue'),
         func.sum(ProjectTask.estimated_hours).label('estimated'),
         func.sum(ProjectTask.actual_hours).label('actual')
@@ -717,10 +717,14 @@ async def assign_task(
     return {"message": "Task assigned successfully"}
 
 
+class CompleteTaskRequest(BaseModel):
+    actual_hours: Optional[float] = None
+
+
 @router.post("/tasks/{task_id}/complete")
 async def complete_task(
     task_id: UUID,
-    actual_hours: Optional[float] = None,
+    request: CompleteTaskRequest = CompleteTaskRequest(),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -742,8 +746,8 @@ async def complete_task(
     
     task.status = "done"
     task.completed_at = datetime.utcnow()
-    if actual_hours is not None:
-        task.actual_hours = actual_hours
+    if request.actual_hours is not None:
+        task.actual_hours = request.actual_hours
     
     db.commit()
     
@@ -942,8 +946,8 @@ def format_project_response(project: Project, db: Session) -> ProjectResponse:
         start_date=project.start_date,
         due_date=project.due_date,
         completed_at=project.completed_at,
-        metadata=project.metadata,
-        tags=project.tags,
+        metadata=project.meta_data or {},
+        tags=project.tags or [],
         member_count=len(project.members),
         task_count=len(project.tasks),
         completed_task_count=completed_tasks,

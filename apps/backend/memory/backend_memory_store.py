@@ -34,7 +34,14 @@ async def get_user_by_email(*args, **kwargs):
 
 async def create_user(*args, **kwargs):
     """Create user stub."""
-    return {"id": "new-user"}
+    from .models import User
+    import uuid
+    return User(
+        id=str(uuid.uuid4()),
+        email=kwargs.get("email", "test@example.com"),
+        username=kwargs.get("username") or kwargs.get("email", "").split("@")[0],
+        is_active=True
+    )
 
 async def update_user_last_login(*args, **kwargs):
     """Update user last login stub."""
@@ -105,3 +112,14 @@ async def log_agent_execution(*args, **kwargs):
 async def get_relevant_memories(*args, **kwargs):
     """Get relevant memories stub."""
     return []
+
+
+def get_prompt_template(template_name: str) -> str:
+    """Get a prompt template by name."""
+    # TODO: implement proper template management
+    templates = {
+        "default": "You are a helpful AI assistant.",
+        "code_review": "You are a code review expert. Analyze the following code:",
+        "task_planning": "You are a task planning assistant. Help break down the following task:",
+    }
+    return templates.get(template_name, templates["default"])

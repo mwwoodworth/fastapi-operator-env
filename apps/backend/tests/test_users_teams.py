@@ -245,7 +245,8 @@ class TestTeamManagement:
         )
         
         assert response.status_code == 400
-        assert "slug already exists" in response.json()["detail"]
+        error_data = response.json()
+        assert "slug already exists" in error_data.get("detail", "") or "slug already exists" in error_data.get("message", "")
     
     def test_list_teams(self, client: TestClient, test_team: Team, auth_headers: dict):
         """Test listing teams."""
@@ -460,4 +461,5 @@ class TestTeamManagement:
         )
         
         assert response.status_code == 400
-        assert "member limit" in response.json()["detail"]
+        error_data = response.json()
+        assert "member limit" in error_data.get("detail", "") or "member limit" in error_data.get("message", "")

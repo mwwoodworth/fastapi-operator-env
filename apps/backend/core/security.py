@@ -29,9 +29,9 @@ class SecurityManager:
     """Manages security operations for the application."""
     
     def __init__(self):
-        self.secret_key = settings.SECRET_KEY
-        self.algorithm = "HS256"
-        self.access_token_expire_minutes = 30
+        self.secret_key = settings.JWT_SECRET
+        self.algorithm = settings.JWT_ALGORITHM
+        self.access_token_expire_minutes = settings.ACCESS_TOKEN_EXPIRE_MINUTES
     
     def create_access_token(self, data: Dict[str, Any], expires_delta: Optional[timedelta] = None) -> str:
         """
@@ -172,10 +172,28 @@ def decode_token(token: str) -> Dict[str, Any]:
 # Re-added by Codex for import fix
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Security(security),
-) -> Dict[str, Any]:
-    """FastAPI dependency returning the current user payload."""
+):
+    """FastAPI dependency returning the current user from database."""
+    from ..db.business_models import User
+    from ..core.database import get_db
+    from sqlalchemy.orm import Session
+    from fastapi import Depends
+    
     payload = security_manager.verify_token(credentials)
-    return {"user_id": payload.get("sub"), "email": payload.get("sub")}
+    email = payload.get("sub")
+    
+    # Return a dependency function that gets the actual user
+    async def _get_user_from_db(db: Session = Depends(get_db)):
+        user = db.query(User).filter(User.email == email).first()
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="User not found"
+            )
+        return user
+    
+    # For now, return the payload
+    return User(email=email, id=payload.get("user_id", email))
 
 
 # Re-added by Codex for import fix

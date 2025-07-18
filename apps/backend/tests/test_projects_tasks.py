@@ -86,6 +86,9 @@ class TestProjectManagement:
             }
         )
         
+        if response.status_code != 200:
+            print(f"Response status: {response.status_code}")
+            print(f"Response body: {response.text}")
         assert response.status_code == 200
         data = response.json()
         assert data["name"] == "New Project"
@@ -159,6 +162,9 @@ class TestProjectManagement:
             }
         )
         
+        if response.status_code != 200:
+            print(f"Response status: {response.status_code}")
+            print(f"Response body: {response.text}")
         assert response.status_code == 200
         data = response.json()
         assert data["name"] == "Updated Project"
@@ -260,6 +266,9 @@ class TestTaskManagement:
             }
         )
         
+        if response.status_code != 200:
+            print(f"Response status: {response.status_code}")
+            print(f"Response body: {response.text}")
         assert response.status_code == 200
         data = response.json()
         assert data["title"] == "New Task"
@@ -432,17 +441,21 @@ class TestTaskManagement:
 class TestProjectAccessControl:
     """Test project access control."""
     
-    def test_non_member_cannot_view_project(self, client: TestClient, test_project: Project):
+    def test_non_member_cannot_view_project(self, client: TestClient, test_project: Project, test_db: Session):
         """Test that non-members cannot view project."""
         # Create another user
         other_user = User(
             email="other@example.com",
             username="other",
             hashed_password="hashed",
-            is_active=True
+            is_active=True,
+            is_verified=True
         )
+        test_db.add(other_user)
+        test_db.commit()
+        test_db.refresh(other_user)
         
-        token = create_access_token(data={"sub": other_user.email})
+        token = create_access_token(data={"sub": other_user.email, "user_id": str(other_user.id)})
         headers = {"Authorization": f"Bearer {token}"}
         
         response = client.get(f"/api/v1/projects/{test_project.id}", headers=headers)

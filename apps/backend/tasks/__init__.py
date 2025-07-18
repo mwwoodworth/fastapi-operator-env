@@ -94,3 +94,27 @@ def list_tasks() -> Dict[str, str]:
 # Re-added by Codex for import fix
 def get_task_registry() -> Dict[str, Callable]:
     return task_registry
+
+
+async def execute_task(task_name: str, **kwargs) -> Any:
+    """
+    Execute a task by name.
+    
+    Args:
+        task_name: Name of the task to execute
+        **kwargs: Arguments to pass to the task
+        
+    Returns:
+        Task result
+        
+    Raises:
+        KeyError: If task not found
+    """
+    task = get_task(task_name)
+    
+    # Check if task is async
+    import asyncio
+    if asyncio.iscoroutinefunction(task):
+        return await task(**kwargs)
+    else:
+        return task(**kwargs)

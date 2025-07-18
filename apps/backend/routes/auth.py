@@ -17,26 +17,111 @@ from ..core.security import (
     get_password_hash,
     create_access_token,
     create_refresh_token,
-    decode_token,
-    get_current_user,
-    get_current_active_user
+    decode_token
 )
+from ..core.auth import authenticate_user
 from ..core.settings import settings
-from ..memory.models import User, UserCreate, UserLogin, TokenResponse
-from ..memory.memory_store import (
+from ..db.business_models import User
+from ..core.database import get_db
+from sqlalchemy.orm import Session
+from pydantic import BaseModel
+from typing import Optional
+from ..core.auth_utils import (
     get_user_by_email,
     create_user,
     update_user_last_login,
     invalidate_refresh_token,
-    validate_refresh_token
+    validate_refresh_token,
+    update_user_profile,
+    update_user_password,
+    invalidate_all_user_tokens,
+    verify_email_token
 )
+from fastapi import Depends
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from jose import jwt, JWTError
+
+security = HTTPBearer()
+
+# Pydantic models for auth
+class UserCreate(BaseModel):
+    email: str
+    username: Optional[str] = None
+    password: str
+    full_name: Optional[str] = None
+    company: Optional[str] = None
+    role: Optional[str] = "USER"
+
+class UserLogin(BaseModel):
+    email: str
+    password: str
+
+class TokenResponse(BaseModel):
+    access_token: str
+    refresh_token: str
+    token_type: str = "bearer"
+    expires_in: int
+
+class RefreshTokenRequest(BaseModel):
+    refresh_token: str
+
+class LogoutRequest(BaseModel):
+    refresh_token: str
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    db: Session = Depends(get_db)
+) -> User:
+    """Get current user from token."""
+    token = credentials.credentials
+    try:
+        payload = jwt.decode(
+            token, 
+            settings.JWT_SECRET, 
+            algorithms=[settings.JWT_ALGORITHM]
+        )
+        email = payload.get("sub")
+        if not email:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Could not validate credentials - no email in token"
+            )
+    except JWTError as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"Could not validate credentials - JWT error: {str(e)}"
+        )
+    
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found"
+        )
+    
+    return user
+
+def get_current_active_user(
+    current_user: User = Depends(get_current_user)
+) -> User:
+    """Get current active user."""
+    if not current_user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Inactive user"
+        )
+    return current_user
 
 
 router = APIRouter()
 
 
-@router.post("/register", response_model=User)
-async def register(user_data: UserCreate) -> User:
+@router.post("/register", status_code=status.HTTP_201_CREATED)
+async def register(user_data: UserCreate, db: Session = Depends(get_db)):
     """
     Register a new user account.
     
@@ -44,7 +129,7 @@ async def register(user_data: UserCreate) -> User:
     if email service is configured.
     """
     # Check if user already exists
-    existing_user = await get_user_by_email(user_data.email)
+    existing_user = await get_user_by_email(user_data.email, db)
     if existing_user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -57,10 +142,12 @@ async def register(user_data: UserCreate) -> User:
     # Create user record with additional metadata
     user = await create_user(
         email=user_data.email,
+        username=user_data.username,
         hashed_password=hashed_password,
         full_name=user_data.full_name,
         company=user_data.company,
-        role=user_data.role or "user"
+        role=user_data.role or "USER",
+        db=db
     )
     
     # TODO: Send verification email if email service is configured
@@ -70,16 +157,16 @@ async def register(user_data: UserCreate) -> User:
 
 
 @router.post("/login", response_model=TokenResponse)
-async def login(form_data: OAuth2PasswordRequestForm = Depends()) -> TokenResponse:
+async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)) -> TokenResponse:
     """
     Authenticate user and return access/refresh tokens.
     
     Validates credentials and returns JWT tokens for API access.
     """
     # Authenticate user credentials
-    user = await get_user_by_email(form_data.username)  # username is email
+    user = await authenticate_user(form_data.username, form_data.password, db)
     
-    if not user or not verify_password(form_data.password, user.hashed_password):
+    if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",
@@ -95,14 +182,14 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()) -> TokenRespon
     
     # Generate access and refresh tokens
     access_token = create_access_token(
-        data={"sub": user.email, "user_id": user.id}
+        data={"sub": user.email, "user_id": str(user.id)}
     )
     refresh_token = create_refresh_token(
-        data={"sub": user.email, "user_id": user.id}
+        data={"sub": user.email, "user_id": str(user.id)}
     )
     
     # Update last login timestamp
-    await update_user_last_login(user.id)
+    await update_user_last_login(str(user.id), db)
     
     return TokenResponse(
         access_token=access_token,
@@ -113,7 +200,7 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()) -> TokenRespon
 
 
 @router.post("/refresh", response_model=TokenResponse)
-async def refresh_token(refresh_token: str) -> TokenResponse:
+async def refresh_token(request: RefreshTokenRequest, db: Session = Depends(get_db)) -> TokenResponse:
     """
     Refresh access token using valid refresh token.
     
@@ -122,7 +209,7 @@ async def refresh_token(refresh_token: str) -> TokenResponse:
     """
     # Decode and validate refresh token
     try:
-        payload = decode_token(refresh_token)
+        payload = decode_token(request.refresh_token)
         email = payload.get("sub")
         user_id = payload.get("user_id")
         
@@ -136,7 +223,7 @@ async def refresh_token(refresh_token: str) -> TokenResponse:
         )
     
     # Validate token hasn't been revoked
-    is_valid = await validate_refresh_token(refresh_token, user_id)
+    is_valid = await validate_refresh_token(request.refresh_token, user_id, db)
     if not is_valid:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -144,7 +231,7 @@ async def refresh_token(refresh_token: str) -> TokenResponse:
         )
     
     # Get user and verify still active
-    user = await get_user_by_email(email)
+    user = await get_user_by_email(email, db)
     if not user or not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -153,12 +240,12 @@ async def refresh_token(refresh_token: str) -> TokenResponse:
     
     # Issue new access token (keep same refresh token)
     new_access_token = create_access_token(
-        data={"sub": user.email, "user_id": user.id}
+        data={"sub": user.email, "user_id": str(user.id)}
     )
     
     return TokenResponse(
         access_token=new_access_token,
-        refresh_token=refresh_token,  # Return same refresh token
+        refresh_token=request.refresh_token,  # Return same refresh token
         token_type="bearer",
         expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60
     )
@@ -166,8 +253,9 @@ async def refresh_token(refresh_token: str) -> TokenResponse:
 
 @router.post("/logout")
 async def logout(
-    refresh_token: str,
-    current_user: User = Depends(get_current_user)
+    request: LogoutRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ) -> Dict[str, str]:
     """
     Logout user and invalidate refresh token.
@@ -176,15 +264,15 @@ async def logout(
     Access tokens remain valid until expiration.
     """
     # Invalidate the refresh token
-    await invalidate_refresh_token(refresh_token, current_user.id)
+    await invalidate_refresh_token(request.refresh_token, str(current_user.id), db)
     
     return {"message": "Successfully logged out"}
 
 
-@router.get("/me", response_model=User)
+@router.get("/me")
 async def get_current_user_profile(
     current_user: User = Depends(get_current_active_user)
-) -> User:
+):
     """
     Get current authenticated user profile.
     
@@ -193,11 +281,12 @@ async def get_current_user_profile(
     return current_user
 
 
-@router.put("/me", response_model=User)
+@router.put("/me")
 async def update_profile(
     profile_update: Dict[str, Any],
-    current_user: User = Depends(get_current_active_user)
-) -> User:
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
     """
     Update current user profile.
     
@@ -209,16 +298,16 @@ async def update_profile(
     update_data = {k: v for k, v in profile_update.items() if k not in protected_fields}
     
     # Update user profile
-    updated_user = await update_user_profile(current_user.id, update_data)
+    updated_user = await update_user_profile(str(current_user.id), update_data, db)
     
     return updated_user
 
 
 @router.post("/change-password")
 async def change_password(
-    current_password: str,
-    new_password: str,
-    current_user: User = Depends(get_current_active_user)
+    request: ChangePasswordRequest,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
 ) -> Dict[str, str]:
     """
     Change user password.
@@ -226,38 +315,38 @@ async def change_password(
     Requires current password verification before updating to new password.
     """
     # Verify current password
-    if not verify_password(current_password, current_user.hashed_password):
+    if not verify_password(request.current_password, current_user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Current password is incorrect"
         )
     
     # Validate new password strength
-    if len(new_password) < 8:
+    if len(request.new_password) < 8:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Password must be at least 8 characters long"
         )
     
     # Hash and update password
-    new_hashed_password = get_password_hash(new_password)
-    await update_user_password(current_user.id, new_hashed_password)
+    new_hashed_password = get_password_hash(request.new_password)
+    await update_user_password(str(current_user.id), new_hashed_password, db)
     
     # Invalidate all existing refresh tokens for security
-    await invalidate_all_user_tokens(current_user.id)
+    await invalidate_all_user_tokens(str(current_user.id), db)
     
     return {"message": "Password successfully changed. Please login again."}
 
 
 @router.post("/verify-email/{token}")
-async def verify_email(token: str) -> Dict[str, str]:
+async def verify_email(token: str, db: Session = Depends(get_db)) -> Dict[str, str]:
     """
     Verify user email address using verification token.
     
     Completes email verification process for new user accounts.
     """
     # Validate and process email verification token
-    user = await verify_email_token(token)
+    user = await verify_email_token(token, db)
     
     if not user:
         raise HTTPException(

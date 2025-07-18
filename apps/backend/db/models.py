@@ -8,13 +8,13 @@ These models map to tables in the Supabase PostgreSQL database.
 from datetime import datetime
 from typing import Optional, Dict, Any, List
 from sqlalchemy import Column, String, DateTime, JSON, Boolean, Text, Integer, ForeignKey, Index
-from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
-from sqlalchemy.dialects.postgresql import UUID
 import uuid
 
-# SQLAlchemy declarative base for all models
-Base = declarative_base()
+# Import Base from core.database to ensure all models use the same Base
+from ..core.database import Base
+# Import custom UUID type that works with both PostgreSQL and SQLite
+from .types import UUID
 
 
 class TaskExecution(Base):

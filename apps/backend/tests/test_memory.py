@@ -15,53 +15,16 @@ from ..core.database import get_db
 from ..core.auth import create_access_token
 from ..db.business_models import User, UserRole, Memory
 
-
-@pytest.fixture
-def client():
-    """Create test client."""
-    return TestClient(app)
+# Using fixtures from conftest.py instead of redefining
 
 
-@pytest.fixture
-def test_db():
-    """Create test database session."""
-    from ..core.database import SessionLocal
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-
-@pytest.fixture
-def test_user(test_db: Session):
-    """Create a test user."""
-    user = User(
-        email="memory@example.com",
-        username="memoryuser",
-        hashed_password="hashedpassword",
-        full_name="Memory Test User",
-        is_active=True,
-        is_verified=True,
-        role=UserRole.USER
-    )
-    test_db.add(user)
-    test_db.commit()
-    test_db.refresh(user)
-    return user
-
-
-@pytest.fixture
-def auth_headers(test_user):
-    """Create authentication headers."""
-    token = create_access_token({"sub": test_user.email})
-    return {"Authorization": f"Bearer {token}"}
+# Removed duplicate fixtures that are in conftest.py
 
 
 class TestMemoryManagement:
     """Test memory CRUD operations."""
     
-    @patch('apps.backend.routes.memory.VectorStore')
+    @patch('apps.backend.memory.vector_store.VectorStore')
     def test_create_memory(self, mock_vector_store, client, auth_headers):
         """Test creating a new memory."""
         mock_store = mock_vector_store.return_value
@@ -89,18 +52,20 @@ class TestMemoryManagement:
         # Create test memories
         memory1 = Memory(
             user_id=test_user.id,
+            title="Test Memory 1",
             content="Test memory 1",
             memory_type="note",
             tags=["test"],
-            metadata={},
+            meta_data={},
             embedding=[0.1] * 1536  # Mock embedding
         )
         memory2 = Memory(
             user_id=test_user.id,
+            title="Test Memory 2",
             content="Test memory 2",
             memory_type="document",
             tags=["test", "doc"],
-            metadata={"source": "upload"}
+            meta_data={"source": "upload"}
         )
         test_db.add_all([memory1, memory2])
         test_db.commit()
@@ -120,10 +85,11 @@ class TestMemoryManagement:
         """Test getting a specific memory."""
         memory = Memory(
             user_id=test_user.id,
+            title="Specific Memory",
             content="Specific memory content",
             memory_type="note",
             tags=["specific"],
-            metadata={"created_by": "test"}
+            meta_data={"created_by": "test"}
         )
         test_db.add(memory)
         test_db.commit()
@@ -143,10 +109,11 @@ class TestMemoryManagement:
         """Test updating a memory."""
         memory = Memory(
             user_id=test_user.id,
+            title="Original Memory",
             content="Original content",
             memory_type="note",
             tags=["original"],
-            metadata={}
+            meta_data={}
         )
         test_db.add(memory)
         test_db.commit()
@@ -171,10 +138,11 @@ class TestMemoryManagement:
         """Test deleting a memory."""
         memory = Memory(
             user_id=test_user.id,
+            title="Memory to Delete",
             content="To be deleted",
             memory_type="note",
             tags=["delete"],
-            metadata={}
+            meta_data={}
         )
         test_db.add(memory)
         test_db.commit()
@@ -310,10 +278,11 @@ class TestMemoryCollections:
         # Create a memory first
         memory = Memory(
             user_id=test_user.id,
+            title="Collection Memory",
             content="Memory for collection",
             memory_type="note",
             tags=["collection"],
-            metadata={}
+            meta_data={}
         )
         test_db.add(memory)
         test_db.commit()
@@ -382,10 +351,11 @@ class TestMemoryImportExport:
         for i in range(3):
             memory = Memory(
                 user_id=test_user.id,
+                title=f"Export Memory {i}",
                 content=f"Export memory {i}",
                 memory_type="note",
                 tags=["export"],
-                metadata={"index": i}
+                meta_data={"index": i}
             )
             memories.append(memory)
         test_db.add_all(memories)
@@ -412,10 +382,11 @@ class TestMemorySharing:
         """Test sharing a memory with another user."""
         memory = Memory(
             user_id=test_user.id,
+            title="Shared Memory",
             content="Shared memory content",
             memory_type="note",
             tags=["shared"],
-            metadata={}
+            meta_data={}
         )
         test_db.add(memory)
         

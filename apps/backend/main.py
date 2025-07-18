@@ -23,21 +23,26 @@ from .core.scheduler import scheduler
 from .memory.supabase_client import init_supabase
 from .tasks import register_all_tasks
 
+# Configure logging before anything else
+configure_logging()
+logger = get_logger(__name__)
+
 # Import all route modules
 try:
     from .routes import (
         tasks, auth, memory, webhooks, agents,
         auth_extended, users, projects, ai_services, 
-        automation, marketplace
+        automation, marketplace, erp_estimating,
+        erp_job_management, erp_field_capture, erp_compliance,
+        erp_task_management, erp_financial
     )
-except Exception:  # Re-added by Codex for import fix
+except Exception as e:  # Re-added by Codex for import fix
+    logger.error(f"Failed to import routes: {e}", exc_info=True)
     tasks = auth = memory = webhooks = agents = None
     auth_extended = users = projects = ai_services = None
     automation = marketplace = None
-
-# Configure logging before anything else
-configure_logging()
-logger = get_logger(__name__)
+    erp_estimating = erp_job_management = erp_field_capture = None
+    erp_compliance = erp_task_management = erp_financial = None
 
 
 @asynccontextmanager
@@ -144,7 +149,14 @@ async def validation_exception_handler(request: Request,
         content={
             "status": "error",
             "message": "Validation failed",
-            "details": exc.errors(),
+            "details": [
+                {
+                    "loc": err.get("loc"),
+                    "msg": str(err.get("msg")),
+                    "type": err.get("type")
+                }
+                for err in exc.errors()
+            ],
             "request_id": (request.state.request_id
                            if hasattr(request.state, "request_id")
                            else None)
@@ -274,7 +286,7 @@ if auth_extended:
 # Mount user management routes
 if users:
     app.include_router(
-        users.router,
+        users,
         prefix=f"{settings.API_V1_PREFIX}/users",
         tags=["users"]
     )
@@ -282,7 +294,7 @@ if users:
 # Mount project management routes
 if projects:
     app.include_router(
-        projects.router,
+        projects,
         prefix=f"{settings.API_V1_PREFIX}/projects",
         tags=["projects"]
     )
@@ -290,7 +302,7 @@ if projects:
 # Mount AI service routes
 if ai_services:
     app.include_router(
-        ai_services.router,
+        ai_services,
         prefix=f"{settings.API_V1_PREFIX}/ai",
         tags=["ai-services"]
     )
@@ -298,17 +310,63 @@ if ai_services:
 # Mount automation routes
 if automation:
     app.include_router(
-        automation.router,
-        prefix=f"{settings.API_V1_PREFIX}/workflows",
+        automation,
+        prefix=f"{settings.API_V1_PREFIX}/automation",
         tags=["automation"]
     )
 
 # Mount marketplace routes
 if marketplace:
+    print(f"Mounting marketplace router: {marketplace}")
     app.include_router(
-        marketplace.router,
+        marketplace,
         prefix=f"{settings.API_V1_PREFIX}/marketplace",
         tags=["marketplace"]
+    )
+else:
+    print("WARNING: Marketplace router not available!")
+
+# Mount ERP routes
+if erp_estimating:
+    app.include_router(
+        erp_estimating,
+        prefix=f"{settings.API_V1_PREFIX}/erp",
+        tags=["erp-estimating"]
+    )
+
+if erp_job_management:
+    app.include_router(
+        erp_job_management,
+        prefix=f"{settings.API_V1_PREFIX}/erp",
+        tags=["erp-jobs"]
+    )
+
+if erp_field_capture:
+    app.include_router(
+        erp_field_capture,
+        prefix=f"{settings.API_V1_PREFIX}/erp",
+        tags=["erp-field"]
+    )
+
+if erp_compliance:
+    app.include_router(
+        erp_compliance,
+        prefix=f"{settings.API_V1_PREFIX}/erp",
+        tags=["erp-compliance"]
+    )
+
+if erp_task_management:
+    app.include_router(
+        erp_task_management,
+        prefix=f"{settings.API_V1_PREFIX}/erp",
+        tags=["erp-tasks"]
+    )
+
+if erp_financial:
+    app.include_router(
+        erp_financial,
+        prefix=f"{settings.API_V1_PREFIX}/erp",
+        tags=["erp-financial"]
     )
 
 

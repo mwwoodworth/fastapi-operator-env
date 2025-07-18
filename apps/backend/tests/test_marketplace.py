@@ -13,30 +13,61 @@ from decimal import Decimal
 
 from ..main import app
 from ..core.database import get_db
-from ..core.auth import create_access_token
-from ..db.business_models import User, UserRole, MarketplaceItem, Purchase, Review
+from ..core.security import create_access_token
+from ..db.business_models import User, UserRole, Product, Purchase, Review
+
+# Using fixtures from conftest.py instead of redefining
+
+# Helper function to create valid Product objects
+def create_test_product(seller_id, name, **kwargs):
+    """Create a test product with all required fields."""
+    return Product(
+        id=kwargs.get('id', uuid4()),
+        seller_id=seller_id,
+        name=name,
+        slug=kwargs.get('slug', name.lower().replace(' ', '-')),
+        description=kwargs.get('description', f'Description for {name}'),
+        category=kwargs.get('category', 'general'),
+        product_type=kwargs.get('product_type', 'digital'),
+        price=kwargs.get('price', 29.99),
+        currency=kwargs.get('currency', 'USD'),
+        status=kwargs.get('status', 'approved'),
+        tags=kwargs.get('tags', []),
+        downloads=kwargs.get('downloads', 0),
+        is_published=kwargs.get('is_published', True),
+        files=kwargs.get('files', []),
+        features=kwargs.get('features', []),
+        requirements=kwargs.get('requirements', []),
+        view_count=kwargs.get('view_count', 0),
+        purchase_count=kwargs.get('purchase_count', 0),
+        rating_average=kwargs.get('rating_average', 0.0),
+        rating_count=kwargs.get('rating_count', 0)
+    )
+
+
+# Helper function to create valid Purchase objects
+def create_test_purchase(buyer_id, product_id, amount, **kwargs):
+    """Create a test purchase with all required fields."""
+    return Purchase(
+        id=kwargs.get('id', uuid4()),
+        buyer_id=buyer_id,
+        product_id=product_id,
+        amount=amount,
+        price=amount,  # Set price same as amount
+        currency=kwargs.get('currency', 'USD'),
+        status=kwargs.get('status', 'completed'),
+        transaction_id=kwargs.get('transaction_id'),
+        payment_method=kwargs.get('payment_method'),
+        payment_id=kwargs.get('payment_id'),
+        license_key=kwargs.get('license_key'),
+        license_expires_at=kwargs.get('license_expires_at'),
+        created_at=kwargs.get('created_at', datetime.utcnow())
+    )
 
 
 @pytest.fixture
-def client():
-    """Create test client."""
-    return TestClient(app)
-
-
-@pytest.fixture
-def test_db():
-    """Create test database session."""
-    from ..core.database import SessionLocal
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-
-@pytest.fixture
-def test_user(test_db: Session):
-    """Create a test user."""
+def marketplace_user(test_db: Session):
+    """Create a test user for marketplace tests."""
     user = User(
         email="marketplace@example.com",
         username="marketuser",
@@ -56,6 +87,7 @@ def test_user(test_db: Session):
 def test_seller(test_db: Session):
     """Create a test seller user."""
     seller = User(
+        id=uuid4(),
         email="seller@example.com",
         username="selleruser",
         hashed_password="hashedpassword",
@@ -107,7 +139,7 @@ def sample_item_data():
     }
 
 
-class TestMarketplaceItems:
+class TestProducts:
     """Test marketplace item management."""
     
     def test_create_marketplace_item(self, client, seller_headers, sample_item_data):
@@ -118,6 +150,8 @@ class TestMarketplaceItems:
             headers=seller_headers
         )
         
+        print(f"Response status: {response.status_code}")
+        print(f"Response body: {response.text}")
         assert response.status_code == 200
         item = response.json()
         assert item["name"] == sample_item_data["name"]
@@ -130,15 +164,22 @@ class TestMarketplaceItems:
         # Create test items
         items = []
         for i in range(3):
-            item = MarketplaceItem(
+            item = Product(
+                id=uuid4(),
                 seller_id=test_seller.id,
                 name=f"Test Item {i}",
+                slug=f"test-item-{i}",
                 description=f"Description {i}",
-                type="workflow" if i % 2 == 0 else "template",
+                category="test",
+                product_type="workflow" if i % 2 == 0 else "template",
                 price=Decimal(str(29.99 + i * 10)),
                 status="approved",
                 tags=["test"],
-                downloads=i * 10
+                downloads=i * 10,
+                is_published=True,
+                files=[],
+                features=[],
+                requirements=[]
             )
             items.append(item)
         test_db.add_all(items)
@@ -157,22 +198,20 @@ class TestMarketplaceItems:
     def test_search_marketplace_items(self, client, auth_headers, test_db, test_seller):
         """Test searching marketplace items."""
         # Create items with different attributes
-        item1 = MarketplaceItem(
-            seller_id=test_seller.id,
-            name="AI Assistant Template",
+        item1 = create_test_product(
+            test_seller.id,
+            "AI Assistant Template",
             description="Build your own AI assistant",
-            type="template",
+            product_type="template",
             price=Decimal("39.99"),
-            status="approved",
             tags=["ai", "assistant", "chatbot"]
         )
-        item2 = MarketplaceItem(
-            seller_id=test_seller.id,
-            name="Data Processing Workflow",
+        item2 = create_test_product(
+            test_seller.id,
+            "Data Processing Workflow",
             description="Automate data processing tasks",
-            type="workflow",
+            product_type="workflow",
             price=Decimal("59.99"),
-            status="approved",
             tags=["data", "automation", "etl"]
         )
         test_db.add_all([item1, item2])
@@ -180,7 +219,7 @@ class TestMarketplaceItems:
         
         # Search by query
         response = client.get(
-            "/api/v1/marketplace/items?search=AI&type=template",
+            "/api/v1/marketplace/items?search=AI&product_type=template",
             headers=auth_headers
         )
         
@@ -191,17 +230,16 @@ class TestMarketplaceItems:
     
     def test_get_marketplace_item(self, client, auth_headers, test_db, test_seller):
         """Test getting marketplace item details."""
-        item = MarketplaceItem(
-            seller_id=test_seller.id,
-            name="Premium Workflow",
+        item = create_test_product(
+            test_seller.id,
+            "Premium Workflow",
             description="Advanced automation workflow",
-            type="workflow",
+            product_type="workflow",
             price=Decimal("99.99"),
-            status="approved",
             tags=["premium", "advanced"],
-            features=["Feature 1", "Feature 2"],
-            version="2.0.0"
+            features=["Feature 1", "Feature 2"]
         )
+        item.version = "2.0.0"
         test_db.add(item)
         test_db.commit()
         test_db.refresh(item)
@@ -219,11 +257,11 @@ class TestMarketplaceItems:
     
     def test_update_marketplace_item(self, client, seller_headers, test_db, test_seller):
         """Test updating a marketplace item."""
-        item = MarketplaceItem(
-            seller_id=test_seller.id,
-            name="Original Name",
+        item = create_test_product(
+            test_seller.id,
+            "Original Name",
             description="Original description",
-            type="template",
+            product_type="template",
             price=Decimal("29.99"),
             status="approved"
         )
@@ -241,6 +279,8 @@ class TestMarketplaceItems:
             headers=seller_headers
         )
         
+        if response.status_code != 200:
+            print(f"Error response: {response.text}")
         assert response.status_code == 200
         data = response.json()
         assert data["name"] == "Updated Name"
@@ -249,11 +289,11 @@ class TestMarketplaceItems:
     
     def test_delete_marketplace_item(self, client, seller_headers, test_db, test_seller):
         """Test deleting a marketplace item."""
-        item = MarketplaceItem(
-            seller_id=test_seller.id,
-            name="To Delete",
+        item = create_test_product(
+            test_seller.id,
+            "To Delete",
             description="Will be deleted",
-            type="workflow",
+            product_type="workflow",
             price=Decimal("19.99"),
             status="approved"
         )
@@ -285,11 +325,11 @@ class TestPurchases:
             "transaction_id": "txn_123456"
         }
         
-        item = MarketplaceItem(
-            seller_id=test_seller.id,
-            name="Test Purchase Item",
+        item = create_test_product(
+            test_seller.id,
+            "Test Purchase Item",
             description="Item for purchase testing",
-            type="template",
+            product_type="template",
             price=Decimal("29.99"),
             status="approved"
         )
@@ -308,26 +348,26 @@ class TestPurchases:
         
         assert response.status_code == 200
         purchase = response.json()
-        assert purchase["item_id"] == str(item.id)
+        assert purchase["product_id"] == str(item.id)
         assert purchase["amount"] == 29.99
         assert purchase["status"] == "completed"
         assert "download_url" in purchase
     
     def test_purchase_already_owned(self, client, auth_headers, test_db, test_user, test_seller):
         """Test purchasing an already owned item."""
-        item = MarketplaceItem(
-            seller_id=test_seller.id,
-            name="Already Owned",
-            type="workflow",
+        item = create_test_product(
+            test_seller.id,
+            "Already Owned",
+            product_type="workflow",
             price=Decimal("49.99"),
             status="approved"
         )
         test_db.add(item)
         
         # Create existing purchase
-        purchase = Purchase(
+        purchase = create_test_purchase(
             buyer_id=test_user.id,
-            item_id=item.id,
+            product_id=item.id,
             amount=item.price,
             status="completed"
         )
@@ -341,27 +381,30 @@ class TestPurchases:
             headers=auth_headers
         )
         
+        if response.status_code != 400:
+            print(f"Response status: {response.status_code}")
+            print(f"Response: {response.text}")
         assert response.status_code == 400
-        assert "already own this item" in response.json()["detail"]
+        assert "already own this item" in response.json().get("detail", response.json().get("message", ""))
     
     def test_list_purchases(self, client, auth_headers, test_db, test_user):
         """Test listing user's purchases."""
         # Create test purchases
         purchases = []
         for i in range(3):
-            item = MarketplaceItem(
-                seller_id=uuid4(),
-                name=f"Purchased Item {i}",
-                type="template",
+            item = create_test_product(
+                uuid4(),
+                f"Purchased Item {i}",
+                product_type="template",
                 price=Decimal("29.99"),
                 status="approved"
             )
             test_db.add(item)
             test_db.flush()
             
-            purchase = Purchase(
+            purchase = create_test_purchase(
                 buyer_id=test_user.id,
-                item_id=item.id,
+                product_id=item.id,
                 amount=item.price,
                 status="completed",
                 transaction_id=f"txn_{i}"
@@ -383,20 +426,21 @@ class TestPurchases:
     
     def test_download_purchased_item(self, client, auth_headers, test_db, test_user, test_seller):
         """Test downloading a purchased item."""
-        item = MarketplaceItem(
-            seller_id=test_seller.id,
-            name="Downloadable Item",
-            type="workflow",
+        item = create_test_product(
+            test_seller.id,
+            "Downloadable Item",
+            product_type="workflow",
             price=Decimal("39.99"),
             status="approved",
-            file_url="https://storage.example.com/item.zip"
+            files=[{"url": "https://storage.example.com/item.zip", "name": "item.zip"}]
         )
+        item.file_url = "https://storage.example.com/item.zip"  # Add for backward compatibility
         test_db.add(item)
         test_db.flush()
         
-        purchase = Purchase(
+        purchase = create_test_purchase(
             buyer_id=test_user.id,
-            item_id=item.id,
+            product_id=item.id,
             amount=item.price,
             status="completed"
         )
@@ -420,10 +464,10 @@ class TestReviews:
     
     def test_create_review(self, client, auth_headers, test_db, test_user, test_seller):
         """Test creating a review for a purchased item."""
-        item = MarketplaceItem(
-            seller_id=test_seller.id,
-            name="Reviewable Item",
-            type="template",
+        item = create_test_product(
+            test_seller.id,
+            "Reviewable Item",
+            product_type="template",
             price=Decimal("29.99"),
             status="approved"
         )
@@ -431,9 +475,9 @@ class TestReviews:
         test_db.flush()
         
         # User must have purchased the item
-        purchase = Purchase(
+        purchase = create_test_purchase(
             buyer_id=test_user.id,
-            item_id=item.id,
+            product_id=item.id,
             amount=item.price,
             status="completed"
         )
@@ -459,10 +503,10 @@ class TestReviews:
     
     def test_cannot_review_unpurchased(self, client, auth_headers, test_db, test_seller):
         """Test that users cannot review items they haven't purchased."""
-        item = MarketplaceItem(
-            seller_id=test_seller.id,
-            name="Unpurchased Item",
-            type="workflow",
+        item = create_test_product(
+            test_seller.id,
+            "Unpurchased Item",
+            product_type="workflow",
             price=Decimal("49.99"),
             status="approved"
         )
@@ -479,15 +523,18 @@ class TestReviews:
             headers=auth_headers
         )
         
+        if response.status_code != 403:
+            print(f"Response status: {response.status_code}")
+            print(f"Response: {response.text}")
         assert response.status_code == 403
-        assert "must purchase" in response.json()["detail"]
+        assert "must purchase" in response.json().get("detail", response.json().get("message", ""))
     
     def test_list_item_reviews(self, client, auth_headers, test_db, test_seller):
         """Test listing reviews for an item."""
-        item = MarketplaceItem(
-            seller_id=test_seller.id,
-            name="Popular Item",
-            type="template",
+        item = create_test_product(
+            test_seller.id,
+            "Popular Item",
+            product_type="template",
             price=Decimal("39.99"),
             status="approved"
         )
@@ -507,7 +554,7 @@ class TestReviews:
             test_db.flush()
             
             review = Review(
-                item_id=item.id,
+                product_id=item.id,
                 reviewer_id=reviewer.id,
                 rating=5 - i,
                 comment=f"Review comment {i}",
@@ -540,10 +587,10 @@ class TestSellerDashboard:
         total_revenue = Decimal("0")
         
         for i in range(3):
-            item = MarketplaceItem(
-                seller_id=test_seller.id,
-                name=f"Seller Item {i}",
-                type="workflow",
+            item = create_test_product(
+                test_seller.id,
+                f"Seller Item {i}",
+                product_type="workflow",
                 price=Decimal("49.99"),
                 status="approved",
                 downloads=i * 5
@@ -563,9 +610,9 @@ class TestSellerDashboard:
                 test_db.add(buyer)
                 test_db.flush()
                 
-                purchase = Purchase(
+                purchase = create_test_purchase(
                     buyer_id=buyer.id,
-                    item_id=item.id,
+                    product_id=item.id,
                     amount=item.price,
                     status="completed"
                 )
@@ -579,6 +626,8 @@ class TestSellerDashboard:
             headers=seller_headers
         )
         
+        if response.status_code != 200:
+            print(f"Error response: {response.text}")
         assert response.status_code == 200
         stats = response.json()
         assert stats["total_items"] == 3
@@ -590,10 +639,10 @@ class TestSellerDashboard:
         """Test listing seller's own items."""
         # Create seller's items
         for i in range(2):
-            item = MarketplaceItem(
-                seller_id=test_seller.id,
-                name=f"My Item {i}",
-                type="template",
+            item = create_test_product(
+                test_seller.id,
+                f"My Item {i}",
+                product_type="template",
                 price=Decimal("29.99"),
                 status="approved" if i == 0 else "pending"
             )
@@ -610,10 +659,10 @@ class TestSellerDashboard:
         test_db.add(other_seller)
         test_db.flush()
         
-        other_item = MarketplaceItem(
-            seller_id=other_seller.id,
-            name="Other Seller Item",
-            type="workflow",
+        other_item = create_test_product(
+            other_seller.id,
+            "Other Seller Item",
+            product_type="workflow",
             price=Decimal("39.99"),
             status="approved"
         )
@@ -632,10 +681,10 @@ class TestSellerDashboard:
     
     def test_get_sales_history(self, client, seller_headers, test_db, test_seller):
         """Test getting seller's sales history."""
-        item = MarketplaceItem(
-            seller_id=test_seller.id,
-            name="Best Seller",
-            type="workflow",
+        item = create_test_product(
+            test_seller.id,
+            "Best Seller",
+            product_type="workflow",
             price=Decimal("79.99"),
             status="approved"
         )
@@ -654,9 +703,9 @@ class TestSellerDashboard:
             test_db.add(buyer)
             test_db.flush()
             
-            purchase = Purchase(
+            purchase = create_test_purchase(
                 buyer_id=buyer.id,
-                item_id=item.id,
+                product_id=item.id,
                 amount=item.price,
                 status="completed",
                 created_at=datetime.utcnow()
@@ -697,10 +746,10 @@ class TestMarketplaceAdmin:
         admin_token = create_access_token({"sub": admin.email})
         admin_headers = {"Authorization": f"Bearer {admin_token}"}
         
-        item = MarketplaceItem(
-            seller_id=test_seller.id,
-            name="Pending Approval",
-            type="template",
+        item = create_test_product(
+            test_seller.id,
+            "Pending Approval",
+            product_type="template",
             price=Decimal("39.99"),
             status="pending"
         )
@@ -736,10 +785,10 @@ class TestMarketplaceAdmin:
         admin_token = create_access_token({"sub": admin.email})
         admin_headers = {"Authorization": f"Bearer {admin_token}"}
         
-        item = MarketplaceItem(
-            seller_id=test_seller.id,
-            name="To Reject",
-            type="workflow",
+        item = create_test_product(
+            test_seller.id,
+            "To Reject",
+            product_type="workflow",
             price=Decimal("99.99"),
             status="pending"
         )

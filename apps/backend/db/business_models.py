@@ -8,11 +8,11 @@ from datetime import datetime
 from typing import Optional, List
 from sqlalchemy import Column, String, DateTime, JSON, Boolean, Text, Integer, ForeignKey, Index, Float, Enum as SQLEnum, Table
 from sqlalchemy.orm import relationship
-from sqlalchemy.dialects.postgresql import UUID
 import uuid
 import enum
 
 from .models import Base
+from .types import UUID
 
 
 # Association tables for many-to-many relationships
@@ -20,20 +20,23 @@ team_members = Table('team_members', Base.metadata,
     Column('team_id', UUID(as_uuid=True), ForeignKey('teams.id')),
     Column('user_id', UUID(as_uuid=True), ForeignKey('users.id')),
     Column('role', String(50), default='member'),
-    Column('joined_at', DateTime, default=datetime.utcnow)
+    Column('joined_at', DateTime, default=datetime.utcnow),
+    extend_existing=True
 )
 
 project_members = Table('project_members', Base.metadata,
     Column('project_id', UUID(as_uuid=True), ForeignKey('projects.id')),
     Column('user_id', UUID(as_uuid=True), ForeignKey('users.id')),
     Column('role', String(50), default='member'),
-    Column('joined_at', DateTime, default=datetime.utcnow)
+    Column('joined_at', DateTime, default=datetime.utcnow),
+    extend_existing=True
 )
 
 
 class UserRole(enum.Enum):
     """User role enumeration."""
     ADMIN = "admin"
+    SUPERVISOR = "supervisor"
     USER = "user"
     VIEWER = "viewer"
 
@@ -67,14 +70,21 @@ class User(Base):
     is_active = Column(Boolean, default=True)
     is_verified = Column(Boolean, default=False)
     is_superuser = Column(Boolean, default=False)
+    is_seller = Column(Boolean, default=False)
     role = Column(SQLEnum(UserRole), default=UserRole.USER)
     
     # Security
     two_factor_enabled = Column(Boolean, default=False)
     two_factor_secret = Column(String(255), nullable=True)
+    two_factor_secret_temp = Column(String(255), nullable=True)
+    two_factor_backup_codes = Column(JSON, default=[])
     last_login = Column(DateTime, nullable=True)
     failed_login_attempts = Column(Integer, default=0)
     locked_until = Column(DateTime, nullable=True)
+    
+    # Password reset
+    reset_token = Column(String(255), nullable=True)
+    reset_token_expires = Column(DateTime, nullable=True)
     
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
@@ -85,12 +95,13 @@ class User(Base):
     owned_teams = relationship("Team", back_populates="owner")
     projects = relationship("Project", secondary=project_members, back_populates="members")
     owned_projects = relationship("Project", back_populates="owner")
-    tasks = relationship("ProjectTask", back_populates="assignee")
+    tasks = relationship("ProjectTask", foreign_keys="ProjectTask.assignee_id", back_populates="assignee")
     created_tasks = relationship("ProjectTask", foreign_keys="ProjectTask.created_by", back_populates="creator")
     api_keys = relationship("APIKey", back_populates="user")
     sessions = relationship("UserSession", back_populates="user")
     notifications = relationship("Notification", back_populates="user")
     subscription = relationship("Subscription", back_populates="user", uselist=False)
+    estimates = relationship("Estimate", back_populates="created_by")
     
     # Indexes
     __table_args__ = (
@@ -154,6 +165,7 @@ class Project(Base):
     start_date = Column(DateTime, nullable=True)
     due_date = Column(DateTime, nullable=True)
     completed_at = Column(DateTime, nullable=True)
+    archived_at = Column(DateTime, nullable=True)
     
     # Custom fields
     meta_data = Column(JSON, default={})  # Renamed from metadata to avoid SQLAlchemy conflict
@@ -167,7 +179,7 @@ class Project(Base):
     owner = relationship("User", back_populates="owned_projects")
     team = relationship("Team", back_populates="projects")
     members = relationship("User", secondary=project_members, back_populates="projects")
-    tasks = relationship("ProjectTask", back_populates="project")
+    tasks = relationship("ProjectTask", back_populates="project", cascade="all, delete-orphan")
     documents = relationship("Document", back_populates="project")
     
     # Indexes
@@ -184,7 +196,7 @@ class ProjectTask(Base):
     __tablename__ = "project_tasks"
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    project_id = Column(UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False)
+    project_id = Column(UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
     
     # Task details
     title = Column(String(500), nullable=False)
@@ -215,7 +227,7 @@ class ProjectTask(Base):
     project = relationship("Project", back_populates="tasks")
     assignee = relationship("User", foreign_keys=[assignee_id], back_populates="tasks")
     creator = relationship("User", foreign_keys=[created_by], back_populates="created_tasks")
-    comments = relationship("TaskComment", back_populates="task")
+    comments = relationship("TaskComment", back_populates="task", cascade="all, delete-orphan")
     
     # Indexes
     __table_args__ = (
@@ -231,7 +243,7 @@ class TaskComment(Base):
     __tablename__ = "task_comments"
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    task_id = Column(UUID(as_uuid=True), ForeignKey("project_tasks.id"), nullable=False)
+    task_id = Column(UUID(as_uuid=True), ForeignKey("project_tasks.id", ondelete="CASCADE"), nullable=False)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     
     content = Column(Text, nullable=False)
@@ -264,6 +276,7 @@ class Product(Base):
     
     # Product files/content
     files = Column(JSON, default=[])
+    file_url = Column(String(500), nullable=True)
     preview_url = Column(String(500), nullable=True)
     thumbnail_url = Column(String(500), nullable=True)
     
@@ -281,6 +294,14 @@ class Product(Base):
     purchase_count = Column(Integer, default=0)
     rating_average = Column(Float, default=0.0)
     rating_count = Column(Integer, default=0)
+    downloads = Column(Integer, default=0)
+    
+    # Version
+    version = Column(String(20), default="1.0.0")
+    
+    # Status
+    status = Column(String(50), default="pending")  # pending, approved, rejected
+    is_deleted = Column(Boolean, default=False)
     
     # Ownership
     seller_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
@@ -311,9 +332,11 @@ class Purchase(Base):
     buyer_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     
     # Purchase details
+    amount = Column(Float, nullable=False)  # Add amount alias for price
     price = Column(Float, nullable=False)
     currency = Column(String(3), default="USD")
     status = Column(String(50), default="pending")  # pending, completed, refunded
+    transaction_id = Column(String(255), nullable=True)
     
     # Payment information
     payment_method = Column(String(50))  # stripe, paypal, etc.
@@ -330,6 +353,43 @@ class Purchase(Base):
     # Relationships
     product = relationship("Product", back_populates="purchases")
     buyer = relationship("User")
+
+
+class Review(Base):
+    """
+    Product review model for marketplace feedback.
+    """
+    __tablename__ = "reviews"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    product_id = Column(UUID(as_uuid=True), ForeignKey("products.id"), nullable=False)
+    reviewer_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    
+    # Review content
+    rating = Column(Integer, nullable=False)  # 1-5 stars
+    title = Column(String(200), nullable=True)
+    comment = Column(Text, nullable=True)
+    title = Column(String(200), nullable=True)
+    
+    # Review metadata
+    is_verified_purchase = Column(Boolean, default=False)
+    helpful_count = Column(Integer, default=0)
+    pros = Column(JSON, default=[])
+    cons = Column(JSON, default=[])
+    
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    product = relationship("Product")
+    reviewer = relationship("User")
+    
+    # Indexes
+    __table_args__ = (
+        Index("idx_review_product", "product_id"),
+        Index("idx_review_rating", "rating"),
+    )
 
 
 class Subscription(Base):
@@ -354,6 +414,7 @@ class Subscription(Base):
     used_ai_requests = Column(Integer, default=0)
     storage_limit_gb = Column(Float, default=1.0)
     used_storage_gb = Column(Float, default=0.0)
+    monthly_budget = Column(Float, default=100.0)  # Monthly budget in USD
     
     # Dates
     current_period_start = Column(DateTime, nullable=True)
@@ -433,11 +494,17 @@ class Document(Base):
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name = Column(String(500), nullable=False)
+    title = Column(String(500), nullable=True)  # For AI-generated documents
     
     # File details
-    file_path = Column(String(1000), nullable=False)
-    file_size = Column(Integer, nullable=False)
-    mime_type = Column(String(100), nullable=False)
+    file_path = Column(String(1000), nullable=True)  # Optional for AI-generated
+    file_size = Column(Integer, nullable=True)  # Optional for AI-generated
+    mime_type = Column(String(100), nullable=True)  # Optional for AI-generated
+    
+    # AI-generated document fields
+    document_type = Column(String(50), nullable=True)  # report, proposal, etc.
+    content = Column(Text, nullable=True)  # Document content
+    format = Column(String(20), nullable=True)  # markdown, html, pdf
     
     # Organization
     project_id = Column(UUID(as_uuid=True), ForeignKey("projects.id"), nullable=True)
@@ -591,6 +658,9 @@ class Estimate(Base):
     # Validity
     valid_until = Column(DateTime, nullable=True)
     
+    # User who created the estimate
+    created_by_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    
     # Timestamps
     sent_at = Column(DateTime, nullable=True)
     approved_at = Column(DateTime, nullable=True)
@@ -600,7 +670,7 @@ class Estimate(Base):
     # Relationships
     inspection = relationship("Inspection", back_populates="estimate")
     project = relationship("Project")
-    created_by = relationship("User")
+    created_by = relationship("User", foreign_keys=[created_by_id])
 
 
 class Integration(Base):
@@ -619,6 +689,7 @@ class Integration(Base):
     # Configuration
     config = Column(JSON, nullable=False)  # Encrypted sensitive data
     is_active = Column(Boolean, default=True)
+    meta_data = Column(JSON, default={})
     
     # OAuth tokens (encrypted)
     access_token = Column(Text, nullable=True)
@@ -631,7 +702,9 @@ class Integration(Base):
     
     # Timestamps
     connected_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)  # Alias for compatibility
     last_synced_at = Column(DateTime, nullable=True)
+    last_sync_at = Column(DateTime, nullable=True)  # Alias for compatibility
     
     # Relationships
     user = relationship("User")
@@ -660,6 +733,11 @@ class Workflow(Base):
     is_active = Column(Boolean, default=True)
     is_public = Column(Boolean, default=False)
     
+    # Additional attributes
+    tags = Column(JSON, default=[])
+    meta_data = Column(JSON, default={})
+    version = Column(String(20), default="1.0.0")
+    
     # Stats
     run_count = Column(Integer, default=0)
     success_count = Column(Integer, default=0)
@@ -672,7 +750,47 @@ class Workflow(Base):
     # Relationships
     owner = relationship("User")
     team = relationship("Team")
-    runs = relationship("WorkflowRun", back_populates="workflow")
+    runs = relationship("WorkflowRun", back_populates="workflow", cascade="all, delete-orphan")
+
+
+class Memory(Base):
+    """
+    User memory model for storing context and knowledge.
+    """
+    __tablename__ = "memories"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    
+    # Memory content
+    title = Column(String(500), nullable=False)
+    content = Column(Text, nullable=False)
+    memory_type = Column(String(50), default="general")  # general, conversation, document, preference
+    
+    # Metadata
+    tags = Column(JSON, default=[])
+    meta_data = Column(JSON, default={})  # Renamed from metadata to avoid SQLAlchemy conflict
+    
+    # Vector embedding (if using vector search)
+    embedding = Column(JSON, nullable=True)
+    
+    # Status
+    is_active = Column(Boolean, default=True)
+    is_pinned = Column(Boolean, default=False)
+    
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    accessed_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    user = relationship("User")
+    
+    # Indexes
+    __table_args__ = (
+        Index("idx_memory_user", "user_id"),
+        Index("idx_memory_type", "memory_type"),
+    )
 
 
 class WorkflowRun(Base):
@@ -682,7 +800,7 @@ class WorkflowRun(Base):
     __tablename__ = "workflow_runs"
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    workflow_id = Column(UUID(as_uuid=True), ForeignKey("workflows.id"), nullable=False)
+    workflow_id = Column(UUID(as_uuid=True), ForeignKey("workflows.id", ondelete="CASCADE"), nullable=False)
     
     # Execution details
     status = Column(String(50), default="running")  # running, completed, failed
@@ -693,6 +811,10 @@ class WorkflowRun(Base):
     steps_total = Column(Integer, nullable=False)
     output = Column(JSON, nullable=True)
     error = Column(Text, nullable=True)
+    logs = Column(JSON, default=[])
+    
+    # Retry tracking
+    parent_run_id = Column(UUID(as_uuid=True), ForeignKey("workflow_runs.id"), nullable=True)
     
     # Timing
     started_at = Column(DateTime, default=datetime.utcnow, nullable=False)
@@ -701,3 +823,87 @@ class WorkflowRun(Base):
     
     # Relationships
     workflow = relationship("Workflow", back_populates="runs")
+
+
+class DocumentTemplate(Base):
+    """
+    Document template for AI-powered document generation.
+    """
+    __tablename__ = "document_templates"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    
+    # Template details
+    name = Column(String(200), nullable=False)
+    description = Column(Text, nullable=True)
+    template_type = Column(String(50), nullable=True)  # report, proposal, email, etc.
+    document_type = Column(String(50), nullable=True)  # Alias for compatibility
+    
+    # Template content
+    template_content = Column(Text, nullable=False)
+    template = Column(Text, nullable=False)  # Alias for compatibility
+    variables = Column(JSON, default={})  # Variables that can be filled in
+    example_context = Column(JSON, default={})  # Example context for variables
+    example_output = Column(Text, nullable=True)
+    
+    # Settings
+    is_public = Column(Boolean, default=False)
+    category = Column(String(100), nullable=True)
+    tags = Column(JSON, default=[])
+    
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    user = relationship("User")
+
+
+class AIUsageLog(Base):
+    """
+    AI service usage tracking for billing and analytics.
+    """
+    __tablename__ = "ai_usage_logs"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    
+    # Usage details
+    service = Column(String(50), nullable=False)  # openai, anthropic, google, etc.
+    model = Column(String(100), nullable=False)  # gpt-4, claude-3, etc.
+    endpoint = Column(String(200), nullable=False)  # /chat, /completions, etc.
+    request_type = Column(String(50), nullable=True)  # chat, analysis, generation, etc.
+    
+    # Metrics
+    input_tokens = Column(Integer, default=0)
+    output_tokens = Column(Integer, default=0)
+    total_tokens = Column(Integer, default=0)
+    tokens_used = Column(Integer, default=0)  # Alias for compatibility
+    
+    # Cost tracking
+    input_cost = Column(Float, default=0.0)
+    output_cost = Column(Float, default=0.0)
+    total_cost = Column(Float, default=0.0)
+    
+    # Request details
+    request_id = Column(String(255), nullable=True)
+    response_time_ms = Column(Integer, nullable=True)
+    status_code = Column(Integer, nullable=True)
+    error = Column(Text, nullable=True)
+    
+    # Metadata
+    meta_data = Column(JSON, default={})  # Renamed from metadata to avoid SQLAlchemy conflict
+    
+    # Timestamp
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    
+    # Relationships
+    user = relationship("User")
+    
+    # Indexes
+    __table_args__ = (
+        Index("idx_ai_usage_user_created", "user_id", "created_at"),
+        Index("idx_ai_usage_service_model", "service", "model"),
+    )
+

@@ -20,6 +20,15 @@ from ..memory.memory_store import get_relevant_memories
 from ..core.settings import settings
 
 
+class AgentType(Enum):
+    """Types of agents in the system."""
+    LLM = "llm"
+    TOOL = "tool"
+    ORCHESTRATOR = "orchestrator"
+    MEMORY = "memory"
+    WORKFLOW = "workflow"
+
+
 class ExecutionContext:
     """Execution context for agents."""
     pass

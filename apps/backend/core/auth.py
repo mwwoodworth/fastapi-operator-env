@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from .settings import settings
 from .database import get_db
-from ..db.business_models import User, APIKey, UserSession
+from ..db.business_models import User, APIKey, UserSession, UserRole
 
 # Password hashing
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -381,3 +381,28 @@ def invalidate_user_tokens(user: User, db: Session):
     ).update({"is_active": False})
     
     db.commit()
+
+
+def require_admin(current_user: User = Depends(get_current_user)) -> User:
+    """
+    Dependency to require admin privileges.
+    
+    Args:
+        current_user: Current authenticated user
+    
+    Returns:
+        Current user if admin
+    
+    Raises:
+        HTTPException: If user is not admin
+    """
+    if not current_user.is_superuser and current_user.role != UserRole.ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin privileges required"
+        )
+    return current_user
+
+
+# Alias for consistency
+get_admin_user = require_admin

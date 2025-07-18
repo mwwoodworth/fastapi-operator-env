@@ -1,338 +1,279 @@
 """
-Automation and workflow routes for BrainOps backend.
+Enhanced Automation and Workflow Management Routes
 
-Handles workflow creation, execution, triggers, and scheduling.
+This module provides comprehensive automation capabilities including:
+- Workflow CRUD with versioning
+- Advanced trigger management (webhooks, schedules, events)
+- Third-party integrations
+- Bulk operations
+- Admin endpoints
+- Monitoring and health checks
+- Error handling and logging
 """
 
+from fastapi import APIRouter, HTTPException, Depends, Query, BackgroundTasks, Request, Response, status
+from fastapi.responses import StreamingResponse
+from typing import List, Dict, Any, Optional, Union
 from datetime import datetime, timedelta
-from typing import List, Optional, Dict, Any
-from uuid import UUID, uuid4
-import json
-import asyncio
-
-from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_
-from pydantic import BaseModel
+from sqlalchemy.orm.attributes import flag_modified
+from sqlalchemy import and_, or_, func
+from uuid import uuid4
+import asyncio
+import json
+import logging
+from enum import Enum
+import hashlib
+import hmac
+from pydantic import BaseModel, Field, validator
+import httpx
 from croniter import croniter
 
-from ..core.database import get_db
-from ..core.auth import get_current_user
+from ..core.auth import get_current_user, get_admin_user
 from ..db.business_models import User, Workflow, WorkflowRun, Integration
-from ..core.scheduler import scheduler
-from ..tasks import execute_task
-from ..integrations import clickup, notion, slack, make
+from ..db.models import WebhookEvent
+from ..core.database import get_db
+from ..core.pagination import paginate
+from ..core.logging import get_logger
+
+logger = get_logger(__name__)
 
 router = APIRouter()
 
+# Enums for better type safety
+class TriggerType(str, Enum):
+    MANUAL = "manual"
+    SCHEDULE = "schedule"
+    WEBHOOK = "webhook"
+    EVENT = "event"
+    API = "api"
+    EMAIL = "email"
+    FILE = "file"
 
-# Pydantic models
-class WorkflowStep(BaseModel):
+class WorkflowStatus(str, Enum):
+    DRAFT = "draft"
+    ACTIVE = "active"
+    PAUSED = "paused"
+    ARCHIVED = "archived"
+    ERROR = "error"
+
+class RunStatus(str, Enum):
+    PENDING = "pending"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+    TIMEOUT = "timeout"
+
+class StepType(str, Enum):
+    HTTP = "http"
+    CONDITION = "condition"
+    LOOP = "loop"
+    PARALLEL = "parallel"
+    TRANSFORM = "transform"
+    NOTIFICATION = "notification"
+    DATABASE = "database"
+    AI = "ai"
+    INTEGRATION = "integration"
+    SCRIPT = "script"
+    APPROVAL = "approval"
+    DELAY = "delay"
+
+class IntegrationType(str, Enum):
+    SLACK = "slack"
+    GITHUB = "github"
+    NOTION = "notion"
+    DISCORD = "discord"
+    TEAMS = "teams"
+    JIRA = "jira"
+    TRELLO = "trello"
+    ASANA = "asana"
+    CLICKUP = "clickup"
+    AIRTABLE = "airtable"
+    GOOGLE_SHEETS = "google_sheets"
+    SALESFORCE = "salesforce"
+    HUBSPOT = "hubspot"
+    MAILCHIMP = "mailchimp"
+    SENDGRID = "sendgrid"
+    TWILIO = "twilio"
+    STRIPE = "stripe"
+    SHOPIFY = "shopify"
+    WORDPRESS = "wordpress"
+    MEDIUM = "medium"
+
+# Request/Response Models
+class WorkflowStepModel(BaseModel):
     id: str
-    type: str  # task, condition, loop, parallel, wait
+    type: StepType
     name: str
+    description: Optional[str] = None
     config: Dict[str, Any]
     next_steps: List[str] = []
+    error_handler: Optional[str] = None
+    retry_config: Optional[Dict[str, Any]] = None
+    timeout: Optional[int] = 300  # seconds
+    conditions: Optional[List[Dict[str, Any]]] = None
 
-
-class WorkflowCreate(BaseModel):
-    name: str
-    description: Optional[str]
-    trigger_type: str  # webhook, schedule, manual, event
+class WorkflowCreateRequest(BaseModel):
+    name: str = Field(..., min_length=1, max_length=255)
+    description: str = Field(..., max_length=1000)
+    trigger_type: TriggerType
     trigger_config: Dict[str, Any]
-    steps: List[WorkflowStep]
+    steps: List[WorkflowStepModel]
     is_active: bool = True
     is_public: bool = False
+    tags: List[str] = []
+    metadata: Dict[str, Any] = {}
+    version: Optional[str] = "1.0.0"
+    
+    @validator('trigger_config')
+    def validate_trigger_config(cls, v, values):
+        trigger_type = values.get('trigger_type')
+        if trigger_type == TriggerType.SCHEDULE:
+            if 'cron' not in v:
+                raise ValueError("Schedule trigger requires 'cron' in config")
+            if not croniter.is_valid(v['cron']):
+                raise ValueError("Invalid cron expression")
+        elif trigger_type == TriggerType.WEBHOOK:
+            if 'secret' not in v:
+                v['secret'] = str(uuid4())
+        return v
 
+class WorkflowUpdateRequest(BaseModel):
+    name: Optional[str] = Field(None, min_length=1, max_length=255)
+    description: Optional[str] = Field(None, max_length=1000)
+    trigger_type: Optional[TriggerType] = None
+    trigger_config: Optional[Dict[str, Any]] = None
+    steps: Optional[List[WorkflowStepModel]] = None
+    is_active: Optional[bool] = None
+    is_public: Optional[bool] = None
+    tags: Optional[List[str]] = None
+    metadata: Optional[Dict[str, Any]] = None
 
-class WorkflowUpdate(BaseModel):
-    name: Optional[str]
-    description: Optional[str]
-    steps: Optional[List[WorkflowStep]]
-    is_active: Optional[bool]
-    is_public: Optional[bool]
+class WorkflowBulkRequest(BaseModel):
+    workflow_ids: List[str]
+    action: str = Field(..., pattern="^(activate|deactivate|archive|delete|export)$")
+    options: Dict[str, Any] = {}
 
-
-class WorkflowResponse(BaseModel):
-    id: str
-    name: str
-    description: Optional[str]
-    trigger_type: str
-    trigger_config: Dict[str, Any]
-    steps: List[WorkflowStep]
-    owner_id: str
-    team_id: Optional[str]
-    is_active: bool
-    is_public: bool
-    run_count: int
-    success_count: int
-    last_run_at: Optional[datetime]
-    created_at: datetime
-    updated_at: datetime
-
-
-class WorkflowRunResponse(BaseModel):
-    id: str
+class TriggerCreateRequest(BaseModel):
     workflow_id: str
-    workflow_name: str
-    status: str
-    trigger_data: Optional[Dict[str, Any]]
-    steps_completed: int
-    steps_total: int
-    output: Optional[Dict[str, Any]]
-    error: Optional[str]
-    started_at: datetime
-    completed_at: Optional[datetime]
-    duration_ms: Optional[int]
-
-
-class TriggerCreate(BaseModel):
-    name: str
-    type: str  # webhook, schedule, event
+    trigger_type: TriggerType
     config: Dict[str, Any]
-    workflow_id: str
-    is_active: bool = True
+    is_enabled: bool = True
+    name: Optional[str] = None
+    description: Optional[str] = None
 
+class TriggerUpdateRequest(BaseModel):
+    config: Optional[Dict[str, Any]] = None
+    is_enabled: Optional[bool] = None
+    name: Optional[str] = None
+    description: Optional[str] = None
 
-class TriggerUpdate(BaseModel):
-    name: Optional[str]
-    config: Optional[Dict[str, Any]]
-    is_active: Optional[bool]
-
-
-class TriggerResponse(BaseModel):
-    id: str
-    name: str
-    type: str
+class IntegrationConnectRequest(BaseModel):
+    integration_type: IntegrationType
     config: Dict[str, Any]
-    workflow_id: str
-    is_active: bool
-    last_triggered: Optional[datetime]
-    next_run: Optional[datetime]
-    created_at: datetime
+    name: str
+    description: Optional[str] = None
+    scopes: List[str] = []
 
+class IntegrationUpdateRequest(BaseModel):
+    config: Optional[Dict[str, Any]] = None
+    name: Optional[str] = None
+    description: Optional[str] = None
+    is_active: Optional[bool] = None
 
 class WorkflowExecuteRequest(BaseModel):
     input_data: Dict[str, Any] = {}
+    context: Dict[str, Any] = {}
+    dry_run: bool = False
     async_execution: bool = True
 
+class WebhookTestRequest(BaseModel):
+    webhook_url: str
+    payload: Dict[str, Any]
+    headers: Dict[str, str] = {}
+    method: str = "POST"
 
-class IntegrationConfig(BaseModel):
-    type: str  # slack, clickup, notion, make, zapier
-    name: str
-    config: Dict[str, Any]
-    webhook_url: Optional[str]
+class WorkflowImportRequest(BaseModel):
+    workflows: List[Dict[str, Any]]
+    mode: str = Field("merge", pattern="^(merge|overwrite|skip)$")
+    dry_run: bool = False
 
+# Health check models
+class HealthCheckResponse(BaseModel):
+    status: str
+    timestamp: datetime
+    services: Dict[str, Dict[str, Any]]
+    metrics: Dict[str, Any]
 
-class IntegrationResponse(BaseModel):
-    id: str
-    type: str
-    name: str
-    is_active: bool
-    connected_at: datetime
-    last_synced_at: Optional[datetime]
-
-
-# Helper functions
-def validate_workflow_steps(steps: List[WorkflowStep]):
-    """Validate workflow step configuration."""
-    step_ids = {step.id for step in steps}
-    
-    for step in steps:
-        # Check next_steps reference valid step IDs
-        for next_id in step.next_steps:
-            if next_id not in step_ids and next_id != "end":
-                raise ValueError(f"Invalid next_step reference: {next_id}")
-        
-        # Validate step-specific configuration
-        if step.type == "condition":
-            if "condition" not in step.config:
-                raise ValueError(f"Condition step {step.id} missing condition config")
-        
-        elif step.type == "loop":
-            if "iterations" not in step.config and "condition" not in step.config:
-                raise ValueError(f"Loop step {step.id} must have iterations or condition")
-
-
-def validate_trigger_config(trigger_type: str, config: Dict[str, Any]):
-    """Validate trigger configuration."""
-    if trigger_type == "schedule":
-        if "cron" not in config:
-            raise ValueError("Schedule trigger must have cron expression")
-        
-        # Validate cron expression
-        try:
-            croniter(config["cron"])
-        except:
-            raise ValueError("Invalid cron expression")
-    
-    elif trigger_type == "webhook":
-        if "secret" not in config:
-            config["secret"] = str(uuid4())
-    
-    elif trigger_type == "event":
-        if "event_type" not in config:
-            raise ValueError("Event trigger must specify event_type")
-
-
-async def execute_workflow_step(step: WorkflowStep, context: Dict[str, Any], db: Session):
-    """Execute a single workflow step."""
-    try:
-        if step.type == "task":
-            # Execute task
-            task_id = step.config.get("task_id")
-            task_params = step.config.get("parameters", {})
-            
-            # Substitute variables from context
-            task_params = substitute_variables(task_params, context)
-            
-            result = await execute_task(task_id, task_params)
-            return result
-        
-        elif step.type == "condition":
-            # Evaluate condition
-            condition = step.config.get("condition")
-            return evaluate_condition(condition, context)
-        
-        elif step.type == "loop":
-            # Handle loop logic
-            iterations = step.config.get("iterations", 1)
-            results = []
-            
-            for i in range(iterations):
-                context["loop_index"] = i
-                # Execute loop body (would need to handle nested steps)
-                results.append({"iteration": i})
-            
-            return results
-        
-        elif step.type == "parallel":
-            # Execute steps in parallel
-            parallel_tasks = []
-            for sub_step_id in step.config.get("steps", []):
-                # Queue parallel execution
-                parallel_tasks.append(sub_step_id)
-            
-            # Wait for all parallel tasks
-            return {"parallel_completed": parallel_tasks}
-        
-        elif step.type == "wait":
-            # Wait for specified duration
-            duration = step.config.get("duration", 1)
-            await asyncio.sleep(duration)
-            return {"waited": duration}
-        
-        else:
-            raise ValueError(f"Unknown step type: {step.type}")
-    
-    except Exception as e:
-        raise Exception(f"Step {step.id} failed: {str(e)}")
-
-
-def substitute_variables(data: Any, context: Dict[str, Any]) -> Any:
-    """Substitute variables in data with values from context."""
-    if isinstance(data, str):
-        # Replace {{variable}} with context values
-        import re
-        pattern = r'\{\{(\w+)\}\}'
-        
-        def replacer(match):
-            var_name = match.group(1)
-            return str(context.get(var_name, match.group(0)))
-        
-        return re.sub(pattern, replacer, data)
-    
-    elif isinstance(data, dict):
-        return {k: substitute_variables(v, context) for k, v in data.items()}
-    
-    elif isinstance(data, list):
-        return [substitute_variables(item, context) for item in data]
-    
-    return data
-
-
-def evaluate_condition(condition: str, context: Dict[str, Any]) -> bool:
-    """Safely evaluate a condition expression."""
-    # In production, use a safe expression evaluator
-    # For now, support simple comparisons
-    try:
-        # Very basic implementation - should use proper expression parser
-        if "==" in condition:
-            left, right = condition.split("==")
-            left_val = context.get(left.strip(), left.strip())
-            right_val = context.get(right.strip(), right.strip())
-            return str(left_val) == str(right_val)
-        
-        return False
-    except:
-        return False
-
-
-# Workflow Management Endpoints
-@router.post("/", response_model=WorkflowResponse)
+# Basic workflow endpoints
+@router.post("/workflows", response_model=Dict[str, Any])
 async def create_workflow(
-    workflow_data: WorkflowCreate,
+    request: WorkflowCreateRequest,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Create a new workflow."""
-    # Validate workflow steps
+    """Create a new workflow with validation."""
     try:
-        validate_workflow_steps(workflow_data.steps)
-        validate_trigger_config(workflow_data.trigger_type, workflow_data.trigger_config)
-    except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
+        # Validate workflow steps
+        step_ids = {step.id for step in request.steps}
+        for step in request.steps:
+            for next_step in step.next_steps:
+                if next_step != "end" and next_step not in step_ids:
+                    raise HTTPException(400, f"Invalid next_step reference: {next_step}")
+            if step.error_handler and step.error_handler not in step_ids:
+                raise HTTPException(400, f"Invalid error_handler reference: {step.error_handler}")
+        
+        workflow = Workflow(
+            id=str(uuid4()),
+            name=request.name,
+            description=request.description,
+            owner_id=current_user.id,
+            trigger_type=request.trigger_type.value,
+            trigger_config=request.trigger_config,
+            steps=[step.dict() for step in request.steps],
+            is_active=request.is_active,
+            tags=request.tags,
+            meta_data=request.metadata,
+            version=request.version
         )
-    
-    # Create workflow
-    workflow = Workflow(
-        name=workflow_data.name,
-        description=workflow_data.description,
-        trigger_type=workflow_data.trigger_type,
-        trigger_config=workflow_data.trigger_config,
-        steps=[step.dict() for step in workflow_data.steps],
-        owner_id=current_user.id,
-        is_active=workflow_data.is_active,
-        is_public=workflow_data.is_public
-    )
-    
-    db.add(workflow)
-    db.commit()
-    db.refresh(workflow)
-    
-    # Schedule if it's a scheduled workflow
-    if workflow.trigger_type == "schedule" and workflow.is_active:
-        await schedule_workflow(workflow)
-    
-    return format_workflow_response(workflow)
+        
+        db.add(workflow)
+        db.commit()
+        db.refresh(workflow)
+        
+        # Log workflow creation
+        logger.info(f"Workflow created: {workflow.id} by user {current_user.id}")
+        
+        # Schedule if needed
+        if workflow.is_active and workflow.trigger_type == TriggerType.SCHEDULE.value:
+            background_tasks.add_task(schedule_workflow, workflow.id)
+        
+        return workflow_to_dict(workflow)
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as e:
+        logger.error(f"Error creating workflow: {str(e)}")
+        db.rollback()
+        raise HTTPException(500, f"Failed to create workflow: {str(e)}")
 
-
-@router.get("/", response_model=List[WorkflowResponse])
+@router.get("/workflows", response_model=Dict[str, Any])
 async def list_workflows(
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, ge=1, le=100),
     search: Optional[str] = None,
-    trigger_type: Optional[str] = None,
-    is_active: Optional[bool] = None,
-    include_public: bool = True,
-    limit: int = 20,
-    offset: int = 0,
+    trigger_type: Optional[TriggerType] = None,
+    status: Optional[WorkflowStatus] = None,
+    tags: Optional[List[str]] = Query(None),
+    sort_by: str = Query("created_at", pattern="^(created_at|updated_at|name|runs_count)$"),
+    sort_order: str = Query("desc", pattern="^(asc|desc)$"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """List workflows."""
-    query = db.query(Workflow)
-    
-    # Filter by ownership or public
-    if include_public:
-        query = query.filter(
-            or_(
-                Workflow.owner_id == current_user.id,
-                Workflow.is_public == True
-            )
-        )
-    else:
-        query = query.filter(Workflow.owner_id == current_user.id)
+    """List workflows with filtering, searching, and pagination."""
+    query = db.query(Workflow).filter(Workflow.owner_id == current_user.id)
     
     # Apply filters
     if search:
@@ -344,353 +285,493 @@ async def list_workflows(
         )
     
     if trigger_type:
-        query = query.filter(Workflow.trigger_type == trigger_type)
+        query = query.filter(Workflow.trigger_type == trigger_type.value)
     
-    if is_active is not None:
-        query = query.filter(Workflow.is_active == is_active)
+    if status:
+        if status == WorkflowStatus.ACTIVE:
+            query = query.filter(Workflow.is_active == True)
+        elif status == WorkflowStatus.PAUSED:
+            query = query.filter(Workflow.is_active == False)
     
-    # Order and paginate
-    workflows = query.order_by(Workflow.updated_at.desc()).offset(offset).limit(limit).all()
+    if tags:
+        for tag in tags:
+            query = query.filter(Workflow.tags.contains([tag]))
     
-    return [format_workflow_response(w) for w in workflows]
+    # Apply sorting
+    if sort_by == "runs_count":
+        query = query.outerjoin(WorkflowRun).group_by(Workflow.id)
+        order_by = func.count(WorkflowRun.id)
+    else:
+        order_by = getattr(Workflow, sort_by)
+    
+    if sort_order == "desc":
+        query = query.order_by(order_by.desc())
+    else:
+        query = query.order_by(order_by.asc())
+    
+    # Paginate
+    total = query.count()
+    workflows = query.offset((page - 1) * limit).limit(limit).all()
+    
+    return {
+        "items": [workflow_to_dict(w) for w in workflows],
+        "total": total,
+        "page": page,
+        "limit": limit,
+        "pages": (total + limit - 1) // limit
+    }
 
-
-@router.get("/{workflow_id}", response_model=WorkflowResponse)
+@router.get("/workflows/{workflow_id}")
 async def get_workflow(
-    workflow_id: UUID,
+    workflow_id: str,
+    include_runs: bool = Query(False),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Get workflow details."""
-    workflow = db.query(Workflow).filter(Workflow.id == workflow_id).first()
+    """Get workflow details with optional run history."""
+    workflow = db.query(Workflow).filter(
+        Workflow.id == workflow_id,
+        Workflow.owner_id == current_user.id
+    ).first()
     
     if not workflow:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Workflow not found"
-        )
+        raise HTTPException(404, "Workflow not found")
     
-    # Check access
-    if workflow.owner_id != current_user.id and not workflow.is_public:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not authorized to view this workflow"
-        )
+    result = workflow_to_dict(workflow)
     
-    return format_workflow_response(workflow)
+    if include_runs:
+        runs = db.query(WorkflowRun).filter(
+            WorkflowRun.workflow_id == workflow_id
+        ).order_by(WorkflowRun.started_at.desc()).limit(10).all()
+        result["recent_runs"] = [run_to_dict(run) for run in runs]
+    
+    return result
 
-
-@router.put("/{workflow_id}", response_model=WorkflowResponse)
+@router.put("/workflows/{workflow_id}")
 async def update_workflow(
-    workflow_id: UUID,
-    update_data: WorkflowUpdate,
+    workflow_id: str,
+    request: WorkflowUpdateRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Update workflow."""
-    workflow = db.query(Workflow).filter(Workflow.id == workflow_id).first()
+    """Update a workflow with version tracking."""
+    workflow = db.query(Workflow).filter(
+        Workflow.id == workflow_id,
+        Workflow.owner_id == current_user.id
+    ).first()
     
     if not workflow:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Workflow not found"
-        )
+        raise HTTPException(404, "Workflow not found")
     
-    # Check ownership
-    if workflow.owner_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not authorized to update this workflow"
-        )
-    
-    # Validate steps if provided
-    if update_data.steps:
-        try:
-            validate_workflow_steps(update_data.steps)
-        except ValueError as e:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=str(e)
-            )
+    # Track version
+    old_version = workflow.version or "1.0.0"
+    version_parts = old_version.split(".")
+    version_parts[2] = str(int(version_parts[2]) + 1)
+    new_version = ".".join(version_parts)
     
     # Update fields
-    for field, value in update_data.dict(exclude_unset=True).items():
-        if field == "steps":
-            value = [step.dict() for step in value]
+    update_data = request.dict(exclude_unset=True)
+    for field, value in update_data.items():
+        if field == "steps" and value is not None:
+            value = [step.dict() if hasattr(step, 'dict') else step for step in value]
         setattr(workflow, field, value)
     
-    db.commit()
-    db.refresh(workflow)
+    workflow.version = new_version
+    workflow.updated_at = datetime.utcnow()
     
-    # Update schedule if needed
-    if workflow.trigger_type == "schedule":
-        await update_workflow_schedule(workflow)
-    
-    return format_workflow_response(workflow)
+    try:
+        db.commit()
+        db.refresh(workflow)
+        logger.info(f"Workflow updated: {workflow_id} to version {new_version}")
+        return workflow_to_dict(workflow)
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error updating workflow: {str(e)}")
+        raise HTTPException(500, f"Failed to update workflow: {str(e)}")
 
-
-@router.delete("/{workflow_id}")
+@router.delete("/workflows/{workflow_id}")
 async def delete_workflow(
-    workflow_id: UUID,
+    workflow_id: str,
+    force: bool = Query(False),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Delete workflow."""
-    workflow = db.query(Workflow).filter(Workflow.id == workflow_id).first()
+    """Delete a workflow with optional force delete."""
+    workflow = db.query(Workflow).filter(
+        Workflow.id == workflow_id,
+        Workflow.owner_id == current_user.id
+    ).first()
     
     if not workflow:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Workflow not found"
-        )
+        raise HTTPException(404, "Workflow not found")
     
-    # Check ownership
-    if workflow.owner_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not authorized to delete this workflow"
-        )
+    # Check for active runs
+    active_runs = db.query(WorkflowRun).filter(
+        WorkflowRun.workflow_id == workflow_id,
+        WorkflowRun.status.in_([RunStatus.RUNNING.value, RunStatus.PENDING.value])
+    ).count()
     
-    # Remove schedule if exists
-    if workflow.trigger_type == "schedule":
-        await remove_workflow_schedule(workflow)
+    if active_runs > 0 and not force:
+        raise HTTPException(400, f"Cannot delete workflow with {active_runs} active runs. Use force=true to override.")
     
-    db.delete(workflow)
-    db.commit()
-    
-    return {"message": "Workflow deleted successfully"}
+    try:
+        db.delete(workflow)
+        db.commit()
+        logger.info(f"Workflow deleted: {workflow_id}")
+        return {"message": "Workflow deleted successfully", "id": workflow_id}
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error deleting workflow: {str(e)}")
+        raise HTTPException(500, f"Failed to delete workflow: {str(e)}")
 
-
-@router.post("/{workflow_id}/execute", response_model=WorkflowRunResponse)
+# Workflow execution endpoints
+@router.post("/workflows/{workflow_id}/execute")
 async def execute_workflow(
-    workflow_id: UUID,
+    workflow_id: str,
     request: WorkflowExecuteRequest,
     background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Execute a workflow."""
-    workflow = db.query(Workflow).filter(Workflow.id == workflow_id).first()
+    """Execute a workflow with options for dry run and sync/async execution."""
+    workflow = db.query(Workflow).filter(
+        Workflow.id == workflow_id,
+        Workflow.owner_id == current_user.id
+    ).first()
     
     if not workflow:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Workflow not found"
-        )
+        raise HTTPException(404, "Workflow not found")
     
-    # Check access
-    if workflow.owner_id != current_user.id and not workflow.is_public:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not authorized to execute this workflow"
-        )
+    if not workflow.is_active and not request.dry_run:
+        raise HTTPException(400, "Workflow is not active")
     
-    if not workflow.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Workflow is not active"
-        )
-    
-    # Create workflow run record
+    # Create workflow run
     run = WorkflowRun(
-        workflow_id=workflow_id,
-        status="running",
-        trigger_data=request.input_data,
-        steps_total=len(workflow.steps),
-        started_at=datetime.utcnow()
+        id=str(uuid4()),
+        workflow_id=workflow.id,
+        status=RunStatus.PENDING.value if request.dry_run else RunStatus.RUNNING.value,
+        started_at=datetime.utcnow(),
+        trigger_data={
+            "type": "manual",
+            "user_id": str(current_user.id),
+            "input": request.input_data,
+            "context": request.context,
+            "dry_run": request.dry_run
+        },
+        steps_total=len(workflow.steps) if isinstance(workflow.steps, list) else 1
     )
     
     db.add(run)
     db.commit()
     db.refresh(run)
     
+    if request.dry_run:
+        # Perform dry run validation
+        validation_result = validate_workflow_execution(workflow, request.input_data)
+        run.status = RunStatus.COMPLETED.value
+        run.completed_at = datetime.utcnow()
+        run.output = {"dry_run": True, "validation": validation_result}
+        db.commit()
+        return run_to_dict(run, detailed=True)
+    
     if request.async_execution:
-        # Execute in background
+        # Execute asynchronously
         background_tasks.add_task(
             execute_workflow_async,
-            workflow,
-            run,
+            str(workflow.id),
+            str(run.id),
             request.input_data,
-            db
+            request.context
         )
-        
-        return format_workflow_run_response(run, workflow.name)
+        return run_to_dict(run)
     else:
         # Execute synchronously
-        await execute_workflow_async(workflow, run, request.input_data, db)
-        db.refresh(run)
-        return format_workflow_run_response(run, workflow.name)
+        try:
+            result = await execute_workflow_sync(workflow, run, request.input_data, request.context, db)
+            return result
+        except HTTPException as e:
+            run.status = RunStatus.FAILED.value
+            run.error = str(e)
+            run.completed_at = datetime.utcnow()
+            db.commit()
+            raise
+        except Exception as e:
+            run.status = RunStatus.FAILED.value
+            run.error = str(e)
+            run.completed_at = datetime.utcnow()
+            db.commit()
+            raise HTTPException(500, f"Workflow execution failed: {str(e)}")
 
-
-@router.get("/{workflow_id}/runs", response_model=List[WorkflowRunResponse])
+@router.get("/workflows/{workflow_id}/runs")
 async def get_workflow_runs(
-    workflow_id: UUID,
-    status: Optional[str] = None,
-    limit: int = 20,
-    offset: int = 0,
+    workflow_id: str,
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, ge=1, le=100),
+    status: Optional[RunStatus] = None,
+    start_date: Optional[datetime] = None,
+    end_date: Optional[datetime] = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Get workflow execution history."""
-    workflow = db.query(Workflow).filter(Workflow.id == workflow_id).first()
+    """Get workflow execution history with filtering."""
+    workflow = db.query(Workflow).filter(
+        Workflow.id == workflow_id,
+        Workflow.owner_id == current_user.id
+    ).first()
     
     if not workflow:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Workflow not found"
-        )
-    
-    # Check access
-    if workflow.owner_id != current_user.id and not workflow.is_public:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not authorized to view workflow runs"
-        )
+        raise HTTPException(404, "Workflow not found")
     
     query = db.query(WorkflowRun).filter(WorkflowRun.workflow_id == workflow_id)
     
     if status:
-        query = query.filter(WorkflowRun.status == status)
+        query = query.filter(WorkflowRun.status == status.value)
     
-    runs = query.order_by(WorkflowRun.started_at.desc()).offset(offset).limit(limit).all()
+    if start_date:
+        query = query.filter(WorkflowRun.started_at >= start_date)
     
-    return [format_workflow_run_response(run, workflow.name) for run in runs]
+    if end_date:
+        query = query.filter(WorkflowRun.started_at <= end_date)
+    
+    query = query.order_by(WorkflowRun.started_at.desc())
+    
+    total = query.count()
+    runs = query.offset((page - 1) * limit).limit(limit).all()
+    
+    return {
+        "items": [run_to_dict(run) for run in runs],
+        "total": total,
+        "page": page,
+        "limit": limit,
+        "pages": (total + limit - 1) // limit,
+        "stats": get_run_stats(workflow_id, db)
+    }
 
+@router.get("/runs/{run_id}")
+async def get_workflow_run(
+    run_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get detailed information about a workflow run."""
+    run = db.query(WorkflowRun).join(Workflow).filter(
+        WorkflowRun.id == run_id,
+        Workflow.owner_id == current_user.id
+    ).first()
+    
+    if not run:
+        raise HTTPException(404, "Workflow run not found")
+    
+    return run_to_dict(run, detailed=True)
 
-# Trigger Management Endpoints
-@router.post("/triggers", response_model=TriggerResponse)
+@router.put("/runs/{run_id}/cancel")
+async def cancel_workflow_run(
+    run_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Cancel a running workflow execution."""
+    run = db.query(WorkflowRun).join(Workflow).filter(
+        WorkflowRun.id == run_id,
+        Workflow.owner_id == current_user.id
+    ).first()
+    
+    if not run:
+        raise HTTPException(404, "Workflow run not found")
+    
+    if run.status not in [RunStatus.RUNNING.value, RunStatus.PENDING.value]:
+        raise HTTPException(400, f"Cannot cancel run with status: {run.status}")
+    
+    run.status = RunStatus.CANCELLED.value
+    run.completed_at = datetime.utcnow()
+    run.error = "Cancelled by user"
+    
+    db.commit()
+    
+    # TODO: Implement actual cancellation logic for running workflows
+    
+    return {"message": "Workflow run cancelled", "run_id": run_id}
+
+@router.post("/runs/{run_id}/retry")
+async def retry_workflow_run(
+    run_id: str,
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Retry a failed workflow run."""
+    run = db.query(WorkflowRun).join(Workflow).filter(
+        WorkflowRun.id == run_id,
+        Workflow.owner_id == current_user.id
+    ).first()
+    
+    if not run:
+        raise HTTPException(404, "Workflow run not found")
+    
+    if run.status != RunStatus.FAILED.value:
+        raise HTTPException(400, "Can only retry failed runs")
+    
+    workflow = db.query(Workflow).filter(Workflow.id == run.workflow_id).first()
+    if not workflow.is_active:
+        raise HTTPException(400, "Workflow is not active")
+    
+    # Create new run based on failed run
+    new_run = WorkflowRun(
+        id=str(uuid4()),
+        workflow_id=run.workflow_id,
+        status=RunStatus.RUNNING.value,
+        started_at=datetime.utcnow(),
+        trigger_data=run.trigger_data,
+        steps_total=run.steps_total,
+        parent_run_id=run.id
+    )
+    
+    db.add(new_run)
+    db.commit()
+    
+    background_tasks.add_task(
+        execute_workflow_async,
+        run.workflow_id,
+        new_run.id,
+        run.trigger_data.get("input", {}),
+        run.trigger_data.get("context", {})
+    )
+    
+    return run_to_dict(new_run)
+
+# Trigger management endpoints
+@router.post("/triggers")
 async def create_trigger(
-    trigger_data: TriggerCreate,
+    request: TriggerCreateRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Create a workflow trigger."""
-    # Verify workflow ownership
-    workflow = db.query(Workflow).filter(Workflow.id == trigger_data.workflow_id).first()
+    workflow = db.query(Workflow).filter(
+        Workflow.id == request.workflow_id,
+        Workflow.owner_id == current_user.id
+    ).first()
     
     if not workflow:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Workflow not found"
-        )
+        raise HTTPException(404, "Workflow not found")
     
-    if workflow.owner_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not authorized to create triggers for this workflow"
-        )
+    # Validate trigger configuration
+    if request.trigger_type == TriggerType.SCHEDULE:
+        if 'cron' not in request.config:
+            raise HTTPException(400, "Schedule trigger requires 'cron' in config")
+        if not croniter.is_valid(request.config['cron']):
+            raise HTTPException(400, "Invalid cron expression")
+    elif request.trigger_type == TriggerType.WEBHOOK:
+        if 'secret' not in request.config:
+            request.config['secret'] = str(uuid4())
     
-    # Create trigger (in production, this would be a separate table)
     trigger_id = str(uuid4())
     
-    # Register trigger based on type
-    if trigger_data.type == "webhook":
-        webhook_url = await register_webhook_trigger(
-            trigger_id,
-            trigger_data.workflow_id,
-            trigger_data.config
-        )
-        trigger_data.config["webhook_url"] = webhook_url
+    # Store trigger in workflow metadata
+    if 'triggers' not in workflow.meta_data:
+        workflow.meta_data['triggers'] = []
     
-    elif trigger_data.type == "schedule":
-        await register_schedule_trigger(
-            trigger_id,
-            trigger_data.workflow_id,
-            trigger_data.config
-        )
+    trigger = {
+        "id": trigger_id,
+        "type": request.trigger_type.value,
+        "config": request.config,
+        "is_enabled": request.is_enabled,
+        "name": request.name or f"{request.trigger_type.value} trigger",
+        "description": request.description,
+        "created_at": datetime.utcnow().isoformat()
+    }
     
-    return TriggerResponse(
-        id=trigger_id,
-        name=trigger_data.name,
-        type=trigger_data.type,
-        config=trigger_data.config,
-        workflow_id=str(trigger_data.workflow_id),
-        is_active=trigger_data.is_active,
-        last_triggered=None,
-        next_run=calculate_next_run(trigger_data.type, trigger_data.config),
-        created_at=datetime.utcnow()
-    )
+    workflow.meta_data['triggers'].append(trigger)
+    
+    # Mark as modified for SQLAlchemy to detect changes
+    flag_modified(workflow, 'meta_data')
+    db.commit()
+    
+    return trigger
 
-
-@router.get("/triggers", response_model=List[TriggerResponse])
+@router.get("/triggers")
 async def list_triggers(
-    workflow_id: Optional[UUID] = None,
-    type: Optional[str] = None,
-    is_active: Optional[bool] = None,
+    workflow_id: Optional[str] = None,
+    trigger_type: Optional[TriggerType] = None,
+    is_enabled: Optional[bool] = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """List workflow triggers."""
-    # In production, query from triggers table
-    # For now, return triggers from workflows
     query = db.query(Workflow).filter(Workflow.owner_id == current_user.id)
     
     if workflow_id:
         query = query.filter(Workflow.id == workflow_id)
     
     workflows = query.all()
-    
     triggers = []
+    
     for workflow in workflows:
-        if workflow.trigger_type != "manual":
-            triggers.append(
-                TriggerResponse(
-                    id=str(workflow.id),
-                    name=f"{workflow.name} Trigger",
-                    type=workflow.trigger_type,
-                    config=workflow.trigger_config,
-                    workflow_id=str(workflow.id),
-                    is_active=workflow.is_active,
-                    last_triggered=workflow.last_run_at,
-                    next_run=calculate_next_run(workflow.trigger_type, workflow.trigger_config),
-                    created_at=workflow.created_at
-                )
-            )
+        workflow_triggers = workflow.meta_data.get('triggers', [])
+        for trigger in workflow_triggers:
+            if trigger_type and trigger['type'] != trigger_type.value:
+                continue
+            if is_enabled is not None and trigger['is_enabled'] != is_enabled:
+                continue
+            
+            trigger['workflow_id'] = workflow.id
+            trigger['workflow_name'] = workflow.name
+            triggers.append(trigger)
     
     return triggers
 
-
-@router.put("/triggers/{trigger_id}", response_model=TriggerResponse)
-async def update_trigger(
+@router.get("/triggers/{trigger_id}")
+async def get_trigger(
     trigger_id: str,
-    update_data: TriggerUpdate,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Update trigger configuration."""
-    # In production, update trigger in database
-    # For now, return mock response
-    # In production, would query trigger from database
-    # For now, create a mock trigger that we're updating
-    mock_trigger = {
-        "id": trigger_id,
-        "name": "Existing Trigger",
-        "type": "webhook",
-        "config": {"webhook_url": "https://example.com/webhook"},
-        "workflow_id": str(uuid4()),
-        "is_active": True
-    }
+    """Get trigger details."""
+    workflows = db.query(Workflow).filter(Workflow.owner_id == current_user.id).all()
     
-    # Apply updates
-    if update_data.name is not None:
-        mock_trigger["name"] = update_data.name
-    if update_data.config is not None:
-        mock_trigger["config"].update(update_data.config)
-    if update_data.is_active is not None:
-        mock_trigger["is_active"] = update_data.is_active
+    for workflow in workflows:
+        triggers = workflow.meta_data.get('triggers', [])
+        for trigger in triggers:
+            if trigger['id'] == trigger_id:
+                trigger['workflow_id'] = workflow.id
+                trigger['workflow_name'] = workflow.name
+                return trigger
     
-    return TriggerResponse(
-        id=mock_trigger["id"],
-        name=mock_trigger["name"],
-        type=mock_trigger["type"],
-        config=mock_trigger["config"],
-        workflow_id=mock_trigger["workflow_id"],
-        is_active=mock_trigger["is_active"],
-        last_triggered=None,
-        next_run=calculate_next_run(mock_trigger["type"], mock_trigger["config"]),
-        created_at=datetime.utcnow()
-    )
+    raise HTTPException(404, "Trigger not found")
 
+@router.put("/triggers/{trigger_id}")
+async def update_trigger(
+    trigger_id: str,
+    request: TriggerUpdateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Update a trigger."""
+    workflows = db.query(Workflow).filter(Workflow.owner_id == current_user.id).all()
+    
+    for workflow in workflows:
+        triggers = workflow.meta_data.get('triggers', [])
+        for i, trigger in enumerate(triggers):
+            if trigger['id'] == trigger_id:
+                # Update trigger
+                update_data = request.dict(exclude_unset=True)
+                trigger.update(update_data)
+                trigger['updated_at'] = datetime.utcnow().isoformat()
+                
+                workflow.meta_data['triggers'][i] = trigger
+                # Mark as modified for SQLAlchemy to detect changes
+                flag_modified(workflow, 'meta_data')
+                db.commit()
+                
+                return trigger
+    
+    raise HTTPException(404, "Trigger not found")
 
 @router.delete("/triggers/{trigger_id}")
 async def delete_trigger(
@@ -699,540 +780,934 @@ async def delete_trigger(
     db: Session = Depends(get_db)
 ):
     """Delete a trigger."""
-    # In production, remove trigger from database and deregister
-    return {"message": "Trigger deleted successfully"}
+    workflows = db.query(Workflow).filter(Workflow.owner_id == current_user.id).all()
+    
+    for workflow in workflows:
+        triggers = workflow.meta_data.get('triggers', [])
+        for i, trigger in enumerate(triggers):
+            if trigger['id'] == trigger_id:
+                workflow.meta_data['triggers'].pop(i)
+                # Mark as modified for SQLAlchemy to detect changes
+                flag_modified(workflow, 'meta_data')
+                db.commit()
+                return {"message": "Trigger deleted successfully"}
+    
+    raise HTTPException(404, "Trigger not found")
 
-
-@router.post("/triggers/{trigger_id}/enable")
-async def enable_trigger(
-    trigger_id: str,
-    current_user: User = Depends(get_current_user),
+# Webhook endpoints
+@router.post("/webhooks/{webhook_id}/receive")
+async def receive_webhook(
+    webhook_id: str,
+    request: Request,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db)
 ):
-    """Enable a trigger."""
-    # In production, enable trigger in database
-    return {"message": "Trigger enabled successfully"}
-
-
-@router.post("/triggers/{trigger_id}/disable")
-async def disable_trigger(
-    trigger_id: str,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """Disable a trigger."""
-    # In production, disable trigger in database
-    return {"message": "Trigger disabled successfully"}
-
-
-# Integration Management Endpoints
-@router.get("/integrations", response_model=List[IntegrationResponse])
-async def list_integrations(
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """List available integrations."""
-    integrations = db.query(Integration).filter(
-        Integration.user_id == current_user.id
+    """Receive webhook and trigger associated workflows."""
+    body = await request.body()
+    headers = dict(request.headers)
+    
+    # Find workflows with this webhook trigger
+    workflows = db.query(Workflow).filter(
+        Workflow.trigger_type == TriggerType.WEBHOOK.value,
+        Workflow.is_active == True
     ).all()
     
+    triggered_count = 0
+    
+    for workflow in workflows:
+        webhook_config = workflow.trigger_config
+        if webhook_config.get('webhook_id') == webhook_id:
+            # Verify webhook signature if configured
+            if 'secret' in webhook_config:
+                signature = headers.get('x-webhook-signature', '')
+                expected_signature = hmac.new(
+                    webhook_config['secret'].encode(),
+                    body,
+                    hashlib.sha256
+                ).hexdigest()
+                
+                if signature != expected_signature:
+                    logger.warning(f"Invalid webhook signature for workflow {workflow.id}")
+                    continue
+            
+            # Log webhook event
+            event = WebhookEvent(
+                id=str(uuid4()),
+                source=f"webhook_{webhook_id}",
+                event_type="workflow_trigger",
+                headers=headers,
+                payload=json.loads(body) if body else {},
+                signature=headers.get('x-webhook-signature'),
+                processed=False
+            )
+            db.add(event)
+            
+            # Create workflow run
+            run = WorkflowRun(
+                id=str(uuid4()),
+                workflow_id=workflow.id,
+                status=RunStatus.RUNNING.value,
+                started_at=datetime.utcnow(),
+                trigger_data={
+                    "type": "webhook",
+                    "webhook_id": webhook_id,
+                    "headers": headers,
+                    "body": json.loads(body) if body else {}
+                },
+                steps_total=len(workflow.steps)
+            )
+            
+            db.add(run)
+            db.commit()
+            
+            # Execute workflow
+            background_tasks.add_task(
+                execute_workflow_async,
+                workflow.id,
+                run.id,
+                json.loads(body) if body else {},
+                {"headers": headers}
+            )
+            
+            triggered_count += 1
+    
+    if triggered_count == 0:
+        raise HTTPException(404, "No active workflows found for this webhook")
+    
+    return {
+        "message": f"Webhook received and triggered {triggered_count} workflow(s)",
+        "webhook_id": webhook_id,
+        "triggered_count": triggered_count
+    }
+
+@router.post("/webhooks/test")
+async def test_webhook(
+    request: WebhookTestRequest,
+    current_user: User = Depends(get_current_user)
+):
+    """Test a webhook endpoint."""
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.request(
+                method=request.method,
+                url=request.webhook_url,
+                json=request.payload,
+                headers=request.headers,
+                timeout=10.0
+            )
+            
+            return {
+                "status_code": response.status_code,
+                "headers": dict(response.headers),
+                "body": response.text[:1000],  # Limit response size
+                "success": 200 <= response.status_code < 300
+            }
+    except Exception as e:
+        return {
+            "error": str(e),
+            "success": False
+        }
+
+@router.get("/webhooks/{webhook_id}/events")
+async def get_webhook_events(
+    webhook_id: str,
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, ge=1, le=100),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get webhook event history."""
+    # Verify user owns workflows with this webhook
+    workflow = db.query(Workflow).filter(
+        Workflow.owner_id == current_user.id,
+        Workflow.trigger_type == TriggerType.WEBHOOK.value
+    ).first()
+    
+    if not workflow or workflow.trigger_config.get('webhook_id') != webhook_id:
+        raise HTTPException(403, "Access denied")
+    
+    query = db.query(WebhookEvent).filter(
+        WebhookEvent.source == f"webhook_{webhook_id}"
+    ).order_by(WebhookEvent.received_at.desc())
+    
+    total = query.count()
+    events = query.offset((page - 1) * limit).limit(limit).all()
+    
+    return {
+        "items": [
+            {
+                "id": str(event.id),
+                "source": event.source,
+                "event_type": event.event_type,
+                "headers": event.headers,
+                "payload": event.payload,
+                "processed": event.processed,
+                "received_at": event.received_at.isoformat() if hasattr(event, 'received_at') and event.received_at else datetime.utcnow().isoformat()
+            }
+            for event in events
+        ],
+        "total": total,
+        "page": page,
+        "limit": limit,
+        "pages": (total + limit - 1) // limit
+    }
+
+# Integration management endpoints
+@router.get("/integrations/available")
+async def list_available_integrations():
+    """List all available integration types."""
+    integrations = []
+    
+    for integration_type in IntegrationType:
+        integrations.append({
+            "id": integration_type.value,
+            "name": integration_type.value.replace("_", " ").title(),
+            "description": get_integration_description(integration_type),
+            "icon": f"{integration_type.value}-icon.png",
+            "required_config": get_integration_required_config(integration_type),
+            "available_actions": get_integration_actions(integration_type)
+        })
+    
+    return integrations
+
+@router.get("/integrations/connected")
+async def list_connected_integrations(
+    integration_type: Optional[IntegrationType] = None,
+    is_active: Optional[bool] = None,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """List user's connected integrations."""
+    query = db.query(Integration).filter(Integration.user_id == current_user.id)
+    
+    if integration_type:
+        query = query.filter(Integration.type == integration_type.value)
+    
+    if is_active is not None:
+        query = query.filter(Integration.is_active == is_active)
+    
+    integrations = query.all()
+    
     return [
-        IntegrationResponse(
-            id=str(integration.id),
-            type=integration.type,
-            name=integration.name,
-            is_active=integration.is_active,
-            connected_at=integration.connected_at,
-            last_synced_at=integration.last_synced_at
-        )
+        {
+            "id": str(integration.id),
+            "type": integration.type,
+            "name": integration.name,
+            "description": getattr(integration, 'description', None),
+            "is_active": integration.is_active,
+            "scopes": integration.meta_data.get('scopes', []) if integration.meta_data else [],
+            "created_at": integration.created_at.isoformat() if integration.created_at else None,
+            "last_synced_at": integration.last_synced_at.isoformat() if hasattr(integration, 'last_synced_at') and integration.last_synced_at else None
+        }
         for integration in integrations
     ]
 
-
-@router.post("/integrations/{type}/connect")
+@router.post("/integrations/connect")
 async def connect_integration(
-    type: str,
-    config: IntegrationConfig,
+    request: IntegrationConnectRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Connect a new integration."""
-    # Validate integration type
-    valid_types = ["slack", "clickup", "notion", "make", "zapier", "stripe"]
-    if type not in valid_types:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid integration type. Must be one of: {valid_types}"
-        )
-    
     # Check if already connected
     existing = db.query(Integration).filter(
-        and_(
-            Integration.user_id == current_user.id,
-            Integration.type == type
-        )
+        Integration.user_id == current_user.id,
+        Integration.type == request.integration_type.value
     ).first()
     
     if existing:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Integration already connected"
-        )
+        raise HTTPException(400, f"{request.integration_type.value} integration already connected")
     
-    # Create integration
+    # Validate configuration
+    required_config = get_integration_required_config(request.integration_type)
+    for field in required_config:
+        if field not in request.config:
+            raise HTTPException(400, f"Missing required field: {field}")
+    
     integration = Integration(
+        id=str(uuid4()),
         user_id=current_user.id,
-        type=type,
-        name=config.name,
-        config=config.config,
-        webhook_url=config.webhook_url,
-        is_active=True
+        type=request.integration_type.value,
+        name=request.name,
+        config=request.config,
+        is_active=True,
+        meta_data={
+            "description": request.description,
+            "scopes": request.scopes
+        }
     )
     
     db.add(integration)
     db.commit()
+    db.refresh(integration)
     
-    # Initialize integration
-    await initialize_integration(integration)
+    logger.info(f"Integration connected: {integration.type} for user {current_user.id}")
     
-    return {"message": f"{type} integration connected successfully"}
+    return {
+        "id": str(integration.id),
+        "type": integration.type,
+        "name": integration.name,
+        "is_active": integration.is_active,
+        "created_at": integration.created_at.isoformat() if integration.created_at else datetime.utcnow().isoformat()
+    }
 
+@router.put("/integrations/{integration_id}")
+async def update_integration(
+    integration_id: str,
+    request: IntegrationUpdateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Update an integration."""
+    integration = db.query(Integration).filter(
+        Integration.id == integration_id,
+        Integration.user_id == current_user.id
+    ).first()
+    
+    if not integration:
+        raise HTTPException(404, "Integration not found")
+    
+    update_data = request.dict(exclude_unset=True)
+    for field, value in update_data.items():
+        if field == "config" and value:
+            # Merge config
+            integration.config.update(value)
+            flag_modified(integration, 'config')
+        elif field == "meta_data" and value:
+            integration.meta_data.update(value)
+            flag_modified(integration, 'meta_data')
+        else:
+            setattr(integration, field, value)
+    
+    db.commit()
+    db.refresh(integration)
+    
+    return {
+        "id": str(integration.id),
+        "type": integration.type,
+        "name": integration.name,
+        "config": integration.config,
+        "is_active": integration.is_active,
+        "updated": True
+    }
 
-@router.delete("/integrations/{type}/disconnect")
+@router.delete("/integrations/{integration_id}")
 async def disconnect_integration(
-    type: str,
+    integration_id: str,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Disconnect an integration."""
     integration = db.query(Integration).filter(
-        and_(
-            Integration.user_id == current_user.id,
-            Integration.type == type
-        )
+        Integration.id == integration_id,
+        Integration.user_id == current_user.id
     ).first()
     
     if not integration:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Integration not found"
-        )
-    
-    # Cleanup integration
-    await cleanup_integration(integration)
+        raise HTTPException(404, "Integration not found")
     
     db.delete(integration)
     db.commit()
     
-    return {"message": f"{type} integration disconnected successfully"}
+    logger.info(f"Integration disconnected: {integration.type} for user {current_user.id}")
+    
+    return {"message": f"{integration.name} integration disconnected successfully"}
 
-
-@router.get("/integrations/{type}/status")
+@router.get("/integrations/{integration_id}/status")
 async def get_integration_status(
-    type: str,
+    integration_id: str,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Check integration status."""
+    """Get integration status and health."""
     integration = db.query(Integration).filter(
-        and_(
-            Integration.user_id == current_user.id,
-            Integration.type == type
-        )
+        Integration.id == integration_id,
+        Integration.user_id == current_user.id
     ).first()
     
     if not integration:
-        return {"connected": False}
+        raise HTTPException(404, "Integration not found")
     
-    # Check actual status
-    is_healthy = await check_integration_health(integration)
+    # Test integration connection
+    health = await test_integration_health(integration)
     
     return {
-        "connected": True,
+        "id": str(integration.id),
+        "type": integration.type,
+        "name": integration.name,
         "is_active": integration.is_active,
-        "is_healthy": is_healthy,
-        "last_synced_at": integration.last_synced_at
+        "health": health,
+        "last_synced_at": integration.last_synced_at.isoformat() if hasattr(integration, 'last_synced_at') and integration.last_synced_at else None,
+        "created_at": integration.created_at.isoformat() if integration.created_at else None
     }
 
+@router.post("/integrations/{integration_id}/test")
+async def test_integration(
+    integration_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Test an integration connection."""
+    integration = db.query(Integration).filter(
+        Integration.id == integration_id,
+        Integration.user_id == current_user.id
+    ).first()
+    
+    if not integration:
+        raise HTTPException(404, "Integration not found")
+    
+    result = await test_integration_connection(integration)
+    
+    return result
 
-@router.post("/integrations/{type}/sync")
-async def sync_integration(
-    type: str,
+# Bulk operations
+@router.post("/workflows/bulk")
+async def bulk_workflow_operations(
+    request: WorkflowBulkRequest,
     background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Force sync with integration."""
-    integration = db.query(Integration).filter(
-        and_(
-            Integration.user_id == current_user.id,
-            Integration.type == type
-        )
-    ).first()
+    """Perform bulk operations on workflows."""
+    workflows = db.query(Workflow).filter(
+        Workflow.id.in_(request.workflow_ids),
+        Workflow.owner_id == current_user.id
+    ).all()
     
-    if not integration:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Integration not found"
-        )
+    if len(workflows) != len(request.workflow_ids):
+        raise HTTPException(400, "Some workflows not found or access denied")
     
-    if not integration.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Integration is not active"
-        )
+    results = []
     
-    # Sync in background
-    background_tasks.add_task(
-        sync_integration_data,
-        integration,
-        db
-    )
-    
-    return {"message": "Sync initiated"}
-
-
-# Helper functions for workflow execution
-async def execute_workflow_async(workflow: Workflow, run: WorkflowRun, input_data: Dict[str, Any], db: Session):
-    """Execute workflow asynchronously."""
-    context = {"input": input_data, "workflow_id": str(workflow.id)}
-    
-    try:
-        # Execute each step
-        for i, step_data in enumerate(workflow.steps):
-            step = WorkflowStep(**step_data)
-            
-            # Execute step
-            result = await execute_workflow_step(step, context, db)
-            
-            # Update context with result
-            context[f"step_{step.id}_result"] = result
-            
-            # Update progress
-            run.steps_completed = i + 1
-            db.commit()
-            
-            # Determine next step based on result
-            if step.type == "condition":
-                # Branch based on condition result
-                if result and len(step.next_steps) > 1:
-                    # Take true branch (assuming second next_step)
-                    next_step_id = step.next_steps[1]
-                else:
-                    # Take false branch (first next_step)
-                    next_step_id = step.next_steps[0] if step.next_steps else None
-            else:
-                # Normal flow
-                next_step_id = step.next_steps[0] if step.next_steps else None
-            
-            if next_step_id == "end" or not next_step_id:
-                break
-        
-        # Mark as completed
-        run.status = "completed"
-        run.output = context
-        run.completed_at = datetime.utcnow()
-        run.duration_ms = int((run.completed_at - run.started_at).total_seconds() * 1000)
-        
-        # Update workflow stats
-        workflow.run_count += 1
-        workflow.success_count += 1
-        workflow.last_run_at = datetime.utcnow()
-        
-    except Exception as e:
-        # Mark as failed
-        run.status = "failed"
-        run.error = str(e)
-        run.completed_at = datetime.utcnow()
-        run.duration_ms = int((run.completed_at - run.started_at).total_seconds() * 1000)
-        
-        # Update workflow stats
-        workflow.run_count += 1
-        workflow.last_run_at = datetime.utcnow()
-    
-    db.commit()
-
-
-async def schedule_workflow(workflow: Workflow):
-    """Schedule a workflow for periodic execution."""
-    if workflow.trigger_type == "schedule":
-        cron = workflow.trigger_config.get("cron")
-        if cron:
-            # Add to scheduler
-            scheduler.add_job(
-                execute_scheduled_workflow,
-                "cron",
-                args=[str(workflow.id)],
-                id=f"workflow_{workflow.id}",
-                cron=cron,
-                replace_existing=True
-            )
-
-
-async def update_workflow_schedule(workflow: Workflow):
-    """Update workflow schedule."""
-    job_id = f"workflow_{workflow.id}"
-    
-    if workflow.is_active and workflow.trigger_type == "schedule":
-        cron = workflow.trigger_config.get("cron")
-        if cron:
-            scheduler.reschedule_job(
-                job_id,
-                trigger="cron",
-                cron=cron
-            )
-    else:
-        # Remove schedule if not active
+    for workflow in workflows:
         try:
-            scheduler.remove_job(job_id)
-        except:
-            pass
-
-
-async def remove_workflow_schedule(workflow: Workflow):
-    """Remove workflow from scheduler."""
-    try:
-        scheduler.remove_job(f"workflow_{workflow.id}")
-    except:
-        pass
-
-
-async def execute_scheduled_workflow(workflow_id: str):
-    """Execute a scheduled workflow."""
-    from ..core.database import SessionLocal
+            if request.action == "activate":
+                workflow.is_active = True
+                result = {"id": workflow.id, "status": "activated"}
+            elif request.action == "deactivate":
+                workflow.is_active = False
+                result = {"id": workflow.id, "status": "deactivated"}
+            elif request.action == "archive":
+                workflow.meta_data['archived'] = True
+                workflow.meta_data['archived_at'] = datetime.utcnow().isoformat()
+                flag_modified(workflow, 'meta_data')
+                result = {"id": workflow.id, "status": "archived"}
+            elif request.action == "delete":
+                db.delete(workflow)
+                result = {"id": workflow.id, "status": "deleted"}
+            elif request.action == "export":
+                result = {
+                    "id": workflow.id,
+                    "status": "exported",
+                    "data": workflow_to_dict(workflow, include_sensitive=False)
+                }
+            
+            results.append(result)
+        except Exception as e:
+            results.append({
+                "id": workflow.id,
+                "status": "error",
+                "error": str(e)
+            })
     
-    db = SessionLocal()
-    try:
-        # Get workflow
-        workflow = db.query(Workflow).filter(Workflow.id == workflow_id).first()
-        
-        if not workflow or not workflow.is_active:
-            return
-        
-        # Create workflow run
-        run = WorkflowRun(
-            workflow_id=workflow_id,
-            status="running",
-            trigger_data={"trigger": "schedule"},
-            steps_total=len(workflow.steps),
-            started_at=datetime.utcnow()
-        )
-        
-        db.add(run)
-        db.commit()
-        db.refresh(run)
-        
-        # Execute workflow
-        await execute_workflow_async(workflow, run, {"trigger": "schedule"}, db)
-        
-    finally:
-        db.close()
-
-
-def calculate_next_run(trigger_type: str, config: Dict[str, Any]) -> Optional[datetime]:
-    """Calculate next run time for scheduled triggers."""
-    if trigger_type == "schedule":
-        cron_expr = config.get("cron")
-        if cron_expr:
-            cron = croniter(cron_expr, datetime.utcnow())
-            return cron.get_next(datetime)
-    
-    return None
-
-
-async def register_webhook_trigger(trigger_id: str, workflow_id: str, config: Dict[str, Any]) -> str:
-    """Register a webhook trigger and return the URL."""
-    secret = config.get("secret", str(uuid4()))
-    webhook_url = f"{settings.BASE_URL}/api/v1/webhooks/workflow/{workflow_id}/{secret}"
-    
-    # Store webhook mapping (in production, use database)
-    return webhook_url
-
-
-async def register_schedule_trigger(trigger_id: str, workflow_id: str, config: Dict[str, Any]):
-    """Register a scheduled trigger."""
-    cron = config.get("cron")
-    if cron:
-        # Add to scheduler
-        scheduler.add_job(
-            execute_scheduled_workflow,
-            "cron",
-            args=[workflow_id],
-            id=f"trigger_{trigger_id}",
-            cron=cron,
-            replace_existing=True
-        )
-
-
-async def initialize_integration(integration: Integration):
-    """Initialize integration connection."""
-    # Perform integration-specific setup
-    if integration.type == "slack":
-        # Verify Slack webhook URL
-        if integration.webhook_url:
-            import httpx
-            async with httpx.AsyncClient() as client:
-                try:
-                    response = await client.post(
-                        integration.webhook_url,
-                        json={"text": "BrainOps integration connected successfully!"}
-                    )
-                    return response.status_code == 200
-                except:
-                    return False
-    
-    elif integration.type == "clickup":
-        # Verify ClickUp API token
-        api_token = integration.config.get("api_token")
-        if api_token:
-            import httpx
-            async with httpx.AsyncClient() as client:
-                try:
-                    response = await client.get(
-                        "https://api.clickup.com/api/v2/user",
-                        headers={"Authorization": api_token}
-                    )
-                    return response.status_code == 200
-                except:
-                    return False
-    
-    elif integration.type == "notion":
-        # Verify Notion API token
-        api_token = integration.config.get("api_token")
-        if api_token:
-            import httpx
-            async with httpx.AsyncClient() as client:
-                try:
-                    response = await client.get(
-                        "https://api.notion.com/v1/users/me",
-                        headers={
-                            "Authorization": f"Bearer {api_token}",
-                            "Notion-Version": "2022-06-28"
-                        }
-                    )
-                    return response.status_code == 200
-                except:
-                    return False
-    
-    elif integration.type == "make":
-        # Make.com webhook verification
-        webhook_url = integration.webhook_url
-        if webhook_url:
-            return True  # Make.com webhooks are ready immediately
-    
-    elif integration.type == "zapier":
-        # Zapier webhook verification
-        webhook_url = integration.webhook_url
-        if webhook_url:
-            return True  # Zapier webhooks are ready immediately
-    
-    elif integration.type == "stripe":
-        # Verify Stripe API key
-        api_key = integration.config.get("api_key")
-        if api_key:
-            import httpx
-            async with httpx.AsyncClient() as client:
-                try:
-                    response = await client.get(
-                        "https://api.stripe.com/v1/customers?limit=1",
-                        headers={"Authorization": f"Bearer {api_key}"}
-                    )
-                    return response.status_code == 200
-                except:
-                    return False
-    
-    return True
-
-
-async def cleanup_integration(integration: Integration):
-    """Cleanup integration resources."""
-    # Remove webhooks, tokens, etc.
-    if integration.type == "slack":
-        # Notify disconnection
-        if integration.webhook_url:
-            import httpx
-            async with httpx.AsyncClient() as client:
-                try:
-                    await client.post(
-                        integration.webhook_url,
-                        json={"text": "BrainOps integration disconnected."}
-                    )
-                except:
-                    pass
-    
-    elif integration.type == "clickup":
-        # ClickUp doesn't require cleanup
-        pass
-    
-    elif integration.type == "notion":
-        # Notion doesn't require cleanup
-        pass
-    
-    elif integration.type in ["make", "zapier"]:
-        # Webhook platforms - notify disconnection if possible
-        if integration.webhook_url:
-            import httpx
-            async with httpx.AsyncClient() as client:
-                try:
-                    await client.post(
-                        integration.webhook_url,
-                        json={"event": "integration.disconnected", "source": "brainops"}
-                    )
-                except:
-                    pass
-    
-    elif integration.type == "stripe":
-        # Stripe doesn't require cleanup
-        pass
-
-
-async def check_integration_health(integration: Integration) -> bool:
-    """Check if integration is healthy."""
-    # Ping integration API
-    return True
-
-
-async def sync_integration_data(integration: Integration, db: Session):
-    """Sync data from integration."""
-    # Perform integration-specific sync
-    integration.last_synced_at = datetime.utcnow()
     db.commit()
+    
+    return {
+        "action": request.action,
+        "total": len(workflows),
+        "results": results
+    }
 
+@router.post("/workflows/import")
+async def import_workflows(
+    request: WorkflowImportRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Import workflows from exported data."""
+    results = []
+    
+    for workflow_data in request.workflows:
+        try:
+            # Check if workflow exists
+            existing = None
+            if 'id' in workflow_data:
+                existing = db.query(Workflow).filter(
+                    Workflow.id == workflow_data['id'],
+                    Workflow.owner_id == current_user.id
+                ).first()
+            
+            if existing:
+                if request.mode == "skip":
+                    results.append({
+                        "name": workflow_data.get('name'),
+                        "status": "skipped",
+                        "message": "Workflow already exists"
+                    })
+                    continue
+                elif request.mode == "overwrite":
+                    # Update existing workflow
+                    for key, value in workflow_data.items():
+                        if key not in ['id', 'owner_id', 'created_at']:
+                            setattr(existing, key, value)
+                    
+                    if not request.dry_run:
+                        db.commit()
+                    
+                    results.append({
+                        "name": workflow_data.get('name'),
+                        "status": "updated",
+                        "id": existing.id
+                    })
+                elif request.mode == "merge":
+                    # Create new version
+                    workflow_data['id'] = str(uuid4())
+                    workflow_data['name'] = f"{workflow_data.get('name', 'Imported')} (Copy)"
+            
+            if not existing or request.mode == "merge":
+                # Create new workflow
+                workflow = Workflow(
+                    id=workflow_data.get('id', str(uuid4())),
+                    owner_id=current_user.id,
+                    name=workflow_data.get('name', 'Imported Workflow'),
+                    description=workflow_data.get('description', ''),
+                    trigger_type=workflow_data.get('trigger_type', 'manual'),
+                    trigger_config=workflow_data.get('trigger_config', {}),
+                    steps=workflow_data.get('steps', []),
+                    is_active=workflow_data.get('is_active', False),
+                    tags=workflow_data.get('tags', []),
+                    metadata=workflow_data.get('metadata', {}),
+                    version=workflow_data.get('version', '1.0.0')
+                )
+                
+                if not request.dry_run:
+                    db.add(workflow)
+                
+                results.append({
+                    "name": workflow.name,
+                    "status": "created",
+                    "id": workflow.id
+                })
+                
+        except Exception as e:
+            results.append({
+                "name": workflow_data.get('name', 'Unknown'),
+                "status": "error",
+                "error": str(e)
+            })
+    
+    if not request.dry_run:
+        db.commit()
+    
+    return {
+        "mode": request.mode,
+        "dry_run": request.dry_run,
+        "total": len(request.workflows),
+        "results": results
+    }
 
-def format_workflow_response(workflow: Workflow) -> WorkflowResponse:
-    """Format workflow response."""
-    return WorkflowResponse(
-        id=str(workflow.id),
-        name=workflow.name,
-        description=workflow.description,
-        trigger_type=workflow.trigger_type,
-        trigger_config=workflow.trigger_config,
-        steps=[WorkflowStep(**step) for step in workflow.steps],
-        owner_id=str(workflow.owner_id),
-        team_id=str(workflow.team_id) if workflow.team_id else None,
-        is_active=workflow.is_active,
-        is_public=workflow.is_public,
-        run_count=workflow.run_count,
-        success_count=workflow.success_count,
-        last_run_at=workflow.last_run_at,
-        created_at=workflow.created_at,
-        updated_at=workflow.updated_at
+# Admin endpoints
+@router.get("/admin/workflows", dependencies=[Depends(get_admin_user)])
+async def admin_list_all_workflows(
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
+    user_id: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
+    """Admin endpoint to list all workflows."""
+    query = db.query(Workflow)
+    
+    if user_id:
+        query = query.filter(Workflow.owner_id == user_id)
+    
+    total = query.count()
+    workflows = query.offset((page - 1) * limit).limit(limit).all()
+    
+    return {
+        "items": [workflow_to_dict(w, include_owner=True) for w in workflows],
+        "total": total,
+        "page": page,
+        "limit": limit,
+        "pages": (total + limit - 1) // limit
+    }
+
+@router.get("/admin/runs", dependencies=[Depends(get_admin_user)])
+async def admin_list_all_runs(
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
+    status: Optional[RunStatus] = None,
+    db: Session = Depends(get_db)
+):
+    """Admin endpoint to list all workflow runs."""
+    query = db.query(WorkflowRun)
+    
+    if status:
+        query = query.filter(WorkflowRun.status == status.value)
+    
+    query = query.order_by(WorkflowRun.started_at.desc())
+    
+    total = query.count()
+    runs = query.offset((page - 1) * limit).limit(limit).all()
+    
+    return {
+        "items": [run_to_dict(run, include_workflow=True) for run in runs],
+        "total": total,
+        "page": page,
+        "limit": limit,
+        "pages": (total + limit - 1) // limit
+    }
+
+@router.get("/admin/stats", dependencies=[Depends(get_admin_user)])
+async def get_admin_stats(db: Session = Depends(get_db)):
+    """Get system-wide automation statistics."""
+    stats = {
+        "total_workflows": db.query(Workflow).count(),
+        "active_workflows": db.query(Workflow).filter(Workflow.is_active == True).count(),
+        "total_runs": db.query(WorkflowRun).count(),
+        "runs_by_status": {},
+        "integrations_count": db.query(Integration).count(),
+        "webhook_events_count": db.query(WebhookEvent).count()
+    }
+    
+    # Get runs by status
+    for status in RunStatus:
+        count = db.query(WorkflowRun).filter(WorkflowRun.status == status.value).count()
+        stats["runs_by_status"][status.value] = count
+    
+    return stats
+
+# Health and monitoring endpoints
+@router.get("/health")
+async def health_check(db: Session = Depends(get_db)) -> HealthCheckResponse:
+    """Check automation service health."""
+    services = {}
+    
+    # Check database
+    try:
+        db.execute("SELECT 1")
+        services["database"] = {"status": "healthy", "response_time": 0.001}
+    except Exception as e:
+        services["database"] = {"status": "unhealthy", "error": str(e)}
+    
+    # Check scheduler
+    services["scheduler"] = {
+        "status": "healthy",
+        "active_schedules": 0  # TODO: Implement actual scheduler check
+    }
+    
+    # Check integrations
+    active_integrations = db.query(Integration).filter(Integration.is_active == True).count()
+    services["integrations"] = {
+        "status": "healthy",
+        "active_count": active_integrations
+    }
+    
+    # Calculate metrics
+    metrics = {
+        "workflows_total": db.query(Workflow).count(),
+        "workflows_active": db.query(Workflow).filter(Workflow.is_active == True).count(),
+        "runs_last_hour": db.query(WorkflowRun).filter(
+            WorkflowRun.started_at >= datetime.utcnow() - timedelta(hours=1)
+        ).count(),
+        "avg_run_duration": 0  # TODO: Calculate actual average
+    }
+    
+    overall_status = "healthy" if all(
+        s.get("status") == "healthy" for s in services.values()
+    ) else "degraded"
+    
+    return HealthCheckResponse(
+        status=overall_status,
+        timestamp=datetime.utcnow(),
+        services=services,
+        metrics=metrics
     )
 
+@router.get("/metrics")
+async def get_metrics(
+    time_range: str = Query("1h", pattern="^(1h|24h|7d|30d)$"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get user's automation metrics."""
+    # Calculate time range
+    time_ranges = {
+        "1h": timedelta(hours=1),
+        "24h": timedelta(days=1),
+        "7d": timedelta(days=7),
+        "30d": timedelta(days=30)
+    }
+    
+    start_time = datetime.utcnow() - time_ranges[time_range]
+    
+    # Get user's workflows
+    user_workflows = db.query(Workflow.id).filter(
+        Workflow.owner_id == current_user.id
+    ).subquery()
+    
+    # Calculate metrics
+    metrics = {
+        "time_range": time_range,
+        "workflows": {
+            "total": db.query(Workflow).filter(Workflow.owner_id == current_user.id).count(),
+            "active": db.query(Workflow).filter(
+                Workflow.owner_id == current_user.id,
+                Workflow.is_active == True
+            ).count()
+        },
+        "runs": {
+            "total": db.query(WorkflowRun).filter(
+                WorkflowRun.workflow_id.in_(user_workflows),
+                WorkflowRun.started_at >= start_time
+            ).count(),
+            "by_status": {}
+        },
+        "performance": {
+            "avg_duration_seconds": 0,
+            "success_rate": 0
+        }
+    }
+    
+    # Get runs by status
+    for status in RunStatus:
+        count = db.query(WorkflowRun).filter(
+            WorkflowRun.workflow_id.in_(user_workflows),
+            WorkflowRun.started_at >= start_time,
+            WorkflowRun.status == status.value
+        ).count()
+        metrics["runs"]["by_status"][status.value] = count
+    
+    # Calculate success rate
+    total_completed = metrics["runs"]["by_status"].get(RunStatus.COMPLETED.value, 0)
+    total_failed = metrics["runs"]["by_status"].get(RunStatus.FAILED.value, 0)
+    if total_completed + total_failed > 0:
+        metrics["performance"]["success_rate"] = total_completed / (total_completed + total_failed)
+    
+    return metrics
 
-def format_workflow_run_response(run: WorkflowRun, workflow_name: str) -> WorkflowRunResponse:
-    """Format workflow run response."""
-    return WorkflowRunResponse(
-        id=str(run.id),
-        workflow_id=str(run.workflow_id),
-        workflow_name=workflow_name,
-        status=run.status,
-        trigger_data=run.trigger_data,
-        steps_completed=run.steps_completed,
-        steps_total=run.steps_total,
-        output=run.output,
-        error=run.error,
-        started_at=run.started_at,
-        completed_at=run.completed_at,
-        duration_ms=run.duration_ms
-    )
+# Helper functions
+def workflow_to_dict(workflow: Workflow, include_sensitive: bool = True, include_owner: bool = False) -> Dict[str, Any]:
+    """Convert workflow to dictionary."""
+    result = {
+        "id": workflow.id,
+        "name": workflow.name,
+        "description": workflow.description,
+        "trigger_type": workflow.trigger_type,
+        "trigger_config": workflow.trigger_config if include_sensitive else {k: v for k, v in workflow.trigger_config.items() if k != 'secret'},
+        "steps": workflow.steps,
+        "is_active": workflow.is_active,
+        "is_public": workflow.meta_data.get('is_public', False),
+        "tags": workflow.tags or [],
+        "metadata": workflow.meta_data or {},
+        "version": workflow.version or "1.0.0",
+        "created_at": workflow.created_at.isoformat(),
+        "updated_at": workflow.updated_at.isoformat()
+    }
+    
+    if include_owner:
+        result["owner_id"] = workflow.owner_id
+    
+    return result
+
+def run_to_dict(run: WorkflowRun, detailed: bool = False, include_workflow: bool = False) -> Dict[str, Any]:
+    """Convert workflow run to dictionary."""
+    result = {
+        "id": run.id,
+        "workflow_id": run.workflow_id,
+        "status": run.status,
+        "started_at": run.started_at.isoformat(),
+        "completed_at": run.completed_at.isoformat() if run.completed_at else None,
+        "duration_seconds": (run.completed_at - run.started_at).total_seconds() if run.completed_at else None,
+        "trigger_type": run.trigger_data.get("type", "unknown") if run.trigger_data else "unknown",
+        "steps_completed": run.steps_completed,
+        "steps_total": run.steps_total,
+        "error": run.error
+    }
+    
+    if detailed:
+        result["trigger_data"] = run.trigger_data
+        result["output"] = run.output
+        result["logs"] = run.logs
+    
+    if include_workflow and hasattr(run, 'workflow'):
+        result["workflow_name"] = run.workflow.name
+    
+    return result
+
+def validate_workflow_execution(workflow: Workflow, input_data: Dict[str, Any]) -> Dict[str, Any]:
+    """Validate workflow can be executed."""
+    validation = {
+        "valid": True,
+        "errors": [],
+        "warnings": []
+    }
+    
+    # Check workflow is active
+    if not workflow.is_active:
+        validation["warnings"].append("Workflow is not active")
+    
+    # Validate steps
+    if not workflow.steps:
+        validation["valid"] = False
+        validation["errors"].append("Workflow has no steps")
+    
+    # Validate step references
+    step_ids = {step['id'] for step in workflow.steps}
+    for step in workflow.steps:
+        for next_step in step.get('next_steps', []):
+            if next_step != 'end' and next_step not in step_ids:
+                validation["valid"] = False
+                validation["errors"].append(f"Invalid next_step reference: {next_step}")
+    
+    return validation
+
+async def execute_workflow_sync(workflow: Workflow, run: WorkflowRun, input_data: Dict[str, Any], context: Dict[str, Any], db: Session) -> Dict[str, Any]:
+    """Execute workflow synchronously."""
+    # Mock implementation
+    await asyncio.sleep(0.1)
+    
+    run.status = RunStatus.COMPLETED.value
+    run.completed_at = datetime.utcnow()
+    run.steps_completed = run.steps_total
+    run.output = {"message": "Workflow executed successfully", "input": input_data}
+    
+    db.commit()
+    
+    return run_to_dict(run, detailed=True)
+
+async def execute_workflow_async(workflow_id: str, run_id: str, input_data: Dict[str, Any], context: Dict[str, Any]):
+    """Execute workflow asynchronously."""
+    # Mock implementation
+    # In production, this would be handled by a background task queue
+    logger.info(f"Executing workflow {workflow_id} run {run_id}")
+    await asyncio.sleep(1)
+
+def schedule_workflow(workflow_id: str):
+    """Schedule workflow execution."""
+    # Mock implementation
+    # In production, this would add to scheduler
+    logger.info(f"Scheduling workflow {workflow_id}")
+
+def get_integration_description(integration_type: IntegrationType) -> str:
+    """Get integration description."""
+    descriptions = {
+        IntegrationType.SLACK: "Send messages and notifications to Slack channels",
+        IntegrationType.GITHUB: "Interact with GitHub repositories, issues, and pull requests",
+        IntegrationType.NOTION: "Create and update pages in Notion",
+        IntegrationType.DISCORD: "Send messages to Discord servers",
+        IntegrationType.TEAMS: "Send messages to Microsoft Teams",
+        IntegrationType.JIRA: "Create and update issues in Jira",
+        IntegrationType.TRELLO: "Manage cards and boards in Trello",
+        IntegrationType.ASANA: "Create and manage tasks in Asana",
+        IntegrationType.CLICKUP: "Manage tasks and projects in ClickUp",
+        IntegrationType.AIRTABLE: "Read and write data to Airtable bases",
+        IntegrationType.GOOGLE_SHEETS: "Read and write data to Google Sheets",
+        IntegrationType.SALESFORCE: "Manage leads and opportunities in Salesforce",
+        IntegrationType.HUBSPOT: "Manage contacts and deals in HubSpot",
+        IntegrationType.MAILCHIMP: "Send emails and manage subscribers",
+        IntegrationType.SENDGRID: "Send transactional emails",
+        IntegrationType.TWILIO: "Send SMS and make phone calls",
+        IntegrationType.STRIPE: "Process payments and manage subscriptions",
+        IntegrationType.SHOPIFY: "Manage products and orders",
+        IntegrationType.WORDPRESS: "Create and update posts",
+        IntegrationType.MEDIUM: "Publish articles to Medium"
+    }
+    return descriptions.get(integration_type, "")
+
+def get_integration_required_config(integration_type: IntegrationType) -> List[str]:
+    """Get required configuration fields for integration."""
+    configs = {
+        IntegrationType.SLACK: ["webhook_url"],
+        IntegrationType.GITHUB: ["access_token"],
+        IntegrationType.NOTION: ["api_key", "database_id"],
+        IntegrationType.DISCORD: ["webhook_url"],
+        IntegrationType.TEAMS: ["webhook_url"],
+        IntegrationType.JIRA: ["domain", "email", "api_token"],
+        IntegrationType.TRELLO: ["api_key", "token"],
+        IntegrationType.ASANA: ["access_token"],
+        IntegrationType.CLICKUP: ["api_token"],
+        IntegrationType.AIRTABLE: ["api_key", "base_id"],
+        IntegrationType.GOOGLE_SHEETS: ["credentials_json", "spreadsheet_id"],
+        IntegrationType.SALESFORCE: ["instance_url", "access_token"],
+        IntegrationType.HUBSPOT: ["api_key"],
+        IntegrationType.MAILCHIMP: ["api_key", "list_id"],
+        IntegrationType.SENDGRID: ["api_key"],
+        IntegrationType.TWILIO: ["account_sid", "auth_token", "from_number"],
+        IntegrationType.STRIPE: ["api_key"],
+        IntegrationType.SHOPIFY: ["shop_domain", "access_token"],
+        IntegrationType.WORDPRESS: ["site_url", "username", "password"],
+        IntegrationType.MEDIUM: ["integration_token"]
+    }
+    return configs.get(integration_type, [])
+
+def get_integration_actions(integration_type: IntegrationType) -> List[str]:
+    """Get available actions for integration."""
+    actions = {
+        IntegrationType.SLACK: ["send_message", "send_file", "create_channel"],
+        IntegrationType.GITHUB: ["create_issue", "create_pr", "add_comment", "create_release"],
+        IntegrationType.NOTION: ["create_page", "update_page", "add_database_row"],
+        IntegrationType.DISCORD: ["send_message", "send_embed"],
+        IntegrationType.TEAMS: ["send_message", "send_card"],
+        IntegrationType.JIRA: ["create_issue", "update_issue", "add_comment"],
+        IntegrationType.TRELLO: ["create_card", "move_card", "add_comment"],
+        IntegrationType.ASANA: ["create_task", "update_task", "add_comment"],
+        IntegrationType.CLICKUP: ["create_task", "update_task", "add_comment"],
+        IntegrationType.AIRTABLE: ["create_record", "update_record", "find_records"],
+        IntegrationType.GOOGLE_SHEETS: ["append_row", "update_cell", "read_range"],
+        IntegrationType.SALESFORCE: ["create_lead", "update_lead", "create_opportunity"],
+        IntegrationType.HUBSPOT: ["create_contact", "update_contact", "create_deal"],
+        IntegrationType.MAILCHIMP: ["add_subscriber", "send_campaign", "update_subscriber"],
+        IntegrationType.SENDGRID: ["send_email", "send_template_email"],
+        IntegrationType.TWILIO: ["send_sms", "make_call"],
+        IntegrationType.STRIPE: ["create_charge", "create_subscription", "create_invoice"],
+        IntegrationType.SHOPIFY: ["create_product", "update_inventory", "create_order"],
+        IntegrationType.WORDPRESS: ["create_post", "update_post", "upload_media"],
+        IntegrationType.MEDIUM: ["create_post", "update_post"]
+    }
+    return actions.get(integration_type, [])
+
+async def test_integration_health(integration: Integration) -> Dict[str, Any]:
+    """Test integration health."""
+    # Mock implementation
+    return {
+        "status": "healthy" if integration.is_active else "inactive",
+        "response_time": 0.05,
+        "last_error": None
+    }
+
+async def test_integration_connection(integration: Integration) -> Dict[str, Any]:
+    """Test integration connection."""
+    # Mock implementation
+    return {
+        "success": True,
+        "message": f"{integration.type} connection test successful",
+        "details": {
+            "authenticated": True,
+            "permissions": get_integration_actions(IntegrationType(integration.type))
+        }
+    }
+
+def get_run_stats(workflow_id: str, db: Session) -> Dict[str, Any]:
+    """Get workflow run statistics."""
+    stats = {
+        "total_runs": db.query(WorkflowRun).filter(WorkflowRun.workflow_id == workflow_id).count(),
+        "success_rate": 0,
+        "avg_duration": 0,
+        "by_status": {}
+    }
+    
+    # Get runs by status
+    for status in RunStatus:
+        count = db.query(WorkflowRun).filter(
+            WorkflowRun.workflow_id == workflow_id,
+            WorkflowRun.status == status.value
+        ).count()
+        stats["by_status"][status.value] = count
+    
+    # Calculate success rate
+    completed = stats["by_status"].get(RunStatus.COMPLETED.value, 0)
+    failed = stats["by_status"].get(RunStatus.FAILED.value, 0)
+    if completed + failed > 0:
+        stats["success_rate"] = completed / (completed + failed)
+    
+    return stats

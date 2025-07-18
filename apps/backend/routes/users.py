@@ -38,33 +38,33 @@ class UserResponse(BaseModel):
 
 
 class UserUpdate(BaseModel):
-    username: Optional[str]
-    full_name: Optional[str]
-    phone: Optional[str]
-    avatar_url: Optional[str]
-    bio: Optional[str]
+    username: Optional[str] = None
+    full_name: Optional[str] = None
+    phone: Optional[str] = None
+    avatar_url: Optional[str] = None
+    bio: Optional[str] = None
 
 
 class UserAdminUpdate(BaseModel):
-    role: Optional[UserRole]
-    is_active: Optional[bool]
-    is_verified: Optional[bool]
+    role: Optional[UserRole] = None
+    is_active: Optional[bool] = None
+    is_verified: Optional[bool] = None
 
 
 class TeamCreate(BaseModel):
     name: str
     slug: str
-    description: Optional[str]
-    logo_url: Optional[str]
-    website: Optional[str]
+    description: Optional[str] = None
+    logo_url: Optional[str] = None
+    website: Optional[str] = None
 
 
 class TeamUpdate(BaseModel):
-    name: Optional[str]
-    description: Optional[str]
-    logo_url: Optional[str]
-    website: Optional[str]
-    max_members: Optional[int]
+    name: Optional[str] = None
+    description: Optional[str] = None
+    logo_url: Optional[str] = None
+    website: Optional[str] = None
+    max_members: Optional[int] = None
 
 
 class TeamResponse(BaseModel):
@@ -101,7 +101,25 @@ class UserActivity(BaseModel):
     details: dict
 
 
-# User Management Endpoints
+# Helper functions
+def is_team_admin(user_id: UUID, team_id: UUID, db: Session) -> bool:
+    """Check if user is team owner or admin member."""
+    team = db.query(Team).filter(Team.id == team_id).first()
+    if team and team.owner_id == user_id:
+        return True
+    
+    member = db.query(team_members).filter(
+        and_(
+            team_members.c.team_id == team_id,
+            team_members.c.user_id == user_id,
+            team_members.c.role == 'admin'
+        )
+    ).first()
+    
+    return member is not None
+
+
+# User Management Endpoints - List users first (no path params)
 @router.get("/", response_model=List[UserResponse])
 async def list_users(
     search: Optional[str] = None,
@@ -158,235 +176,7 @@ async def list_users(
     ]
 
 
-@router.get("/{user_id}", response_model=UserResponse)
-async def get_user(
-    user_id: UUID,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """Get user details."""
-    # Users can view their own profile, admins can view anyone
-    if str(user_id) != str(current_user.id) and current_user.role != UserRole.ADMIN:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not authorized to view this user"
-        )
-    
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
-        )
-    
-    return UserResponse(
-        id=str(user.id),
-        email=user.email,
-        username=user.username,
-        full_name=user.full_name,
-        avatar_url=user.avatar_url,
-        bio=user.bio,
-        role=user.role.value,
-        is_active=user.is_active,
-        is_verified=user.is_verified,
-        created_at=user.created_at,
-        last_login=user.last_login
-    )
-
-
-@router.put("/{user_id}", response_model=UserResponse)
-async def update_user(
-    user_id: UUID,
-    update_data: UserUpdate,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """Update user profile."""
-    # Users can update their own profile
-    if str(user_id) != str(current_user.id) and current_user.role != UserRole.ADMIN:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not authorized to update this user"
-        )
-    
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
-        )
-    
-    # Update fields
-    for field, value in update_data.dict(exclude_unset=True).items():
-        setattr(user, field, value)
-    
-    db.commit()
-    db.refresh(user)
-    
-    return UserResponse(
-        id=str(user.id),
-        email=user.email,
-        username=user.username,
-        full_name=user.full_name,
-        avatar_url=user.avatar_url,
-        bio=user.bio,
-        role=user.role.value,
-        is_active=user.is_active,
-        is_verified=user.is_verified,
-        created_at=user.created_at,
-        last_login=user.last_login
-    )
-
-
-@router.put("/{user_id}/admin", response_model=UserResponse)
-async def admin_update_user(
-    user_id: UUID,
-    update_data: UserAdminUpdate,
-    current_user: User = Depends(require_admin),
-    db: Session = Depends(get_db)
-):
-    """Update user administrative settings (admin only)."""
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
-        )
-    
-    # Prevent self-demotion
-    if str(user_id) == str(current_user.id) and update_data.role and update_data.role != UserRole.ADMIN:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot change your own admin role"
-        )
-    
-    # Update fields
-    for field, value in update_data.dict(exclude_unset=True).items():
-        setattr(user, field, value)
-    
-    db.commit()
-    db.refresh(user)
-    
-    return UserResponse(
-        id=str(user.id),
-        email=user.email,
-        username=user.username,
-        full_name=user.full_name,
-        avatar_url=user.avatar_url,
-        bio=user.bio,
-        role=user.role.value,
-        is_active=user.is_active,
-        is_verified=user.is_verified,
-        created_at=user.created_at,
-        last_login=user.last_login
-    )
-
-
-@router.delete("/{user_id}")
-async def delete_user(
-    user_id: UUID,
-    current_user: User = Depends(require_admin),
-    db: Session = Depends(get_db)
-):
-    """Delete a user (admin only)."""
-    if str(user_id) == str(current_user.id):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot delete your own account"
-        )
-    
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
-        )
-    
-    # Soft delete by deactivating
-    user.is_active = False
-    user.deleted_at = datetime.utcnow()
-    db.commit()
-    
-    return {"message": "User deleted successfully"}
-
-
-@router.post("/{user_id}/suspend")
-async def suspend_user(
-    user_id: UUID,
-    current_user: User = Depends(require_admin),
-    db: Session = Depends(get_db)
-):
-    """Suspend a user account (admin only)."""
-    if str(user_id) == str(current_user.id):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot suspend your own account"
-        )
-    
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
-        )
-    
-    user.is_active = False
-    user.suspended_at = datetime.utcnow()
-    db.commit()
-    
-    return {"message": "User suspended successfully"}
-
-
-@router.post("/{user_id}/activate")
-async def activate_user(
-    user_id: UUID,
-    current_user: User = Depends(require_admin),
-    db: Session = Depends(get_db)
-):
-    """Activate a suspended user account (admin only)."""
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
-        )
-    
-    user.is_active = True
-    user.suspended_at = None
-    db.commit()
-    
-    return {"message": "User activated successfully"}
-
-
-@router.get("/{user_id}/activity", response_model=List[UserActivity])
-async def get_user_activity(
-    user_id: UUID,
-    days: int = Query(7, ge=1, le=90),
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """Get user activity history."""
-    # Users can view their own activity, admins can view anyone's
-    if str(user_id) != str(current_user.id) and current_user.role != UserRole.ADMIN:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not authorized to view this user's activity"
-        )
-    
-    # In a real implementation, this would query an activity log table
-    # For now, return mock data
-    return [
-        UserActivity(
-            timestamp=datetime.utcnow(),
-            action="login",
-            resource_type="session",
-            resource_id=None,
-            details={"ip": "127.0.0.1"}
-        )
-    ]
-
-
-# Team Management Endpoints
+# Team Management Endpoints - All team routes BEFORE user-specific routes
 @router.post("/teams", response_model=TeamResponse)
 async def create_team(
     team_data: TeamCreate,
@@ -627,11 +417,15 @@ async def list_team_members(
     ]
 
 
+class AddTeamMemberRequest(BaseModel):
+    user_email: EmailStr
+    role: str = "member"
+
+
 @router.post("/teams/{team_id}/members")
 async def add_team_member(
     team_id: UUID,
-    user_email: EmailStr,
-    role: str = "member",
+    request: AddTeamMemberRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -652,7 +446,7 @@ async def add_team_member(
         )
     
     # Find user by email
-    new_member = db.query(User).filter(User.email == user_email).first()
+    new_member = db.query(User).filter(User.email == request.user_email).first()
     if not new_member:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -689,7 +483,7 @@ async def add_team_member(
         team_members.insert().values(
             team_id=team_id,
             user_id=new_member.id,
-            role=role,
+            role=request.role,
             joined_at=datetime.utcnow()
         )
     )
@@ -801,19 +595,230 @@ async def update_member_role(
     return {"message": "Member role updated successfully"}
 
 
-# Helper functions
-def is_team_admin(user_id: UUID, team_id: UUID, db: Session) -> bool:
-    """Check if user is team owner or admin member."""
-    team = db.query(Team).filter(Team.id == team_id).first()
-    if team and team.owner_id == user_id:
-        return True
-    
-    member = db.query(team_members).filter(
-        and_(
-            team_members.c.team_id == team_id,
-            team_members.c.user_id == user_id,
-            team_members.c.role == 'admin'
+# User-specific endpoints - AFTER all team routes
+@router.get("/{user_id}", response_model=UserResponse)
+async def get_user(
+    user_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get user details."""
+    # Users can view their own profile, admins can view anyone
+    if str(user_id) != str(current_user.id) and current_user.role != UserRole.ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to view this user"
         )
-    ).first()
     
-    return member is not None
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    
+    return UserResponse(
+        id=str(user.id),
+        email=user.email,
+        username=user.username,
+        full_name=user.full_name,
+        avatar_url=user.avatar_url,
+        bio=user.bio,
+        role=user.role.value,
+        is_active=user.is_active,
+        is_verified=user.is_verified,
+        created_at=user.created_at,
+        last_login=user.last_login
+    )
+
+
+@router.put("/{user_id}", response_model=UserResponse)
+async def update_user(
+    user_id: UUID,
+    update_data: UserUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Update user profile."""
+    # Users can update their own profile
+    if str(user_id) != str(current_user.id) and current_user.role != UserRole.ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to update this user"
+        )
+    
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    
+    # Update fields
+    for field, value in update_data.dict(exclude_unset=True).items():
+        setattr(user, field, value)
+    
+    db.commit()
+    db.refresh(user)
+    
+    return UserResponse(
+        id=str(user.id),
+        email=user.email,
+        username=user.username,
+        full_name=user.full_name,
+        avatar_url=user.avatar_url,
+        bio=user.bio,
+        role=user.role.value,
+        is_active=user.is_active,
+        is_verified=user.is_verified,
+        created_at=user.created_at,
+        last_login=user.last_login
+    )
+
+
+@router.put("/{user_id}/admin", response_model=UserResponse)
+async def admin_update_user(
+    user_id: UUID,
+    update_data: UserAdminUpdate,
+    current_user: User = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    """Update user administrative settings (admin only)."""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    
+    # Prevent self-demotion
+    if str(user_id) == str(current_user.id) and update_data.role and update_data.role != UserRole.ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot change your own admin role"
+        )
+    
+    # Update fields
+    for field, value in update_data.dict(exclude_unset=True).items():
+        setattr(user, field, value)
+    
+    db.commit()
+    db.refresh(user)
+    
+    return UserResponse(
+        id=str(user.id),
+        email=user.email,
+        username=user.username,
+        full_name=user.full_name,
+        avatar_url=user.avatar_url,
+        bio=user.bio,
+        role=user.role.value,
+        is_active=user.is_active,
+        is_verified=user.is_verified,
+        created_at=user.created_at,
+        last_login=user.last_login
+    )
+
+
+@router.delete("/{user_id}")
+async def delete_user(
+    user_id: UUID,
+    current_user: User = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    """Delete a user (admin only)."""
+    if str(user_id) == str(current_user.id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot delete your own account"
+        )
+    
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    
+    # Soft delete by deactivating
+    user.is_active = False
+    user.deleted_at = datetime.utcnow()
+    db.commit()
+    
+    return {"message": "User deleted successfully"}
+
+
+@router.post("/{user_id}/suspend")
+async def suspend_user(
+    user_id: UUID,
+    current_user: User = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    """Suspend a user account (admin only)."""
+    if str(user_id) == str(current_user.id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot suspend your own account"
+        )
+    
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    
+    user.is_active = False
+    user.suspended_at = datetime.utcnow()
+    db.commit()
+    
+    return {"message": "User suspended successfully"}
+
+
+@router.post("/{user_id}/activate")
+async def activate_user(
+    user_id: UUID,
+    current_user: User = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    """Activate a suspended user account (admin only)."""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    
+    user.is_active = True
+    user.suspended_at = None
+    db.commit()
+    
+    return {"message": "User activated successfully"}
+
+
+@router.get("/{user_id}/activity", response_model=List[UserActivity])
+async def get_user_activity(
+    user_id: UUID,
+    days: int = Query(7, ge=1, le=90),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get user activity history."""
+    # Users can view their own activity, admins can view anyone's
+    if str(user_id) != str(current_user.id) and current_user.role != UserRole.ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to view this user's activity"
+        )
+    
+    # In a real implementation, this would query an activity log table
+    # For now, return mock data
+    return [
+        UserActivity(
+            timestamp=datetime.utcnow(),
+            action="login",
+            resource_type="session",
+            resource_id=None,
+            details={"ip": "127.0.0.1"}
+        )
+    ]

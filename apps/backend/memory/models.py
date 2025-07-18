@@ -33,6 +33,9 @@ class UserCreate(BaseModel):
     email: str
     password: str
     username: Optional[str] = None
+    full_name: Optional[str] = None
+    company: Optional[str] = None
+    role: Optional[str] = None
 
 class UserLogin(BaseModel):
     """User login model stub."""

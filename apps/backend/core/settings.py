@@ -40,11 +40,20 @@ class Settings(BaseSettings):
     API_KEYS: str = Field(default="", env="API_KEYS")
     ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(default=30, env="ACCESS_TOKEN_EXPIRE_MINUTES")
     REFRESH_TOKEN_EXPIRE_DAYS: int = Field(default=7, env="REFRESH_TOKEN_EXPIRE_DAYS")
+    JWT_SECRET: str = Field(default="change-me-in-production", env="JWT_SECRET")
+    JWT_ALGORITHM: str = Field(default="HS256", env="JWT_ALGORITHM")
+    JWT_EXPIRATION_HOURS: int = Field(default=24, env="JWT_EXPIRATION_HOURS")
     CORS_ORIGINS: List[str] = Field(
         default=["http://localhost:3000", "http://localhost:8000"],
         env="CORS_ORIGINS"
     )
     SENTRY_DSN: Optional[str] = Field(default=None, env="SENTRY_DSN")
+    
+    # Frontend
+    FRONTEND_URL: str = Field(default="http://localhost:3000", env="FRONTEND_URL")
+    
+    # API Limits
+    MAX_API_KEYS_PER_USER: int = Field(default=5, env="MAX_API_KEYS_PER_USER")
     
     # ClickUp
     CLICKUP_API_KEY: Optional[str] = Field(default=None, env="CLICKUP_API_KEY")
@@ -128,12 +137,17 @@ class Settings(BaseSettings):
 
     # OpenAI
     openai_api_key: Optional[str] = Field(default=None, env="OPENAI_API_KEY")
+    OPENAI_API_KEY: Optional[str] = Field(default=None, env="OPENAI_API_KEY")
 
     GOOGLE_AI_API_KEY: Optional[str] = Field(default=None, env="GOOGLE_AI_API_KEY")
     EMBEDDING_MODEL: str = Field(default="text-embedding-3-small", env="EMBEDDING_MODEL")
 
-    # Claude
+    # Claude/Anthropic
     claude_api_key: Optional[str] = Field(default=None, env="CLAUDE_API_KEY")
+    ANTHROPIC_API_KEY: Optional[str] = Field(default=None, env="ANTHROPIC_API_KEY")
+    
+    # Gemini
+    GEMINI_API_KEY: Optional[str] = Field(default=None, env="GEMINI_API_KEY")
 
     COST_THRESHOLD_USD: float = Field(default=100.0, env="COST_THRESHOLD_USD")
     
@@ -144,6 +158,12 @@ class Settings(BaseSettings):
     email_alert_recipients: Optional[List[str]] = Field(
         default=None, env="EMAIL_ALERT_RECIPIENTS"
     )
+    EMAIL_HOST: str = Field(default="smtp.gmail.com", env="EMAIL_HOST")
+    EMAIL_PORT: int = Field(default=587, env="EMAIL_PORT")
+    EMAIL_USERNAME: Optional[str] = Field(default=None, env="EMAIL_USERNAME")
+    EMAIL_PASSWORD: Optional[str] = Field(default=None, env="EMAIL_PASSWORD")
+    EMAIL_FROM: str = Field(default="noreply@brainops.com", env="EMAIL_FROM")
+    EMAIL_USE_TLS: bool = Field(default=True, env="EMAIL_USE_TLS")
 
     # Monitoring
     SENTRY_DSN: Optional[str] = Field(default=None, env="SENTRY_DSN")
@@ -380,7 +400,7 @@ class Settings(BaseSettings):
         else:
             integrations["notion"] = "not configured"
 
-        if self.slack_bot_token:
+        if self.SLACK_BOT_TOKEN:
             integrations["slack"] = "configured"
         else:
             integrations["slack"] = "not configured"
@@ -402,13 +422,13 @@ class Settings(BaseSettings):
             },
             "claude": {
                 "configured": bool(
-                    self.claude_api_key or self.anthropic_api_key
+                    self.claude_api_key or self.ANTHROPIC_API_KEY
                 ),
                 "model": "claude-3-sonnet",
                 "max_tokens": 4000
             },
             "google": {
-                "configured": bool(self.google_ai_api_key),
+                "configured": bool(self.GOOGLE_AI_API_KEY),
                 "model": "gemini-pro",
                 "max_tokens": 4000
             }
