@@ -37,16 +37,23 @@ apps/backend/
 
 2. **Set up environment**
    ```bash
-   cp .env.example .env
+   cp .env.master .env
    # Edit .env with your configuration
    ```
 
 3. **Install dependencies**
    ```bash
+   python3 -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
    pip install -r requirements.txt
    ```
 
-4. **Run the application**
+4. **Run database migrations**
+   ```bash
+   alembic upgrade head
+   ```
+
+5. **Run the application**
    ```bash
    uvicorn apps.backend.main:app --reload
    ```
@@ -64,18 +71,30 @@ The application is configured for deployment on Render:
 
 ### Docker
 
-Build and run with Docker:
+The production Docker image is available on Docker Hub:
+
+```bash
+docker pull mwwoodworth/brainops-backend:latest
+docker run -p 8000:8000 --env-file .env mwwoodworth/brainops-backend:latest
+```
+
+To build locally:
 
 ```bash
 docker build -t brainops-backend .
 docker run -p 8000:8000 --env-file .env brainops-backend
 ```
 
-After running Alembic migrations, apply the additional schema required for
-vector search:
+### Database Setup
+
+After deployment, run migrations:
 
 ```bash
-psql $DATABASE_URL -f apps/backend/db/schema_extra.sql
+# Using Docker
+docker run --env-file .env mwwoodworth/brainops-backend:latest alembic upgrade head
+
+# Or directly
+DATABASE_URL=your-database-url alembic upgrade head
 ```
 
 ## API Documentation
@@ -86,13 +105,22 @@ Once running, visit:
 
 ## Environment Variables
 
-See `.env.example` for all available configuration options. Key variables:
+See `.env.master` for all available configuration options. Key variables:
 
 - `SECRET_KEY` - JWT signing key (generate a secure random string)
 - `DATABASE_URL` - PostgreSQL connection string
 - `SUPABASE_URL` - Supabase project URL
 - `OPENAI_API_KEY` - OpenAI API key
 - `ANTHROPIC_API_KEY` - Anthropic Claude API key
+- `STRIPE_SECRET_KEY` - Stripe API key for payments
+- `SLACK_BOT_TOKEN` - Slack bot token for notifications
+
+## Production URLs
+
+- **Backend API**: https://brainops-backend.onrender.com
+- **Health Check**: https://brainops-backend.onrender.com/health
+- **API Docs**: https://brainops-backend.onrender.com/docs
+- **Docker Image**: `mwwoodworth/brainops-backend:latest`
 
 ## Development
 
