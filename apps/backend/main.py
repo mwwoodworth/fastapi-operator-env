@@ -239,6 +239,14 @@ async def add_request_id(request: Request, call_next):
         return response
 
 
+# Mount auth routes at root level for backward compatibility
+if auth:
+    app.include_router(
+        auth,
+        prefix="/auth",
+        tags=["authentication"]
+    )
+
 # Mount API routes with clear versioning
 if tasks:
     app.include_router(
