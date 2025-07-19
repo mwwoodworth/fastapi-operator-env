@@ -81,10 +81,12 @@ fi
 # Step 4: Build Docker image
 echo -e "\n${YELLOW}Step 4: Building Docker image${NC}"
 
-docker build -t brainops-backend:latest . || {
+# Build from repository root
+cd ../.. && docker build -t brainops-backend:latest -f apps/backend/Dockerfile . || {
     echo -e "${RED}Docker build failed!${NC}"
     exit 1
 }
+cd apps/backend
 
 echo -e "${GREEN}✓ Docker image built successfully${NC}"
 

@@ -1,0 +1,43 @@
+Metadata-Version: 2.4
+Name: docspec
+Version: 2.2.2
+Summary: Docspec is a JSON object specification for representing API documentation of programming languages.
+Author-email: Niklas Rosenstein <rosensteinniklas@gmail.com>
+Requires-Python: >=3.8
+Requires-Dist: databind-core>=4.2.6
+Requires-Dist: databind-json>=4.2.6
+Requires-Dist: deprecated>=1.2.12
+Description-Content-Type: text/markdown
+
+# docspec
+
+This Python packages provides
+
+* A library to (de-) serialize Docspec conformat JSON payloads
+* A CLI to validate and introspect such payloads
+
+Example:
+
+```py
+import docspec, sys
+for module in docspec.load_modules(sys.stdin):
+  module.members = [member for member in module.members if member.docstring]
+  docspec.dump_module(sys.stdout)
+```
+
+```
+$ docspec module.json --dump-tree
+module docspec
+| class Location
+| | data filename
+| | data lineno
+| class Decoration
+| | data name
+# ...
+```
+
+The `docspec` Python module requires Python 3.5 or newer.
+
+---
+
+<p align="center">Copyright &copy; 2020, Niklas Rosenstein</p>

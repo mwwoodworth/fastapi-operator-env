@@ -1,0 +1,23 @@
+Metadata-Version: 2.1
+Name: databind.json
+Version: 4.5.2
+Summary: De-/serialize Python dataclasses to or from JSON payloads. Compatible with Python 3.8 and newer. Deprecated, use `databind` module instead.
+License: MIT
+Author: Niklas Rosenstein
+Author-email: rosensteinniklas@gmail.com
+Requires-Python: >=3.8.0,<4.0.0
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.8
+Classifier: Programming Language :: Python :: 3.9
+Requires-Dist: databind (>=4.5.2,<5.0.0)
+Project-URL: Bug Tracker, https://github.com/NiklasRosenstein/python-databind/issues
+Project-URL: Documentation, https://niklasrosenstein.github.io/python-databind/
+Project-URL: Repository, https://github.com/NiklasRosenstein/python-databind
+Description-Content-Type: text/markdown
+
+
+Deprecated since v4.5.0. This is a proxy for depending on [`databind`](https://pypi.org/project/databind/). Do not
+depend on this package directly anymore.
+

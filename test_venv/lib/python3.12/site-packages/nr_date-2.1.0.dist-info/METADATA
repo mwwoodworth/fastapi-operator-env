@@ -1,0 +1,23 @@
+Metadata-Version: 2.1
+Name: nr-date
+Version: 2.1.0
+Summary: 
+License: MIT
+Author: Niklas Rosenstein
+Author-email: rosensteinniklas@gmail.com
+Requires-Python: >=3.6,<4.0
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.6
+Classifier: Programming Language :: Python :: 3.7
+Classifier: Programming Language :: Python :: 3.8
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Requires-Dist: dataclasses (>=0.8,<0.9) ; python_version == "3.6"
+Description-Content-Type: text/markdown
+
+# nr.date
+
+A fast, regex-based date parsing library in pure Python.
+

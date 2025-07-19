@@ -1,0 +1,2 @@
+[console_scripts]
+docspec = docspec.__main__:main
