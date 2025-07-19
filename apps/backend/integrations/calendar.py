@@ -144,3 +144,7 @@ class CalendarSync:
     def get_sync_status(self, task_id: str) -> Optional[Dict[str, Any]]:
         """Get sync status for a task."""
         return self.sync_status.get(task_id)
+
+
+# Alias for backward compatibility
+CalendarService = CalendarIntegration

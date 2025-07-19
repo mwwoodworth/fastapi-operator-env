@@ -821,7 +821,7 @@ async def get_estimate_analytics(
         default=datetime.utcnow() - timedelta(days=90)
     ),
     date_to: datetime = Query(default=datetime.utcnow()),
-    group_by: str = Query(default="month", regex="^(day|week|month|quarter)$"),
+    group_by: str = Query(default="month", pattern="^(day|week|month|quarter)$"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):

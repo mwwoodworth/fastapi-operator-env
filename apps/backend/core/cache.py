@@ -15,6 +15,15 @@ logger = get_logger(__name__)
 # In production, would use Redis
 _cache_store = {}
 
+# Cache instance for backward compatibility
+cache = None
+
+def cache_key_builder(*args, **kwargs) -> str:
+    """Build a cache key from function arguments."""
+    key_parts = [str(arg) for arg in args]
+    key_parts.extend([f"{k}:{v}" for k, v in sorted(kwargs.items())])
+    return hashlib.md5(":".join(key_parts).encode()).hexdigest()
+
 
 def cache_result(ttl: int = 300):
     """

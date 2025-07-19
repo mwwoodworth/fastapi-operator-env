@@ -27,7 +27,7 @@ from ..core.cache import cache_result, invalidate_cache
 from ..services.notifications import send_notification, NotificationType
 from ..core.audit import audit_log
 from ..db.business_models import User, UserRole, Project, Estimate
-from ..db.financial_models import Job
+from ..db.financial_models import Job, Invoice, Payment, Expense, Customer, Vendor
 from ..services.document_generator import DocumentGenerator
 from ..integrations.stripe import StripeService
 from ..integrations.quickbooks import QuickBooksService
@@ -223,140 +223,8 @@ class FinancialReportRequest(BaseModel):
     
     # Options
     include_details: bool = True
-    format: str = Field(default="json", regex="^(json|csv|pdf)$")
+    format: str = Field(default="json", pattern="^(json|csv|pdf)$")
     compare_period: Optional[str] = None  # "previous_period", "previous_year"
-
-
-# Database Models
-class Invoice(Base):
-    """Invoice model."""
-    __tablename__ = "invoices"
-    
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    invoice_number = Column(String(50), unique=True, nullable=False, index=True)
-    customer_id = Column(UUID(as_uuid=True), ForeignKey("customers.id"), nullable=False)
-    estimate_id = Column(UUID(as_uuid=True), ForeignKey("estimates.id"), nullable=True)
-    job_id = Column(UUID(as_uuid=True), ForeignKey("jobs.id"), nullable=True)
-    
-    # Dates
-    invoice_date = Column(Date, nullable=False)
-    due_date = Column(Date, nullable=False)
-    sent_date = Column(DateTime, nullable=True)
-    viewed_date = Column(DateTime, nullable=True)
-    paid_date = Column(DateTime, nullable=True)
-    
-    # Amounts (stored as cents to avoid decimal issues)
-    subtotal_cents = Column(Integer, nullable=False)
-    tax_cents = Column(Integer, nullable=False)
-    discount_cents = Column(Integer, default=0)
-    shipping_cents = Column(Integer, default=0)
-    total_cents = Column(Integer, nullable=False)
-    paid_cents = Column(Integer, default=0)
-    
-    # Status
-    status = Column(String(20), default=InvoiceStatus.DRAFT.value)
-    
-    # Content
-    line_items = Column(JSON, nullable=False)
-    payment_terms = Column(String(100), default="Net 30")
-    notes = Column(Text, nullable=True)
-    internal_notes = Column(Text, nullable=True)
-    
-    # Tracking
-    view_count = Column(Integer, default=0)
-    reminder_count = Column(Integer, default=0)
-    last_reminder_date = Column(DateTime, nullable=True)
-    
-    # Metadata
-    created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
-    # Relationships
-    customer = relationship("Customer", back_populates="invoices")
-    payments = relationship("Payment", back_populates="invoice")
-    creator = relationship("User")
-
-
-class Payment(Base):
-    """Payment record model."""
-    __tablename__ = "payments"
-    
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    invoice_id = Column(UUID(as_uuid=True), ForeignKey("invoices.id"), nullable=False)
-    
-    # Amount
-    amount_cents = Column(Integer, nullable=False)
-    processing_fee_cents = Column(Integer, default=0)
-    
-    # Payment info
-    payment_method = Column(String(20), nullable=False)
-    payment_date = Column(Date, nullable=False)
-    reference_number = Column(String(100), nullable=True)
-    transaction_id = Column(String(200), nullable=True)
-    
-    # Additional details
-    details = Column(JSON, default={})
-    notes = Column(Text, nullable=True)
-    
-    # Status
-    is_verified = Column(Boolean, default=False)
-    verification_date = Column(DateTime, nullable=True)
-    
-    # Metadata
-    created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    
-    # Relationships
-    invoice = relationship("Invoice", back_populates="payments")
-    creator = relationship("User")
-
-
-class Expense(Base):
-    """Expense tracking model."""
-    __tablename__ = "expenses"
-    
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    
-    # Categorization
-    category = Column(String(50), nullable=False)
-    vendor = Column(String(200), nullable=False)
-    description = Column(Text, nullable=False)
-    
-    # Amount
-    amount_cents = Column(Integer, nullable=False)
-    expense_date = Column(Date, nullable=False)
-    
-    # Job allocation
-    job_id = Column(UUID(as_uuid=True), ForeignKey("jobs.id"), nullable=True)
-    billable = Column(Boolean, default=False)
-    billed = Column(Boolean, default=False)
-    
-    # Payment
-    payment_method = Column(String(20), nullable=True)
-    reference_number = Column(String(100), nullable=True)
-    
-    # Documentation
-    receipt_url = Column(String(500), nullable=True)
-    
-    # Accounting
-    tax_deductible = Column(Boolean, default=True)
-    tags = Column(JSON, default=[])
-    
-    # Approval
-    requires_approval = Column(Boolean, default=False)
-    approved_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
-    approved_at = Column(DateTime, nullable=True)
-    
-    # Metadata
-    created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
-    # Relationships
-    job = relationship("Job")
-    creator = relationship("User", foreign_keys=[created_by])
-    approver = relationship("User", foreign_keys=[approved_by])
 
 
 # API Endpoints
@@ -502,8 +370,8 @@ async def list_invoices(
     page_size: int = Query(20, ge=1, le=100),
     
     # Sorting
-    sort_by: str = Query("invoice_date", regex="^(invoice_date|due_date|total|invoice_number)$"),
-    sort_order: str = Query("desc", regex="^(asc|desc)$"),
+    sort_by: str = Query("invoice_date", pattern="^(invoice_date|due_date|total|invoice_number)$"),
+    sort_order: str = Query("desc", pattern="^(asc|desc)$"),
     
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -1100,7 +968,7 @@ async def generate_financial_report(
 @require_permission(Permission.FINANCE_READ)
 @cache_result(ttl=300)  # Cache for 5 minutes
 async def financial_dashboard(
-    period: str = Query("month", regex="^(week|month|quarter|year)$"),
+    period: str = Query("month", pattern="^(week|month|quarter|year)$"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ) -> Dict[str, Any]:

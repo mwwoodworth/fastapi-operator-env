@@ -106,6 +106,7 @@ class Lead(Base):
         Index("idx_lead_score", "score"),
         Index("idx_lead_source", "source"),
         Index("idx_lead_assigned", "assigned_to"),
+        {'extend_existing': True}
     )
 
 
@@ -166,6 +167,7 @@ class Opportunity(Base):
         Index("idx_opportunity_assigned", "assigned_to"),
         Index("idx_opportunity_close_date", "expected_close_date"),
         Index("idx_opportunity_customer", "customer_id"),
+        {'extend_existing': True}
     )
 
 
@@ -206,6 +208,7 @@ class Contact(Base):
     __table_args__ = (
         Index("idx_contact_customer", "customer_id"),
         Index("idx_contact_email", "email"),
+        {'extend_existing': True}
     )
 
 
@@ -251,6 +254,7 @@ class Communication(Base):
         Index("idx_communication_type", "type"),
         Index("idx_communication_user", "user_id"),
         Index("idx_communication_scheduled", "scheduled_at"),
+        {'extend_existing': True}
     )
 
 
@@ -270,7 +274,7 @@ class Activity(Base):
     description = Column(Text, nullable=True)
     
     # Metadata
-    metadata = Column(JSON, default={})
+    activity_metadata = Column("metadata", JSON, default={})
     
     # User
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
@@ -286,6 +290,7 @@ class Activity(Base):
         Index("idx_activity_type", "type"),
         Index("idx_activity_user", "user_id"),
         Index("idx_activity_created", "created_at"),
+        {'extend_existing': True}
     )
 
 
@@ -337,6 +342,7 @@ class Campaign(Base):
         Index("idx_campaign_status", "status"),
         Index("idx_campaign_dates", "start_date", "end_date"),
         Index("idx_campaign_type", "type"),
+        {'extend_existing': True}
     )
 
 
@@ -380,6 +386,7 @@ class SalesGoal(Base):
     __table_args__ = (
         Index("idx_sales_goal_user", "user_id"),
         Index("idx_sales_goal_period", "period_start", "period_end"),
+        {'extend_existing': True}
     )
 
 
@@ -410,6 +417,8 @@ class CustomerSegment(Base):
     
     # Relationships
     created_by_user = relationship("User")
+    
+    __table_args__ = {'extend_existing': True}
 
 
 class LeadSource(Base):
@@ -445,4 +454,5 @@ class LeadSource(Base):
     
     __table_args__ = (
         Index("idx_lead_source_category", "category"),
+        {'extend_existing': True}
     )

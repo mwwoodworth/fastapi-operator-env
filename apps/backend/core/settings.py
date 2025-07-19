@@ -158,12 +158,25 @@ class Settings(BaseSettings):
     email_alert_recipients: Optional[List[str]] = Field(
         default=None, env="EMAIL_ALERT_RECIPIENTS"
     )
+    # Email settings (using both conventions for compatibility)
     EMAIL_HOST: str = Field(default="smtp.gmail.com", env="EMAIL_HOST")
     EMAIL_PORT: int = Field(default=587, env="EMAIL_PORT")
     EMAIL_USERNAME: Optional[str] = Field(default=None, env="EMAIL_USERNAME")
     EMAIL_PASSWORD: Optional[str] = Field(default=None, env="EMAIL_PASSWORD")
     EMAIL_FROM: str = Field(default="noreply@brainops.com", env="EMAIL_FROM")
     EMAIL_USE_TLS: bool = Field(default=True, env="EMAIL_USE_TLS")
+    
+    # SMTP settings (for notification service compatibility)
+    SMTP_HOST: str = Field(default="smtp.gmail.com", env="SMTP_HOST")
+    SMTP_PORT: int = Field(default=587, env="SMTP_PORT")
+    SMTP_USERNAME: Optional[str] = Field(default=None, env="SMTP_USERNAME")
+    SMTP_PASSWORD: Optional[str] = Field(default=None, env="SMTP_PASSWORD")
+    SMTP_FROM_EMAIL: str = Field(default="noreply@brainops.com", env="SMTP_FROM_EMAIL")
+    SMTP_USE_TLS: bool = Field(default=True, env="SMTP_USE_TLS")
+    
+    # SendGrid and AWS SES
+    SENDGRID_API_KEY: Optional[str] = Field(default=None, env="SENDGRID_API_KEY")
+    AWS_ACCESS_KEY_ID: Optional[str] = Field(default=None, env="AWS_ACCESS_KEY_ID")
 
     # Monitoring
     SENTRY_DSN: Optional[str] = Field(default=None, env="SENTRY_DSN")

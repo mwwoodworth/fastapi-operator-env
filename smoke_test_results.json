@@ -1,0 +1,112 @@
+{
+  "timestamp": "2025-07-19T09:34:00.730812",
+  "base_url": "https://brainops-backend.onrender.com",
+  "summary": {
+    "total": 20,
+    "passed": 0,
+    "failed": 20,
+    "pass_rate": "0.0%"
+  },
+  "results": [
+    {
+      "test": "Basic Health Check",
+      "passed": false,
+      "status": 404
+    },
+    {
+      "test": "API Health Check",
+      "passed": false,
+      "status": 404
+    },
+    {
+      "test": "Detailed Health Check",
+      "passed": false,
+      "status": 404
+    },
+    {
+      "test": "User Registration",
+      "passed": false,
+      "status": 404
+    },
+    {
+      "test": "List Projects",
+      "passed": false,
+      "status": 404
+    },
+    {
+      "test": "List Tasks",
+      "passed": false,
+      "status": 404
+    },
+    {
+      "test": "List Users",
+      "passed": false,
+      "status": 404
+    },
+    {
+      "test": "List Estimates",
+      "passed": false,
+      "status": 404
+    },
+    {
+      "test": "List Jobs",
+      "passed": false,
+      "status": 404
+    },
+    {
+      "test": "List Field Reports",
+      "passed": false,
+      "status": 404
+    },
+    {
+      "test": "List Permits",
+      "passed": false,
+      "status": 404
+    },
+    {
+      "test": "List Invoices",
+      "passed": false,
+      "status": 404
+    },
+    {
+      "test": "List Leads",
+      "passed": false,
+      "status": 404
+    },
+    {
+      "test": "List Opportunities",
+      "passed": false,
+      "status": 404
+    },
+    {
+      "test": "Pipeline Analytics",
+      "passed": false,
+      "status": 404
+    },
+    {
+      "test": "List LangGraph Workflows",
+      "passed": false,
+      "status": 404
+    },
+    {
+      "test": "Material Calculator",
+      "passed": false,
+      "status": 404
+    },
+    {
+      "test": "Smart Inventory Reorder",
+      "passed": false,
+      "status": 404
+    },
+    {
+      "test": "Available Integrations",
+      "passed": false,
+      "status": 404
+    },
+    {
+      "test": "Webhook Health",
+      "passed": false,
+      "status": 404
+    }
+  ]
+}

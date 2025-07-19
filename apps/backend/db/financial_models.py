@@ -9,7 +9,8 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import UUID
 import uuid
 
-from .models import Base, User
+from .models import Base
+from .business_models import User
 
 
 class Customer(Base):
@@ -65,6 +66,7 @@ class Customer(Base):
     __table_args__ = (
         Index("idx_customer_email", "email"),
         Index("idx_customer_active", "is_active"),
+        {'extend_existing': True}
     )
 
 
@@ -115,6 +117,7 @@ class Estimate(Base):
     __table_args__ = (
         Index("idx_estimate_status", "status"),
         Index("idx_estimate_customer", "customer_id"),
+        {'extend_existing': True}
     )
 
 
@@ -170,6 +173,7 @@ class Job(Base):
         Index("idx_job_status", "status"),
         Index("idx_job_customer", "customer_id"),
         Index("idx_job_dates", "scheduled_start", "scheduled_end"),
+        {'extend_existing': True}
     )
 
 
@@ -239,6 +243,7 @@ class Invoice(Base):
         Index("idx_invoice_customer", "customer_id"),
         Index("idx_invoice_due_date", "due_date"),
         Index("idx_invoice_date", "invoice_date"),
+        {'extend_existing': True}
     )
 
 
@@ -301,6 +306,7 @@ class Payment(Base):
         Index("idx_payment_customer", "customer_id"),
         Index("idx_payment_date", "payment_date"),
         Index("idx_payment_status", "status"),
+        {'extend_existing': True}
     )
 
 
@@ -375,6 +381,7 @@ class Expense(Base):
         Index("idx_expense_category", "category"),
         Index("idx_expense_job", "job_id"),
         Index("idx_expense_billable", "is_billable", "billed"),
+        {'extend_existing': True}
     )
 
 
@@ -419,4 +426,5 @@ class Vendor(Base):
     __table_args__ = (
         Index("idx_vendor_name", "name"),
         Index("idx_vendor_active", "is_active"),
+        {'extend_existing': True}
     )

@@ -423,8 +423,8 @@ async def list_tasks(
     my_tasks_only: bool = Query(False),
     
     # Sorting
-    sort_by: str = Query("created_at", regex="^(created_at|due_date|priority|status)$"),
-    sort_order: str = Query("desc", regex="^(asc|desc)$"),
+    sort_by: str = Query("created_at", pattern="^(created_at|due_date|priority|status)$"),
+    sort_order: str = Query("desc", pattern="^(asc|desc)$"),
     
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -1027,7 +1027,7 @@ async def bulk_update_tasks(
 @router.get("/dashboard/operations", response_model=Dict[str, Any])
 @cache_result(ttl=300)  # Cache for 5 minutes
 async def get_operations_dashboard(
-    date_range: str = Query("today", regex="^(today|week|month)$"),
+    date_range: str = Query("today", pattern="^(today|week|month)$"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ) -> Dict[str, Any]:

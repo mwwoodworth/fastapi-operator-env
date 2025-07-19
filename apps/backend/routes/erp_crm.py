@@ -542,7 +542,7 @@ async def get_communication_timeline(
 @require_permission(Permission.CRM_READ)
 @cache(key_builder=cache_key_builder)
 async def get_pipeline_analytics(
-    date_range: str = Query("30d", regex="^(7d|30d|90d|1y)$"),
+    date_range: str = Query("30d", pattern="^(7d|30d|90d|1y)$"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ) -> Dict[str, Any]:
