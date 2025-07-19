@@ -4,7 +4,7 @@ services:
     name: brainops-backend
     runtime: docker
     dockerfilePath: ./apps/backend/Dockerfile
-    repo: https://github.com/yourusername/fastapi-operator-env
+    repo: https://github.com/mwwoodworth/fastapi-operator-env
     branch: main
     rootDir: .
     envVars:
@@ -52,7 +52,7 @@ services:
     runtime: docker
     dockerfilePath: ./apps/backend/Dockerfile
     dockerCommand: celery -A celery_app worker --loglevel=info
-    repo: https://github.com/yourusername/fastapi-operator-env
+    repo: https://github.com/mwwoodworth/fastapi-operator-env
     branch: main
     rootDir: .
     envVars:
