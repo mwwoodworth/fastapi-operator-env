@@ -1,0 +1,178 @@
+[
+  {
+    "method": "GET",
+    "path": "/health",
+    "status": 200,
+    "success": true,
+    "data": {
+      "status": "healthy",
+      "version": "1.0.0",
+      "environment": "development"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/health",
+    "status": 404,
+    "success": false,
+    "data": {
+      "status": "error",
+      "message": "Not Found",
+      "request_id": "297905e8-1474-4b38-9059-6a93ac99788d"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/api/docs",
+    "status": 404,
+    "success": false,
+    "data": {
+      "status": "error",
+      "message": "Not Found",
+      "request_id": "63cd0282-d3ea-463f-b73a-9c15ebd83fe2"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/api/openapi.json",
+    "status": 404,
+    "success": false,
+    "data": {
+      "status": "error",
+      "message": "Not Found",
+      "request_id": "ec9a3e79-6bcf-41cf-8dd8-ea1dc2b31111"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/auth/register",
+    "status": 404,
+    "success": false,
+    "data": {
+      "status": "error",
+      "message": "Not Found",
+      "request_id": "4ae2c62b-2add-426d-b64e-c5fbcf887b9f"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/auth/login",
+    "status": 404,
+    "success": false,
+    "data": {
+      "status": "error",
+      "message": "Not Found",
+      "request_id": "985008b6-d590-4ba0-9a13-d037a1b6d538"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/users/me",
+    "status": 404,
+    "success": false,
+    "data": {
+      "status": "error",
+      "message": "Not Found",
+      "request_id": "5dcc4fcb-8725-4cc8-9d89-5c7ad308bf02"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/users",
+    "status": 404,
+    "success": false,
+    "data": {
+      "status": "error",
+      "message": "Not Found",
+      "request_id": "093c91d9-0b2f-44d5-adce-a2ac3ac5a977"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/projects",
+    "status": 404,
+    "success": false,
+    "data": {
+      "status": "error",
+      "message": "Not Found",
+      "request_id": "1c7c767c-ac62-4a85-9a79-69fff9714894"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/tasks",
+    "status": 404,
+    "success": false,
+    "data": {
+      "status": "error",
+      "message": "Not Found",
+      "request_id": "3781deed-8de2-4cb5-99e6-e6fbd99e5fe8"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ai/models",
+    "status": 404,
+    "success": false,
+    "data": {
+      "status": "error",
+      "message": "Not Found",
+      "request_id": "09c74bf8-8218-4ad6-a245-79fca9d4dffc"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ai/completions",
+    "status": 404,
+    "success": false,
+    "data": {
+      "status": "error",
+      "message": "Not Found",
+      "request_id": "206f355e-74eb-4fcf-a37d-2d014e08c773"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/webhooks",
+    "status": 404,
+    "success": false,
+    "data": {
+      "status": "error",
+      "message": "Not Found",
+      "request_id": "0bb3f471-dad2-49d8-8770-fc7c00349601"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/webhooks/health",
+    "status": 404,
+    "success": false,
+    "data": {
+      "status": "error",
+      "message": "Not Found",
+      "request_id": "2debe25e-ac5b-47c0-a598-cc2c5bd8def8"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/memory/collections",
+    "status": 404,
+    "success": false,
+    "data": {
+      "status": "error",
+      "message": "Not Found",
+      "request_id": "dad9899b-c267-44c2-9428-b758042e5970"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/memory/search",
+    "status": 404,
+    "success": false,
+    "data": {
+      "status": "error",
+      "message": "Not Found",
+      "request_id": "ee28ba23-0e9d-4a29-8e3c-4c77ce96b477"
+    }
+  }
+]

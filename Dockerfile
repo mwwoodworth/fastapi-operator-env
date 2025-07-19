@@ -16,8 +16,8 @@ RUN apt-get update && apt-get install -y \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Ensure pyotp is installed (in case it's missing from requirements)
-RUN pip install pyotp
+# Ensure pyotp, qrcode, and email-validator are installed (in case they're missing from requirements)
+RUN pip install pyotp qrcode[pil] email-validator
 
 # Copy entire project structure to maintain package hierarchy
 COPY . .

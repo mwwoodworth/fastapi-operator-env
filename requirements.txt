@@ -78,3 +78,5 @@ pre-commit==3.6.0
 mkdocs==1.5.3
 mkdocs-material==9.5.4
 pydoc-markdown==4.8.2
+qrcode[pil]==7.4.2
+email-validator==2.1.0.post1
