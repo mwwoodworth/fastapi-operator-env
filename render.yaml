@@ -33,6 +33,14 @@ services:
         sync: false
       - key: CLICKUP_API_TOKEN
         sync: false
+      - key: SECRET_KEY
+        generateValue: true
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      - key: APP_NAME
+        value: BrainOps
+      - key: ENVIRONMENT
+        value: production
     autoDeploy: true
 
   # Background Worker (commented out until celery_app is properly configured)
