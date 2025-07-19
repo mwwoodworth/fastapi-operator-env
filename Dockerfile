@@ -23,7 +23,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Install additional packages
-RUN pip install pyotp qrcode[pil] email-validator croniter opencv-python-headless boto3
+RUN pip install pyotp qrcode[pil] email-validator croniter opencv-python-headless boto3 anthropic
 
 # Copy entire project structure to maintain package hierarchy
 COPY . .
