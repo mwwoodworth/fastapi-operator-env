@@ -58,3 +58,4 @@ htmlcov/
 .cache/
 tmp/
 temp/test_venv/
+test_venv/
