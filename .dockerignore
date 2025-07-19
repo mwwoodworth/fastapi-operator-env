@@ -1,101 +1,53 @@
-# Virtual environments
-venv/
-env/
-.venv/
-
-# Python cache files
-**/__pycache__/
-**/*.pyc
-**/*.pyo
-**/*.pyd
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
 .Python
+env/
+venv/
+ENV/
+test_venv/
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.hypothesis/
 
-# IDEs and editors
+# Git
+.git/
+.gitignore
+
+# IDE
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
 
-# OS generated files
+# OS
 .DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
 Thumbs.db
 
-# Git
-.git/
-.gitignore
-.gitattributes
-
-# Logs
+# Project specific
 *.log
-logs/
-
-# Testing
-.coverage
-.pytest_cache/
-htmlcov/
-
-# Documentation
-docs/
-*.md
-README*
-
-# Build artifacts
-build/
+*.pid
+*.seed
+*.pid.lock
+.env.local
+.env.*.local
+node_modules/
 dist/
+build/
 *.egg-info/
 
-# Node.js (for any frontend components)
-node_modules/
-frontend/node_modules/
-myroofgenius-app/node_modules/
-
-# Docker files
-Dockerfile*
-docker-compose*.yml
-
-# Environment files (will be set via environment variables)
-.env
-.env.*
-
-# Database files
-*.db
-*.sqlite
-*.sqlite3
-
-# Temporary files
-temp/
-tmp/
-.tmp/
-
-# Other unnecessary directories
-tests/
-scripts/
-misc/
-
-# Specific problematic test files with apps.backend imports
-tests/agents.py
-tests/tasks.py
-tests/execution.py
-tests/integrations.py
-tests/memory.py
-
-# Test files
-test_*.py
-tests/test_*.py
-
-# Duplicate directories that should not exist
-fastapi-operator-env/
-brainops-ai-assistant/
-# Heavy or unused directories
-Reference/
-brainops-ai-ops-bot/
-test_env/
-frontend/
-myroofgenius-app/
-weathercraft/
+# Backend specific
+apps/backend/venv/
+apps/backend/.coverage*
+apps/backend/htmlcov/
+apps/backend/__pycache__/
+apps/backend/*.log
+apps/backend/*.pyc
+apps/backend/.pytest_cache/
+EOF < /dev/null
