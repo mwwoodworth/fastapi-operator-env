@@ -16,8 +16,8 @@ RUN apt-get update && apt-get install -y \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Ensure pyotp, qrcode, and email-validator are installed (in case they're missing from requirements)
-RUN pip install pyotp qrcode[pil] email-validator
+# Ensure pyotp, qrcode, email-validator, and croniter are installed (in case they're missing from requirements)
+RUN pip install pyotp qrcode[pil] email-validator croniter
 
 # Copy entire project structure to maintain package hierarchy
 COPY . .
