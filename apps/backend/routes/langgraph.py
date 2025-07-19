@@ -171,8 +171,8 @@ async def get_workflow_status(
 @require_permission(Permission.AUTOMATION_EXECUTE)
 async def resume_workflow(
     workflow_id: str,
-    checkpoint_id: Optional[str] = None,
     background_tasks: BackgroundTasks,
+    checkpoint_id: Optional[str] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ) -> Dict[str, Any]:

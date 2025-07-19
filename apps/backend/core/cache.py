@@ -15,9 +15,6 @@ logger = get_logger(__name__)
 # In production, would use Redis
 _cache_store = {}
 
-# Cache instance for backward compatibility
-cache = None
-
 def cache_key_builder(*args, **kwargs) -> str:
     """Build a cache key from function arguments."""
     key_parts = [str(arg) for arg in args]
@@ -25,12 +22,13 @@ def cache_key_builder(*args, **kwargs) -> str:
     return hashlib.md5(":".join(key_parts).encode()).hexdigest()
 
 
-def cache_result(ttl: int = 300):
+def cache_result(ttl: int = 300, key_builder: Optional[Callable] = None):
     """
     Decorator to cache function results.
     
     Args:
         ttl: Time to live in seconds (default: 5 minutes)
+        key_builder: Optional custom key builder function
     """
     def decorator(func: Callable) -> Callable:
         @wraps(func)
@@ -121,3 +119,7 @@ def _store_in_cache(key: str, value: Any, ttl: int):
         'value': value,
         'expires_at': datetime.utcnow() + timedelta(seconds=ttl)
     }
+
+
+# Alias for backward compatibility
+cache = cache_result

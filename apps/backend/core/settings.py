@@ -177,6 +177,11 @@ class Settings(BaseSettings):
     # SendGrid and AWS SES
     SENDGRID_API_KEY: Optional[str] = Field(default=None, env="SENDGRID_API_KEY")
     AWS_ACCESS_KEY_ID: Optional[str] = Field(default=None, env="AWS_ACCESS_KEY_ID")
+    
+    # Twilio SMS
+    TWILIO_ACCOUNT_SID: Optional[str] = Field(default=None, env="TWILIO_ACCOUNT_SID")
+    TWILIO_AUTH_TOKEN: Optional[str] = Field(default=None, env="TWILIO_AUTH_TOKEN")
+    TWILIO_FROM_NUMBER: Optional[str] = Field(default=None, env="TWILIO_FROM_NUMBER")
 
     # Monitoring
     SENTRY_DSN: Optional[str] = Field(default=None, env="SENTRY_DSN")
