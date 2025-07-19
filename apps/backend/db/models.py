@@ -167,6 +167,7 @@ class SystemConfig(Base):
     without redeploying the application.
     """
     __tablename__ = "system_config"
+    __table_args__ = {'extend_existing': True}
     
     key = Column(String(100), primary_key=True)
     value = Column(JSON, nullable=False)

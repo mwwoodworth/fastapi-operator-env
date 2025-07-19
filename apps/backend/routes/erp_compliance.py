@@ -29,9 +29,9 @@ from ..core.database import get_db
 from ..core.auth import get_current_user, require_admin
 from ..core.logging import get_logger
 from ..db.business_models import (
-    User, Team, Project, Document, Notification,
-    SystemConfig
+    User, Team, Project, Document, Notification
 )
+from ..db.models import SystemConfig
 from ..services.notifications import NotificationService, NotificationPriority
 from ..services.document_generator import DocumentGenerator
 from ..services.compliance_checker import ComplianceChecker
