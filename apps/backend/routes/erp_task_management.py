@@ -22,7 +22,7 @@ from enum import Enum
 
 from ..core.database import get_db
 from ..core.auth import get_current_user
-from ..core.permissions import require_permissions
+from ..core.permissions import require_permission
 from ..core.cache import cache_result, invalidate_cache
 from ..services.notifications import send_notification, NotificationType
 from ..core.audit import audit_log
@@ -958,7 +958,7 @@ async def complete_checklist_item(
 
 
 @router.post("/tasks/bulk-update", response_model=Dict[str, Any])
-@require_permissions(["task:bulk_update"])
+@require_permission("task:bulk_update")
 async def bulk_update_tasks(
     bulk_data: TaskBulkUpdate,
     background_tasks: BackgroundTasks,
