@@ -18,7 +18,7 @@ from ..agents.langgraph_orchestrator import (
     AgentRole, AgentNode, execute_analysis_workflow
 )
 from ..agents.claude_agent import ClaudeAgent
-from ..db.models import User
+from ..db.business_models import User
 
 
 client = TestClient(app)

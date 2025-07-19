@@ -14,8 +14,8 @@ from ..core.database import get_db
 from ..core.auth import get_current_user
 from ..core.rbac import check_permission, Permission
 from ..core.cache import cache, cache_key_builder
-from ..models import User
-from ..db.models import Project, Job, Estimate
+from ..db.business_models import User, Project, Estimate
+from ..db.financial_models import Job
 from ..db.financial_models import Invoice, Customer
 from ..services.weather import WeatherService
 from ..services.crew_scheduler import CrewScheduler

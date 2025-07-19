@@ -14,7 +14,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from ..main import app
-from ..db.models import User
+from ..db.business_models import User
 from ..db.financial_models import Customer, Invoice, Payment, Expense
 from ..db.crm_models import Lead, Opportunity, Contact, Activity
 from ..db.business_models import Project, ProjectTask
