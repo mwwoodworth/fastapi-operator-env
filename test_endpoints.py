@@ -13,17 +13,22 @@ TEST_CONFIGS = [
     {
         "name": "Render Direct",
         "base_url": "https://brainops-backend.onrender.com",
-        "headers": {"Host": "api.brainops.com"}
+        "headers": {"Host": "api.brainstackstudio.com"}
     },
     {
         "name": "API Domain",
-        "base_url": "https://api.brainops.com",
+        "base_url": "https://api.brainstackstudio.com",
+        "headers": {}
+    },
+    {
+        "name": "BrainStack Domain",
+        "base_url": "https://brainstackstudio.com",
         "headers": {}
     },
     {
         "name": "Local Docker",
         "base_url": "http://localhost:8001",
-        "headers": {"Host": "api.brainops.com"}
+        "headers": {"Host": "api.brainstackstudio.com"}
     }
 ]
 

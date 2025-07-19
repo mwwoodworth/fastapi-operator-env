@@ -6,11 +6,11 @@
       "response": "<html>\r\n<head><title>403 Forbidden</title></head>\r\n<body>\r\n<center><h1>403 Forbidden</h1></center>\r\n<hr><center>cloudflare</center>\r\n</body>\r\n</html>\r\n",
       "headers": {
         "Server": "cloudflare",
-        "Date": "Sat, 19 Jul 2025 05:24:41 GMT",
+        "Date": "Sat, 19 Jul 2025 05:35:21 GMT",
         "Content-Type": "text/html",
         "Content-Length": "151",
         "Connection": "keep-alive",
-        "CF-RAY": "9617cb3d2f6c1f4e-DEN"
+        "CF-RAY": "9617daddae4179a0-DEN"
       }
     },
     "/health": {
@@ -19,11 +19,11 @@
       "response": "<html>\r\n<head><title>403 Forbidden</title></head>\r\n<body>\r\n<center><h1>403 Forbidden</h1></center>\r\n<hr><center>cloudflare</center>\r\n</body>\r\n</html>\r\n",
       "headers": {
         "Server": "cloudflare",
-        "Date": "Sat, 19 Jul 2025 05:24:41 GMT",
+        "Date": "Sat, 19 Jul 2025 05:35:21 GMT",
         "Content-Type": "text/html",
         "Content-Length": "151",
         "Connection": "keep-alive",
-        "CF-RAY": "9617cb3db8ca51a6-DEN"
+        "CF-RAY": "9617dade3e9f1f46-DEN"
       }
     },
     "/health/detailed": {
@@ -32,11 +32,11 @@
       "response": "<html>\r\n<head><title>403 Forbidden</title></head>\r\n<body>\r\n<center><h1>403 Forbidden</h1></center>\r\n<hr><center>cloudflare</center>\r\n</body>\r\n</html>\r\n",
       "headers": {
         "Server": "cloudflare",
-        "Date": "Sat, 19 Jul 2025 05:24:41 GMT",
+        "Date": "Sat, 19 Jul 2025 05:35:21 GMT",
         "Content-Type": "text/html",
         "Content-Length": "151",
         "Connection": "keep-alive",
-        "CF-RAY": "9617cb3e4ddbe751-DEN"
+        "CF-RAY": "9617dadeba017b04-DEN"
       }
     },
     "/api/v1/health": {
@@ -45,11 +45,11 @@
       "response": "<html>\r\n<head><title>403 Forbidden</title></head>\r\n<body>\r\n<center><h1>403 Forbidden</h1></center>\r\n<hr><center>cloudflare</center>\r\n</body>\r\n</html>\r\n",
       "headers": {
         "Server": "cloudflare",
-        "Date": "Sat, 19 Jul 2025 05:24:41 GMT",
+        "Date": "Sat, 19 Jul 2025 05:35:21 GMT",
         "Content-Type": "text/html",
         "Content-Length": "151",
         "Connection": "keep-alive",
-        "CF-RAY": "9617cb3eecce1f2c-DEN"
+        "CF-RAY": "9617dadf4f2ee761-DEN"
       }
     },
     "/docs": {
@@ -58,11 +58,11 @@
       "response": "<html>\r\n<head><title>403 Forbidden</title></head>\r\n<body>\r\n<center><h1>403 Forbidden</h1></center>\r\n<hr><center>cloudflare</center>\r\n</body>\r\n</html>\r\n",
       "headers": {
         "Server": "cloudflare",
-        "Date": "Sat, 19 Jul 2025 05:24:41 GMT",
+        "Date": "Sat, 19 Jul 2025 05:35:21 GMT",
         "Content-Type": "text/html",
         "Content-Length": "151",
         "Connection": "keep-alive",
-        "CF-RAY": "9617cb3f7bf6798a-DEN"
+        "CF-RAY": "9617dadfdfd451df-DEN"
       }
     },
     "/openapi.json": {
@@ -71,11 +71,11 @@
       "response": "<html>\r\n<head><title>403 Forbidden</title></head>\r\n<body>\r\n<center><h1>403 Forbidden</h1></center>\r\n<hr><center>cloudflare</center>\r\n</body>\r\n</html>\r\n",
       "headers": {
         "Server": "cloudflare",
-        "Date": "Sat, 19 Jul 2025 05:24:41 GMT",
+        "Date": "Sat, 19 Jul 2025 05:35:21 GMT",
         "Content-Type": "text/html",
         "Content-Length": "151",
         "Connection": "keep-alive",
-        "CF-RAY": "9617cb400d35e771-DEN"
+        "CF-RAY": "9617dae0f927e74d-DEN"
       }
     },
     "/auth/register": {
@@ -84,11 +84,11 @@
       "response": "<html>\r\n<head><title>403 Forbidden</title></head>\r\n<body>\r\n<center><h1>403 Forbidden</h1></center>\r\n<hr><center>cloudflare</center>\r\n</body>\r\n</html>\r\n",
       "headers": {
         "Server": "cloudflare",
-        "Date": "Sat, 19 Jul 2025 05:24:41 GMT",
+        "Date": "Sat, 19 Jul 2025 05:35:21 GMT",
         "Content-Type": "text/html",
         "Content-Length": "151",
         "Connection": "keep-alive",
-        "CF-RAY": "9617cb409865e763-DEN"
+        "CF-RAY": "9617dae1ba70e66e-DEN"
       }
     },
     "/auth/login": {
@@ -97,11 +97,11 @@
       "response": "<html>\r\n<head><title>403 Forbidden</title></head>\r\n<body>\r\n<center><h1>403 Forbidden</h1></center>\r\n<hr><center>cloudflare</center>\r\n</body>\r\n</html>\r\n",
       "headers": {
         "Server": "cloudflare",
-        "Date": "Sat, 19 Jul 2025 05:24:41 GMT",
+        "Date": "Sat, 19 Jul 2025 05:35:21 GMT",
         "Content-Type": "text/html",
         "Content-Length": "151",
         "Connection": "keep-alive",
-        "CF-RAY": "9617cb41282be75b-DEN"
+        "CF-RAY": "9617dae24ec15202-DEN"
       }
     },
     "/erp/jobs": {
@@ -110,11 +110,11 @@
       "response": "<html>\r\n<head><title>403 Forbidden</title></head>\r\n<body>\r\n<center><h1>403 Forbidden</h1></center>\r\n<hr><center>cloudflare</center>\r\n</body>\r\n</html>\r\n",
       "headers": {
         "Server": "cloudflare",
-        "Date": "Sat, 19 Jul 2025 05:24:41 GMT",
+        "Date": "Sat, 19 Jul 2025 05:35:22 GMT",
         "Content-Type": "text/html",
         "Content-Length": "151",
         "Connection": "keep-alive",
-        "CF-RAY": "9617cb41b934e64f-DEN"
+        "CF-RAY": "9617dae2d95ce65f-DEN"
       }
     },
     "/erp/estimates": {
@@ -123,11 +123,11 @@
       "response": "<html>\r\n<head><title>403 Forbidden</title></head>\r\n<body>\r\n<center><h1>403 Forbidden</h1></center>\r\n<hr><center>cloudflare</center>\r\n</body>\r\n</html>\r\n",
       "headers": {
         "Server": "cloudflare",
-        "Date": "Sat, 19 Jul 2025 05:24:41 GMT",
+        "Date": "Sat, 19 Jul 2025 05:35:22 GMT",
         "Content-Type": "text/html",
         "Content-Length": "151",
         "Connection": "keep-alive",
-        "CF-RAY": "9617cb424af851f7-DEN"
+        "CF-RAY": "9617dae379081f39-DEN"
       }
     },
     "/crm/customers": {
@@ -136,11 +136,11 @@
       "response": "<html>\r\n<head><title>403 Forbidden</title></head>\r\n<body>\r\n<center><h1>403 Forbidden</h1></center>\r\n<hr><center>cloudflare</center>\r\n</body>\r\n</html>\r\n",
       "headers": {
         "Server": "cloudflare",
-        "Date": "Sat, 19 Jul 2025 05:24:42 GMT",
+        "Date": "Sat, 19 Jul 2025 05:35:22 GMT",
         "Content-Type": "text/html",
         "Content-Length": "151",
         "Connection": "keep-alive",
-        "CF-RAY": "9617cb42dbade749-DEN"
+        "CF-RAY": "9617dae40fd6e66b-DEN"
       }
     },
     "/marketplace/templates": {
@@ -149,11 +149,11 @@
       "response": "<html>\r\n<head><title>403 Forbidden</title></head>\r\n<body>\r\n<center><h1>403 Forbidden</h1></center>\r\n<hr><center>cloudflare</center>\r\n</body>\r\n</html>\r\n",
       "headers": {
         "Server": "cloudflare",
-        "Date": "Sat, 19 Jul 2025 05:24:42 GMT",
+        "Date": "Sat, 19 Jul 2025 05:35:22 GMT",
         "Content-Type": "text/html",
         "Content-Length": "151",
         "Connection": "keep-alive",
-        "CF-RAY": "9617cb436efce759-DEN"
+        "CF-RAY": "9617dae49b1279a2-DEN"
       }
     }
   },
@@ -207,17 +207,199 @@
       "success": false
     }
   },
+  "BrainStack Domain": {
+    "/": {
+      "status": 404,
+      "success": false,
+      "response": "The deployment could not be found on Vercel.\n\nDEPLOYMENT_NOT_FOUND\n\nsfo1::w2bhg-1752903323294-b8d7cfe23fe8\n",
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Content-Length": "107",
+        "Content-Type": "text/plain; charset=utf-8",
+        "Date": "Sat, 19 Jul 2025 05:35:23 GMT",
+        "Server": "Vercel",
+        "Strict-Transport-Security": "max-age=63072000",
+        "X-Vercel-Error": "DEPLOYMENT_NOT_FOUND",
+        "X-Vercel-Id": "sfo1::w2bhg-1752903323294-b8d7cfe23fe8"
+      }
+    },
+    "/health": {
+      "status": 404,
+      "success": false,
+      "response": "The deployment could not be found on Vercel.\n\nDEPLOYMENT_NOT_FOUND\n\nsfo1::hz6cz-1752903323467-304be57b9ac8\n",
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Content-Length": "107",
+        "Content-Type": "text/plain; charset=utf-8",
+        "Date": "Sat, 19 Jul 2025 05:35:23 GMT",
+        "Server": "Vercel",
+        "Strict-Transport-Security": "max-age=63072000",
+        "X-Vercel-Error": "DEPLOYMENT_NOT_FOUND",
+        "X-Vercel-Id": "sfo1::hz6cz-1752903323467-304be57b9ac8"
+      }
+    },
+    "/health/detailed": {
+      "status": 404,
+      "success": false,
+      "response": "The deployment could not be found on Vercel.\n\nDEPLOYMENT_NOT_FOUND\n\nsfo1::rtm64-1752903323633-08282e606d94\n",
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Content-Length": "107",
+        "Content-Type": "text/plain; charset=utf-8",
+        "Date": "Sat, 19 Jul 2025 05:35:23 GMT",
+        "Server": "Vercel",
+        "Strict-Transport-Security": "max-age=63072000",
+        "X-Vercel-Error": "DEPLOYMENT_NOT_FOUND",
+        "X-Vercel-Id": "sfo1::rtm64-1752903323633-08282e606d94"
+      }
+    },
+    "/api/v1/health": {
+      "status": 404,
+      "success": false,
+      "response": "The deployment could not be found on Vercel.\n\nDEPLOYMENT_NOT_FOUND\n\nsfo1::6gmz8-1752903323842-259d951beb3a\n",
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Content-Length": "107",
+        "Content-Type": "text/plain; charset=utf-8",
+        "Date": "Sat, 19 Jul 2025 05:35:23 GMT",
+        "Server": "Vercel",
+        "Strict-Transport-Security": "max-age=63072000",
+        "X-Vercel-Error": "DEPLOYMENT_NOT_FOUND",
+        "X-Vercel-Id": "sfo1::6gmz8-1752903323842-259d951beb3a"
+      }
+    },
+    "/docs": {
+      "status": 404,
+      "success": false,
+      "response": "The deployment could not be found on Vercel.\n\nDEPLOYMENT_NOT_FOUND\n\nsfo1::t7pll-1752903324009-934ece8ee393\n",
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Content-Length": "107",
+        "Content-Type": "text/plain; charset=utf-8",
+        "Date": "Sat, 19 Jul 2025 05:35:24 GMT",
+        "Server": "Vercel",
+        "Strict-Transport-Security": "max-age=63072000",
+        "X-Vercel-Error": "DEPLOYMENT_NOT_FOUND",
+        "X-Vercel-Id": "sfo1::t7pll-1752903324009-934ece8ee393"
+      }
+    },
+    "/openapi.json": {
+      "status": 404,
+      "success": false,
+      "response": "The deployment could not be found on Vercel.\n\nDEPLOYMENT_NOT_FOUND\n\nsfo1::264pv-1752903324184-992f5d556b3d\n",
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Content-Length": "107",
+        "Content-Type": "text/plain; charset=utf-8",
+        "Date": "Sat, 19 Jul 2025 05:35:24 GMT",
+        "Server": "Vercel",
+        "Strict-Transport-Security": "max-age=63072000",
+        "X-Vercel-Error": "DEPLOYMENT_NOT_FOUND",
+        "X-Vercel-Id": "sfo1::264pv-1752903324184-992f5d556b3d"
+      }
+    },
+    "/auth/register": {
+      "status": 404,
+      "success": false,
+      "response": "The deployment could not be found on Vercel.\n\nDEPLOYMENT_NOT_FOUND\n\nsfo1::6r9x5-1752903324351-acf21fcabab0\n",
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Content-Length": "107",
+        "Content-Type": "text/plain; charset=utf-8",
+        "Date": "Sat, 19 Jul 2025 05:35:24 GMT",
+        "Server": "Vercel",
+        "Strict-Transport-Security": "max-age=63072000",
+        "X-Vercel-Error": "DEPLOYMENT_NOT_FOUND",
+        "X-Vercel-Id": "sfo1::6r9x5-1752903324351-acf21fcabab0"
+      }
+    },
+    "/auth/login": {
+      "status": 404,
+      "success": false,
+      "response": "The deployment could not be found on Vercel.\n\nDEPLOYMENT_NOT_FOUND\n\nsfo1::994xj-1752903324511-c66604c2c33d\n",
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Content-Length": "107",
+        "Content-Type": "text/plain; charset=utf-8",
+        "Date": "Sat, 19 Jul 2025 05:35:24 GMT",
+        "Server": "Vercel",
+        "Strict-Transport-Security": "max-age=63072000",
+        "X-Vercel-Error": "DEPLOYMENT_NOT_FOUND",
+        "X-Vercel-Id": "sfo1::994xj-1752903324511-c66604c2c33d"
+      }
+    },
+    "/erp/jobs": {
+      "status": 404,
+      "success": false,
+      "response": "The deployment could not be found on Vercel.\n\nDEPLOYMENT_NOT_FOUND\n\nsfo1::6wwns-1752903324671-6b4456a27d59\n",
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Content-Length": "107",
+        "Content-Type": "text/plain; charset=utf-8",
+        "Date": "Sat, 19 Jul 2025 05:35:24 GMT",
+        "Server": "Vercel",
+        "Strict-Transport-Security": "max-age=63072000",
+        "X-Vercel-Error": "DEPLOYMENT_NOT_FOUND",
+        "X-Vercel-Id": "sfo1::6wwns-1752903324671-6b4456a27d59"
+      }
+    },
+    "/erp/estimates": {
+      "status": 404,
+      "success": false,
+      "response": "The deployment could not be found on Vercel.\n\nDEPLOYMENT_NOT_FOUND\n\nsfo1::hmrml-1752903324830-d4a8b66ed844\n",
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Content-Length": "107",
+        "Content-Type": "text/plain; charset=utf-8",
+        "Date": "Sat, 19 Jul 2025 05:35:24 GMT",
+        "Server": "Vercel",
+        "Strict-Transport-Security": "max-age=63072000",
+        "X-Vercel-Error": "DEPLOYMENT_NOT_FOUND",
+        "X-Vercel-Id": "sfo1::hmrml-1752903324830-d4a8b66ed844"
+      }
+    },
+    "/crm/customers": {
+      "status": 404,
+      "success": false,
+      "response": "The deployment could not be found on Vercel.\n\nDEPLOYMENT_NOT_FOUND\n\nsfo1::trgm7-1752903324991-319484237433\n",
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Content-Length": "107",
+        "Content-Type": "text/plain; charset=utf-8",
+        "Date": "Sat, 19 Jul 2025 05:35:24 GMT",
+        "Server": "Vercel",
+        "Strict-Transport-Security": "max-age=63072000",
+        "X-Vercel-Error": "DEPLOYMENT_NOT_FOUND",
+        "X-Vercel-Id": "sfo1::trgm7-1752903324991-319484237433"
+      }
+    },
+    "/marketplace/templates": {
+      "status": 404,
+      "success": false,
+      "response": "The deployment could not be found on Vercel.\n\nDEPLOYMENT_NOT_FOUND\n\nsfo1::plb9j-1752903325152-6533cbff950c\n",
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Content-Length": "107",
+        "Content-Type": "text/plain; charset=utf-8",
+        "Date": "Sat, 19 Jul 2025 05:35:25 GMT",
+        "Server": "Vercel",
+        "Strict-Transport-Security": "max-age=63072000",
+        "X-Vercel-Error": "DEPLOYMENT_NOT_FOUND",
+        "X-Vercel-Id": "sfo1::plb9j-1752903325152-6533cbff950c"
+      }
+    }
+  },
   "Local Docker": {
     "/": {
       "status": 200,
       "success": true,
       "response": "{\"service\":\"BrainOps Operator Service\",\"version\":\"1.0.0\",\"documentation\":\"Contact support for API documentation\",\"health\":\"/health\",\"status\":\"operational\"}",
       "headers": {
-        "date": "Sat, 19 Jul 2025 05:24:43 GMT",
+        "date": "Sat, 19 Jul 2025 05:35:24 GMT",
         "server": "uvicorn",
         "content-length": "155",
         "content-type": "application/json",
-        "x-request-id": "a2b58a62-a5bc-4e82-b643-d974534f4587"
+        "x-request-id": "1d9d805d-ccb4-4c8c-938f-8154f454fb5b"
       }
     },
     "/health": {
@@ -225,11 +407,11 @@
       "success": true,
       "response": "{\"status\":\"healthy\",\"version\":\"1.0.0\",\"environment\":\"production\"}",
       "headers": {
-        "date": "Sat, 19 Jul 2025 05:24:43 GMT",
+        "date": "Sat, 19 Jul 2025 05:35:24 GMT",
         "server": "uvicorn",
         "content-length": "65",
         "content-type": "application/json",
-        "x-request-id": "308d3996-c524-442e-9174-400482b3afd2"
+        "x-request-id": "25e13f46-bd62-46b1-8e9e-e93a252f563e"
       }
     },
     "/health/detailed": {
@@ -237,119 +419,119 @@
       "success": true,
       "response": "{\"status\":\"healthy\",\"version\":\"1.0.0\",\"environment\":\"production\",\"components\":{\"database\":\"healthy\",\"scheduler\":\"healthy\",\"ai_providers\":{\"openai\":\"healthy\",\"anthropic\":\"healthy\",\"google\":\"healthy\"},\"",
       "headers": {
-        "date": "Sat, 19 Jul 2025 05:24:43 GMT",
+        "date": "Sat, 19 Jul 2025 05:35:24 GMT",
         "server": "uvicorn",
         "content-length": "315",
         "content-type": "application/json",
-        "x-request-id": "49be3893-ea99-4d14-9731-687c33d239eb"
+        "x-request-id": "c7b63afe-2f2d-45c6-8e7f-d9af4dfed195"
       }
     },
     "/api/v1/health": {
       "status": 404,
       "success": false,
-      "response": "{\"status\":\"error\",\"message\":\"Not Found\",\"request_id\":\"098b1ea5-9ade-41c0-a2c4-ba50a70edb3e\"}",
+      "response": "{\"status\":\"error\",\"message\":\"Not Found\",\"request_id\":\"ae7ab4ba-2f4a-4df4-b29a-3a3bc1b5cf47\"}",
       "headers": {
-        "date": "Sat, 19 Jul 2025 05:24:43 GMT",
+        "date": "Sat, 19 Jul 2025 05:35:24 GMT",
         "server": "uvicorn",
         "content-length": "92",
         "content-type": "application/json",
-        "x-request-id": "098b1ea5-9ade-41c0-a2c4-ba50a70edb3e"
+        "x-request-id": "ae7ab4ba-2f4a-4df4-b29a-3a3bc1b5cf47"
       }
     },
     "/docs": {
       "status": 404,
       "success": false,
-      "response": "{\"status\":\"error\",\"message\":\"Not Found\",\"request_id\":\"1f14919d-fb7d-470e-935d-9e85b2484d7c\"}",
+      "response": "{\"status\":\"error\",\"message\":\"Not Found\",\"request_id\":\"c4cd109a-4ff5-419e-8731-fab8684e460f\"}",
       "headers": {
-        "date": "Sat, 19 Jul 2025 05:24:43 GMT",
+        "date": "Sat, 19 Jul 2025 05:35:24 GMT",
         "server": "uvicorn",
         "content-length": "92",
         "content-type": "application/json",
-        "x-request-id": "1f14919d-fb7d-470e-935d-9e85b2484d7c"
+        "x-request-id": "c4cd109a-4ff5-419e-8731-fab8684e460f"
       }
     },
     "/openapi.json": {
       "status": 404,
       "success": false,
-      "response": "{\"status\":\"error\",\"message\":\"Not Found\",\"request_id\":\"7e0d596d-2e49-4e91-8149-86361dbebbcd\"}",
+      "response": "{\"status\":\"error\",\"message\":\"Not Found\",\"request_id\":\"e09d6188-c3e9-4bfb-8350-ca6e2c0836f0\"}",
       "headers": {
-        "date": "Sat, 19 Jul 2025 05:24:43 GMT",
+        "date": "Sat, 19 Jul 2025 05:35:24 GMT",
         "server": "uvicorn",
         "content-length": "92",
         "content-type": "application/json",
-        "x-request-id": "7e0d596d-2e49-4e91-8149-86361dbebbcd"
+        "x-request-id": "e09d6188-c3e9-4bfb-8350-ca6e2c0836f0"
       }
     },
     "/auth/register": {
       "status": 404,
       "success": false,
-      "response": "{\"status\":\"error\",\"message\":\"Not Found\",\"request_id\":\"a13521a9-7634-4f79-8801-e61c15ae4e3b\"}",
+      "response": "{\"status\":\"error\",\"message\":\"Not Found\",\"request_id\":\"46b9364a-77f5-42a0-ae71-e38c4f6e8da2\"}",
       "headers": {
-        "date": "Sat, 19 Jul 2025 05:24:43 GMT",
+        "date": "Sat, 19 Jul 2025 05:35:24 GMT",
         "server": "uvicorn",
         "content-length": "92",
         "content-type": "application/json",
-        "x-request-id": "a13521a9-7634-4f79-8801-e61c15ae4e3b"
+        "x-request-id": "46b9364a-77f5-42a0-ae71-e38c4f6e8da2"
       }
     },
     "/auth/login": {
       "status": 404,
       "success": false,
-      "response": "{\"status\":\"error\",\"message\":\"Not Found\",\"request_id\":\"ff2aa80f-5168-4f5e-89ae-7ebd573242dd\"}",
+      "response": "{\"status\":\"error\",\"message\":\"Not Found\",\"request_id\":\"01bf592b-912f-408e-a63d-a8bec9eb076d\"}",
       "headers": {
-        "date": "Sat, 19 Jul 2025 05:24:43 GMT",
+        "date": "Sat, 19 Jul 2025 05:35:24 GMT",
         "server": "uvicorn",
         "content-length": "92",
         "content-type": "application/json",
-        "x-request-id": "ff2aa80f-5168-4f5e-89ae-7ebd573242dd"
+        "x-request-id": "01bf592b-912f-408e-a63d-a8bec9eb076d"
       }
     },
     "/erp/jobs": {
       "status": 404,
       "success": false,
-      "response": "{\"status\":\"error\",\"message\":\"Not Found\",\"request_id\":\"fbeec579-0a36-430f-9423-6c4dc10200d8\"}",
+      "response": "{\"status\":\"error\",\"message\":\"Not Found\",\"request_id\":\"c2f977b3-9351-4b9c-b080-0d3c110f0e32\"}",
       "headers": {
-        "date": "Sat, 19 Jul 2025 05:24:43 GMT",
+        "date": "Sat, 19 Jul 2025 05:35:24 GMT",
         "server": "uvicorn",
         "content-length": "92",
         "content-type": "application/json",
-        "x-request-id": "fbeec579-0a36-430f-9423-6c4dc10200d8"
+        "x-request-id": "c2f977b3-9351-4b9c-b080-0d3c110f0e32"
       }
     },
     "/erp/estimates": {
       "status": 404,
       "success": false,
-      "response": "{\"status\":\"error\",\"message\":\"Not Found\",\"request_id\":\"3340d1c6-6023-4354-9c73-d22b69017e9f\"}",
+      "response": "{\"status\":\"error\",\"message\":\"Not Found\",\"request_id\":\"c6cd907c-d982-4176-9fe1-5223adcb2702\"}",
       "headers": {
-        "date": "Sat, 19 Jul 2025 05:24:43 GMT",
+        "date": "Sat, 19 Jul 2025 05:35:24 GMT",
         "server": "uvicorn",
         "content-length": "92",
         "content-type": "application/json",
-        "x-request-id": "3340d1c6-6023-4354-9c73-d22b69017e9f"
+        "x-request-id": "c6cd907c-d982-4176-9fe1-5223adcb2702"
       }
     },
     "/crm/customers": {
       "status": 404,
       "success": false,
-      "response": "{\"status\":\"error\",\"message\":\"Not Found\",\"request_id\":\"0b6bc0a9-5ba8-4cd3-af08-ee15fd47bfe2\"}",
+      "response": "{\"status\":\"error\",\"message\":\"Not Found\",\"request_id\":\"525ec896-5235-4077-a98a-721c31a8083d\"}",
       "headers": {
-        "date": "Sat, 19 Jul 2025 05:24:43 GMT",
+        "date": "Sat, 19 Jul 2025 05:35:24 GMT",
         "server": "uvicorn",
         "content-length": "92",
         "content-type": "application/json",
-        "x-request-id": "0b6bc0a9-5ba8-4cd3-af08-ee15fd47bfe2"
+        "x-request-id": "525ec896-5235-4077-a98a-721c31a8083d"
       }
     },
     "/marketplace/templates": {
       "status": 404,
       "success": false,
-      "response": "{\"status\":\"error\",\"message\":\"Not Found\",\"request_id\":\"73480b8d-ffac-40d1-9e52-0a36cc742a60\"}",
+      "response": "{\"status\":\"error\",\"message\":\"Not Found\",\"request_id\":\"dd722409-565c-4aba-bef3-1884ef5f5b36\"}",
       "headers": {
-        "date": "Sat, 19 Jul 2025 05:24:43 GMT",
+        "date": "Sat, 19 Jul 2025 05:35:24 GMT",
         "server": "uvicorn",
         "content-length": "92",
         "content-type": "application/json",
-        "x-request-id": "73480b8d-ffac-40d1-9e52-0a36cc742a60"
+        "x-request-id": "dd722409-565c-4aba-bef3-1884ef5f5b36"
       }
     }
   }

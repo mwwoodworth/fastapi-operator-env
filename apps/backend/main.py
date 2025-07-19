@@ -130,7 +130,7 @@ app.add_middleware(GZipMiddleware, minimum_size=1000)
 if settings.ENVIRONMENT == "production":
     app.add_middleware(
         TrustedHostMiddleware,
-        allowed_hosts=["*.brainops.com", "brainops.com"]
+        allowed_hosts=["*.brainstackstudio.com", "brainstackstudio.com", "localhost", "*.onrender.com"]
     )
 
 
