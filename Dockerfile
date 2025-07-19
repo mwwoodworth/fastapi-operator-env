@@ -16,6 +16,8 @@ RUN apt-get update && apt-get install -y \
     libxext6 \
     libxrender-dev \
     libgomp1 \
+    tesseract-ocr \
+    tesseract-ocr-eng \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for better caching
@@ -23,7 +25,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Install additional packages
-RUN pip install pyotp qrcode[pil] email-validator croniter opencv-python-headless boto3 anthropic
+RUN pip install pyotp qrcode[pil] email-validator croniter opencv-python-headless boto3 anthropic pytesseract
 
 # Copy entire project structure to maintain package hierarchy
 COPY . .
