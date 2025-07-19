@@ -907,3 +907,25 @@ class AIUsageLog(Base):
         Index("idx_ai_usage_service_model", "service", "model"),
     )
 
+
+class SystemConfig(Base):
+    """
+    Model for storing system configuration and feature flags.
+    
+    Key-value store for runtime configuration that can be updated
+    without redeploying the application.
+    """
+    __tablename__ = "system_config"
+    
+    key = Column(String(100), primary_key=True)
+    value = Column(JSON, nullable=False)
+    description = Column(Text, nullable=True)
+    
+    # Configuration metadata
+    config_type = Column(String(50), default="general")  # general, feature_flag, integration
+    is_secret = Column(Boolean, default=False)
+    
+    # Audit fields
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_by = Column(String(100), nullable=True)
+
