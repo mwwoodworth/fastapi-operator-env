@@ -1072,7 +1072,7 @@ async def complete_quality_checkpoint(
         'current_phase': job.meta_data.get('phase')
     }
 
-@router.ws("/jobs/{job_id}/live")
+@router.websocket("/jobs/{job_id}/live")
 async def job_live_updates(
     websocket: WebSocket,
     job_id: str,

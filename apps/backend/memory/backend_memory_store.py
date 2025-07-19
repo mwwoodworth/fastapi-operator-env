@@ -51,6 +51,18 @@ async def save_refresh_token(*args, **kwargs):
     """Save refresh token stub."""
     return True
 
+async def get_prompt_template(*args, **kwargs):
+    """Get prompt template stub."""
+    return {
+        "template": "Default template for {task_type}",
+        "variables": ["task_type"],
+        "description": "Default template"
+    }
+
+async def save_search_results(*args, **kwargs):
+    """Save search results stub."""
+    return {"success": True, "id": "search_result_123"}
+
 async def invalidate_refresh_token(*args, **kwargs):
     """Invalidate refresh token stub."""
     return True

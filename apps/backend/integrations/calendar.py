@@ -74,3 +74,73 @@ class CalendarIntegration:
         """
         # Mock implementation
         return []
+
+
+class CalendarSync:
+    """Service for syncing calendar events with external systems."""
+    
+    def __init__(self):
+        self.integration = CalendarIntegration()
+        self.sync_status = {}
+    
+    async def sync_task_to_calendar(
+        self,
+        task_id: str,
+        user_id: str,
+        task_data: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Sync a task to the user's calendar."""
+        # Extract event details from task
+        start_time = task_data.get('scheduled_start', datetime.utcnow())
+        end_time = task_data.get('scheduled_end', datetime.utcnow())
+        title = task_data.get('title', 'Task')
+        description = task_data.get('description', '')
+        
+        # Create calendar event
+        result = await self.integration.create_event(
+            task_id=uuid.UUID(task_id),
+            user_id=uuid.UUID(user_id),
+            title=title,
+            start_time=start_time,
+            end_time=end_time,
+            description=description
+        )
+        
+        # Track sync status
+        self.sync_status[task_id] = {
+            'synced_at': datetime.utcnow(),
+            'calendar_event_id': result.get('event_id'),
+            'status': 'synced'
+        }
+        
+        return result
+    
+    async def remove_from_calendar(self, task_id: str) -> Dict[str, Any]:
+        """Remove a task from calendar."""
+        if task_id in self.sync_status:
+            event_id = self.sync_status[task_id].get('calendar_event_id')
+            if event_id:
+                result = await self.integration.delete_event(event_id)
+                del self.sync_status[task_id]
+                return result
+        
+        return {'status': 'not_found'}
+    
+    async def update_calendar_event(
+        self,
+        task_id: str,
+        updates: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Update calendar event for a task."""
+        if task_id in self.sync_status:
+            event_id = self.sync_status[task_id].get('calendar_event_id')
+            if event_id:
+                result = await self.integration.update_event(event_id, updates)
+                self.sync_status[task_id]['last_updated'] = datetime.utcnow()
+                return result
+        
+        return {'status': 'not_found'}
+    
+    def get_sync_status(self, task_id: str) -> Optional[Dict[str, Any]]:
+        """Get sync status for a task."""
+        return self.sync_status.get(task_id)

@@ -10,14 +10,20 @@ RUN apt-get update && apt-get install -y \
     g++ \
     libpq-dev \
     curl \
+    libgl1-mesa-glx \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender-dev \
+    libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for better caching
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Ensure pyotp, qrcode, email-validator, and croniter are installed (in case they're missing from requirements)
-RUN pip install pyotp qrcode[pil] email-validator croniter
+# Install additional packages
+RUN pip install pyotp qrcode[pil] email-validator croniter opencv-python-headless
 
 # Copy entire project structure to maintain package hierarchy
 COPY . .
