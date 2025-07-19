@@ -17,7 +17,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 import json
 
-from ..db.models import User
+from ..db.business_models import User
 from ..core.auth import get_current_user
 from ..core.database import get_db
 from ..core.rbac import Permission, require_permission

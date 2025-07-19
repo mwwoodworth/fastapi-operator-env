@@ -25,7 +25,7 @@ from langgraph.graph import StateGraph, END
 from langgraph.checkpoint import MemorySaver, CheckpointTuple
 from langgraph.pregel import Channel
 
-from ..db.models import User
+from ..db.business_models import User
 from ..core.database import get_db
 from ..core.logging import get_logger
 from ..memory.backend_memory_store import BackendMemoryStore

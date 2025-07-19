@@ -13,7 +13,7 @@ from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_, or_
 
-from ..db.models import User
+from ..db.business_models import User
 from ..db.financial_models import Customer
 from ..db.crm_models import (
     Lead, Opportunity, Contact, Communication, 
