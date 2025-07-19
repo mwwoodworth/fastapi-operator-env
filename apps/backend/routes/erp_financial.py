@@ -26,7 +26,8 @@ from ..core.rbac import Permission, require_permission, PermissionChecker
 from ..core.cache import cache_result, invalidate_cache
 from ..services.notifications import send_notification, NotificationType
 from ..core.audit import audit_log
-from ..db.business_models import User, UserRole, Project, Job, Estimate
+from ..db.business_models import User, UserRole, Project, Estimate
+from ..db.financial_models import Job
 from ..services.document_generator import DocumentGenerator
 from ..integrations.stripe import StripeService
 from ..integrations.quickbooks import QuickBooksService
